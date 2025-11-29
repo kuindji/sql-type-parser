@@ -1,0 +1,65 @@
+{
+  "name": "@kuindji/sql-type-parser",
+  "version": "1.0.0",
+  "description": "Type-level SQL SELECT parser for TypeScript",
+  "author": "kuindji",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuindji/sql-type-parser"
+  },
+  "homepage": "https://github.com/kuindji/sql-type-parser#readme",
+  "bugs": {
+    "url": "https://github.com/kuindji/sql-type-parser/issues"
+  },
+  "keywords": [
+    "typescript",
+    "sql",
+    "parser",
+    "type-level",
+    "ast",
+    "compile-time",
+    "type-safe",
+    "postgresql",
+    "query-builder",
+    "orm",
+    "database",
+    "types"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./examples": {
+      "types": "./dist/examples/index.d.ts",
+      "import": "./dist/examples/index.js",
+      "default": "./dist/examples/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "test": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

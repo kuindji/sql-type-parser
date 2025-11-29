@@ -1,0 +1,16 @@
+# Source files (dist is published instead)
+src/
+
+# Config files
+tsconfig.json
+tsconfig.build.json
+.gitignore
+
+# Development files
+node_modules/
+*.log
+.DS_Store
+
+# Lock files
+package-lock.json
+
