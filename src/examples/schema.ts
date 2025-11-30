@@ -24,9 +24,12 @@ type JSONObject = Record<string, unknown>
 
 /**
  * E-commerce database schema with users, products, orders, etc.
+ * Now with schema support - all tables are in the 'public' schema by default
  */
 export type ECommerceSchema = {
-  tables: {
+  defaultSchema: "public"
+  schemas: {
+    public: {
     // -------------------------------------------------------------------------
     // User Management
     // -------------------------------------------------------------------------
@@ -299,6 +302,7 @@ export type ECommerceSchema = {
       created_at: Timestamp
     }
   }
+  }
 }
 
 // ============================================================================
@@ -307,48 +311,52 @@ export type ECommerceSchema = {
 
 /**
  * Simple blog schema for basic examples
+ * Now with schema support - all tables are in the 'public' schema by default
  */
 export type BlogSchema = {
-  tables: {
-    users: {
-      id: number
-      name: string
-      email: string
-      role: "admin" | "author" | "reader"
-      is_active: boolean
-      created_at: string
-    }
-    
-    posts: {
-      id: number
-      author_id: number
-      title: string
-      slug: string
-      content: string
-      status: "draft" | "published" | "archived"
-      views: number
-      created_at: string
-      published_at: string | null
-    }
-    
-    comments: {
-      id: number
-      post_id: number
-      user_id: number
-      content: string
-      is_approved: boolean
-      created_at: string
-    }
-    
-    categories: {
-      id: number
-      name: string
-      parent_id: number | null
-    }
-    
-    post_categories: {
-      post_id: number
-      category_id: number
+  defaultSchema: "public"
+  schemas: {
+    public: {
+      users: {
+        id: number
+        name: string
+        email: string
+        role: "admin" | "author" | "reader"
+        is_active: boolean
+        created_at: string
+      }
+      
+      posts: {
+        id: number
+        author_id: number
+        title: string
+        slug: string
+        content: string
+        status: "draft" | "published" | "archived"
+        views: number
+        created_at: string
+        published_at: string | null
+      }
+      
+      comments: {
+        id: number
+        post_id: number
+        user_id: number
+        content: string
+        is_approved: boolean
+        created_at: string
+      }
+      
+      categories: {
+        id: number
+        name: string
+        parent_id: number | null
+      }
+      
+      post_categories: {
+        post_id: number
+        category_id: number
+      }
     }
   }
 }
@@ -359,30 +367,34 @@ export type BlogSchema = {
 
 /**
  * Schema with JSON/JSONB columns for testing complex expressions
+ * Now with schema support - all tables are in the 'public' schema by default
  */
 export type JsonSchema = {
-  tables: {
-    documents: {
-      id: number
-      data: JSONObject
-      metadata: JSONObject | null
-      tags: string[]
-      created_at: string
-    }
-    
-    events: {
-      id: number
-      type: string
-      payload: JSONObject
-      context: JSONObject | null
-      occurred_at: string
-    }
-    
-    settings: {
-      id: number
-      user_id: number
-      preferences: JSONObject
-      notifications: JSONObject
+  defaultSchema: "public"
+  schemas: {
+    public: {
+      documents: {
+        id: number
+        data: JSONObject
+        metadata: JSONObject | null
+        tags: string[]
+        created_at: string
+      }
+      
+      events: {
+        id: number
+        type: string
+        payload: JSONObject
+        context: JSONObject | null
+        occurred_at: string
+      }
+      
+      settings: {
+        id: number
+        user_id: number
+        preferences: JSONObject
+        notifications: JSONObject
+      }
     }
   }
 }
@@ -394,80 +406,152 @@ export type JsonSchema = {
 /**
  * Schema with camelCased and Mixed_Case column/table names
  * Tests identifier case preservation
+ * Now with schema support - all tables are in the 'public' schema by default
  */
 export type CamelCaseSchema = {
-  tables: {
-    // camelCase table name
-    userAccounts: {
-      id: number
+  defaultSchema: "public"
+  schemas: {
+    public: {
+      // camelCase table name
+      userAccounts: {
+        id: number
+        
+        // camelCased columns
+        firstName: string
+        lastName: string
+        emailAddress: string
+        phoneNumber: string | null
+        createdAt: string
+        updatedAt: string
+        isActive: boolean
+        
+        // Mixed_Case columns
+        Account_Status: "active" | "suspended" | "deleted"
+        Last_Login_Date: string | null
+      }
       
-      // camelCased columns
-      firstName: string
-      lastName: string
-      emailAddress: string
-      phoneNumber: string | null
-      createdAt: string
-      updatedAt: string
-      isActive: boolean
+      // PascalCase table name
+      OrderItems: {
+        id: number
+        orderId: number
+        productId: number
+        
+        // camelCased
+        unitPrice: number
+        totalPrice: number
+        discountAmount: number
+        
+        // Mixed_Case
+        Item_Status: "pending" | "shipped" | "delivered"
+        Created_At: string
+      }
       
-      // Mixed_Case columns
-      Account_Status: "active" | "suspended" | "deleted"
-      Last_Login_Date: string | null
-    }
-    
-    // PascalCase table name
-    OrderItems: {
-      id: number
-      orderId: number
-      productId: number
+      // Mixed_Case table name
+      Product_Categories: {
+        id: number
+        
+        // camelCased
+        categoryName: string
+        parentId: number | null
+        sortOrder: number
+        
+        // Mixed_Case
+        Is_Active: boolean
+        Display_Name: string
+      }
       
-      // camelCased
-      unitPrice: number
-      totalPrice: number
-      discountAmount: number
+      // Table with special characters (needs quoting)
+      "user-sessions": {
+        id: number
+        userId: number
+        sessionToken: string
+        expiresAt: string
+        "ip-address": string
+        "user-agent": string | null
+      }
       
-      // Mixed_Case
-      Item_Status: "pending" | "shipped" | "delivered"
-      Created_At: string
-    }
-    
-    // Mixed_Case table name
-    Product_Categories: {
-      id: number
-      
-      // camelCased
-      categoryName: string
-      parentId: number | null
-      sortOrder: number
-      
-      // Mixed_Case
-      Is_Active: boolean
-      Display_Name: string
-    }
-    
-    // Table with special characters (needs quoting)
-    "user-sessions": {
-      id: number
-      userId: number
-      sessionToken: string
-      expiresAt: string
-      "ip-address": string
-      "user-agent": string | null
-    }
-    
-    // Table with underscores in quoted form
-    "audit_logs": {
-      id: number
-      "user_id": number | null
-      action: string
-      "entity_type": string
-      "created_at": string
+      // Table with underscores in quoted form
+      "audit_logs": {
+        id: number
+        "user_id": number | null
+        action: string
+        "entity_type": string
+        "created_at": string
+      }
     }
   }
 }
 
 // Note: Quoted identifiers with spaces (e.g., "audit logs", "user id") are not supported
 // because the SQL tokenizer splits on spaces. Use hyphens or underscores instead.
+
+// ============================================================================
+// Multi-Schema Example
+// ============================================================================
+
+/**
+ * Example schema demonstrating multiple database schemas
+ * Shows how to organize tables across different schemas (public, audit, analytics)
+ */
+export type MultiSchemaExample = {
+  defaultSchema: "public"
+  schemas: {
+    /** Main application tables */
+    public: {
+      users: {
+        id: number
+        email: string
+        name: string
+        created_at: string
+      }
+      posts: {
+        id: number
+        user_id: number
+        title: string
+        content: string
+        created_at: string
+      }
+    }
+    /** Audit/logging tables */
+    audit: {
+      logs: {
+        id: number
+        user_id: number | null
+        action: string
+        table_name: string
+        record_id: number
+        old_data: JSONObject | null
+        new_data: JSONObject | null
+        created_at: string
+      }
+      sessions: {
+        id: number
+        user_id: number
+        ip_address: string
+        user_agent: string | null
+        started_at: string
+        ended_at: string | null
+      }
+    }
+    /** Analytics/reporting tables */
+    analytics: {
+      page_views: {
+        id: number
+        page: string
+        user_id: number | null
+        referrer: string | null
+        viewed_at: string
+      }
+      events: {
+        id: number
+        event_type: string
+        user_id: number | null
+        properties: JSONObject
+        occurred_at: string
+      }
+    }
+  }
+}
 
 // ============================================================================
 // Type Exports for Testing

@@ -10,17 +10,27 @@
  * ```typescript
  * import type { ParseSQL, QueryResult, ValidateSQL } from '@kuindji/sql-type-parser'
  *
- * // Define your schema
+ * // Define your schema with schema support
  * type Schema = {
- *   tables: {
- *     users: { id: number; name: string; email: string }
- *     orders: { id: number; user_id: number; total: number }
+ *   defaultSchema: "public",
+ *   schemas: {
+ *     public: {
+ *       users: { id: number; name: string; email: string }
+ *       orders: { id: number; user_id: number; total: number }
+ *     },
+ *     audit: {
+ *       logs: { id: number; user_id: number; action: string }
+ *     }
  *   }
  * }
  *
- * // Get typed query results
+ * // Get typed query results (uses default schema)
  * type Result = QueryResult<"SELECT id, name FROM users", Schema>
  * // Result: { id: number; name: string }
+ *
+ * // Query with explicit schema prefix
+ * type AuditResult = QueryResult<"SELECT id, action FROM audit.logs", Schema>
+ * // Result: { id: number; action: string }
  *
  * // Validate queries at compile time
  * type IsValid = ValidateSQL<"SELECT id FROM users", Schema>

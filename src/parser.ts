@@ -420,26 +420,64 @@ type ScanTokensForColumnRefs<
 
 /**
  * Try to extract a column reference from a single token
- * Handles: alias."col", alias."col"::type, "table"."col", "col", "col"::type
- * Also handles unquoted: table.col::type, col::type
+ * Handles: schema.table.col, alias."col", alias."col"::type, "table"."col", "col", "col"::type
+ * Also handles unquoted: schema.table.col::type, table.col::type, col::type
  */
 type ExtractColumnFromToken<T extends string> =
+  // First check for three-part identifier (schema.table.column)
+  ExtractThreePartColumnRef<T> extends infer ThreePart
+    ? [ThreePart] extends [never]
+      ? ExtractTwoPartOrSimpleColumnRef<T>
+      : ThreePart
+    : never
+
+/**
+ * Extract three-part column reference (schema.table.column)
+ */
+type ExtractThreePartColumnRef<T extends string> =
+  // Pattern: "schema"."table"."column"::type
+  T extends `"${infer Schema}"."${infer Table}"."${infer Col}"::${string}`
+    ? TableColumnRef<Table, Col, Schema>
+  : T extends `"${infer Schema}"."${infer Table}"."${infer Col}"`
+    ? TableColumnRef<Table, Col, Schema>
+  // Pattern: schema.table.column::type (unquoted)
+  : T extends `${infer Schema}.${infer Table}.${infer Col}::${string}`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? IsSimpleIdentifier<Table> extends true
+        ? TableColumnRef<Table, ExtractBeforeCast<Col>, Schema>
+        : never
+      : never
+  // Pattern: schema.table.column (unquoted, no cast)
+  : T extends `${infer Schema}.${infer Table}.${infer Col}`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? IsSimpleIdentifier<Table> extends true
+        ? IsSimpleIdentifier<Col> extends true
+          ? TableColumnRef<Table, Col, Schema>
+          : never
+        : never
+      : never
+  : never
+
+/**
+ * Extract two-part (table.column) or simple column reference
+ */
+type ExtractTwoPartOrSimpleColumnRef<T extends string> =
   // Pattern: alias."column"::type (with cast) - alias must be simple identifier
   T extends `${infer Alias}."${infer Col}"::${string}`
     ? IsSimpleIdentifier<Alias> extends true
-      ? TableColumnRef<Alias, Col>
+      ? TableColumnRef<Alias, Col, undefined>
       : never
   // Pattern: alias."column" (no cast)
   : T extends `${infer Alias}."${infer Col}"`
     ? IsSimpleIdentifier<Alias> extends true
-      ? TableColumnRef<Alias, Col>
+      ? TableColumnRef<Alias, Col, undefined>
       : never
   // Pattern: "table"."column"::type
   : T extends `"${infer Table}"."${infer Col}"::${string}`
-    ? TableColumnRef<Table, Col>
+    ? TableColumnRef<Table, Col, undefined>
   // Pattern: "table"."column"
   : T extends `"${infer Table}"."${infer Col}"`
-    ? TableColumnRef<Table, Col>
+    ? TableColumnRef<Table, Col, undefined>
   // Pattern: "column"::type (unbound column with cast)
   : T extends `"${infer Col}"::${string}`
     ? UnboundColumnRef<Col>
@@ -448,11 +486,22 @@ type ExtractColumnFromToken<T extends string> =
     ? UnboundColumnRef<Col>
   : T extends `"${infer Col}"->${string}`
     ? UnboundColumnRef<Col>
-  // Pattern: table.column::type (unquoted with cast)
+  // Pattern: table.column::type (unquoted with cast) - but NOT schema.table.column
   : T extends `${infer Table}.${infer Col}::${string}`
-    ? IsSimpleIdentifier<Table> extends true
-      ? TableColumnRef<Table, ExtractBeforeCast<Col>>
-      : never
+    ? Col extends `${string}.${string}`
+      ? never  // This is schema.table.column, handled above
+      : IsSimpleIdentifier<Table> extends true
+        ? TableColumnRef<Table, ExtractBeforeCast<Col>, undefined>
+        : never
+  // Pattern: table.column (unquoted, no cast) - but NOT schema.table.column  
+  : T extends `${infer Table}.${infer Col}`
+    ? Col extends `${string}.${string}`
+      ? never  // This is schema.table.column, handled above
+      : IsSimpleIdentifier<Table> extends true
+        ? IsSimpleIdentifier<Col> extends true
+          ? TableColumnRef<Table, Col, undefined>
+          : never
+        : never
   // Pattern: column::type (unquoted simple column with cast)
   : T extends `${infer Col}::${string}`
     ? IsSimpleIdentifier<ExtractBeforeCast<Col>> extends true
@@ -519,7 +568,7 @@ type StripTypeCast<T extends string> = T extends `${infer Col}::${string}`
   : T
 
 /**
- * Check if this is a table.* or alias.* pattern
+ * Check if this is a table.* or alias.* or schema.table.* pattern
  */
 type IsTableWildcard<T extends string> = Trim<T> extends `${string}.*`
   ? true
@@ -528,28 +577,160 @@ type IsTableWildcard<T extends string> = Trim<T> extends `${string}.*`
   : false
 
 /**
- * Parse a table.* wildcard into a TableWildcard type
+ * Parse a table.* or schema.table.* wildcard into a TableWildcard type
+ * Note: We use [X] extends [never] pattern due to TypeScript 5.9+ behavior
  */
-type ParseTableWildcard<T extends string> = Trim<T> extends `${infer Table}.*`
-  ? TableWildcard<RemoveQuotes<Table>>
+type ParseTableWildcard<T extends string> = 
+  // Check for schema.table.* pattern first
+  // Use [X] extends [never] pattern to properly handle never in TypeScript 5.9+
+  [ParseSchemaTableWildcard<Trim<T>>] extends [never]
+    ? ParseSimpleTableWildcard<T>
+    : ParseSchemaTableWildcard<Trim<T>> extends [infer Schema extends string, infer Table extends string]
+      ? TableWildcard<Table, Schema>
+      : ParseSimpleTableWildcard<T>
+
+/**
+ * Parse simple table.* pattern (no schema)
+ */
+type ParseSimpleTableWildcard<T extends string> =
+  Trim<T> extends `${infer Table}.*`
+    ? TableWildcard<RemoveQuotes<Table>, undefined>
   : Trim<T> extends `${infer Table}. *`
-  ? TableWildcard<RemoveQuotes<Table>>
+    ? TableWildcard<RemoveQuotes<Table>, undefined>
+  : never
+
+/**
+ * Parse schema.table.* pattern, returns [schema, table] or never
+ */
+type ParseSchemaTableWildcard<T extends string> =
+  // Pattern: "schema"."table".*
+  T extends `"${infer Schema}"."${infer Table}".*`
+    ? [Schema, Table]
+  : T extends `"${infer Schema}"."${infer Table}". *`
+    ? [Schema, Table]
+  // Pattern: "schema".table.*
+  : T extends `"${infer Schema}".${infer Table}.*`
+    ? IsSimpleIdentifier<Table> extends true
+      ? [Schema, Table]
+      : never
+  : T extends `"${infer Schema}".${infer Table}. *`
+    ? IsSimpleIdentifier<Table> extends true
+      ? [Schema, Table]
+      : never
+  // Pattern: schema."table".*
+  : T extends `${infer Schema}."${infer Table}".*`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? [Schema, Table]
+      : never
+  : T extends `${infer Schema}."${infer Table}". *`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? [Schema, Table]
+      : never
+  // Pattern: schema.table.* (check it has exactly 2 dots before *)
+  : T extends `${infer Part1}.${infer Part2}.*`
+    ? IsSimpleIdentifier<Part1> extends true
+      ? Part2 extends `${string}.${string}`
+        ? never  // More than 2 parts, not schema.table.*
+        : IsSimpleIdentifier<Part2> extends true
+          ? [Part1, Part2]
+          : never
+      : never
+  : T extends `${infer Part1}.${infer Part2}. *`
+    ? IsSimpleIdentifier<Part1> extends true
+      ? Part2 extends `${string}.${string}`
+        ? never
+        : IsSimpleIdentifier<Part2> extends true
+          ? [Part1, Part2]
+          : never
+      : never
   : never
 
 /**
  * Extract column name for default alias (removes quotes)
+ * For three-part identifiers (schema.table.column), extracts just the column
  */
-type ExtractColumnName<T extends string> = T extends `${infer _}.${infer Col}`
-  ? RemoveQuotes<Col>
+type ExtractColumnName<T extends string> = 
+  // Check for three-part: schema.table.column
+  T extends `${infer _}.${infer _2}.${infer Col}`
+    ? RemoveQuotes<Col>
+  // Check for two-part: table.column
+  : T extends `${infer _}.${infer Col}`
+    ? RemoveQuotes<Col>
+  // Single identifier
   : RemoveQuotes<T>
 
 /**
- * Parse a column reference (table.column or just column)
- * Removes quotes from both table and column names
+ * Parse a column reference (schema.table.column, table.column, or just column)
+ * Removes quotes from schema, table, and column names
+ * Note: We use [X] extends [never] pattern due to TypeScript 5.9+ behavior
  */
-type ParseColumnRefType<T extends string> = Trim<T> extends `${infer Table}.${infer Col}`
-  ? TableColumnRef<RemoveQuotes<Table>, RemoveQuotes<Col>>
+type ParseColumnRefType<T extends string> = 
+  // Check for three-part identifier: schema.table.column
+  // Use [X] extends [never] pattern to properly handle never in TypeScript 5.9+
+  [ParseThreePartIdentifier<Trim<T>>] extends [never]
+    ? ParseTwoOrOnePartIdentifier<T>
+    : ParseThreePartIdentifier<Trim<T>> extends [infer Schema extends string, infer Table extends string, infer Col extends string]
+      ? TableColumnRef<Table, Col, Schema>
+      : ParseTwoOrOnePartIdentifier<T>
+
+/**
+ * Parse two-part (table.column) or single-part (column) identifier
+ */
+type ParseTwoOrOnePartIdentifier<T extends string> =
+  // Check for two-part identifier: table.column
+  Trim<T> extends `${infer Table}.${infer Col}`
+    ? TableColumnRef<RemoveQuotes<Table>, RemoveQuotes<Col>, undefined>
+  // Single identifier: column
   : UnboundColumnRef<RemoveQuotes<T>>
+
+/**
+ * Parse a three-part identifier: schema.table.column
+ * Returns [schema, table, column] or never if not a three-part identifier
+ */
+type ParseThreePartIdentifier<T extends string> =
+  // Pattern: "schema"."table"."column"
+  T extends `"${infer Schema}"."${infer Table}"."${infer Col}"`
+    ? [Schema, Table, Col]
+  // Pattern: "schema"."table".column
+  : T extends `"${infer Schema}"."${infer Table}".${infer Col}`
+    ? [Schema, Table, RemoveQuotes<Col>]
+  // Pattern: "schema".table."column"
+  : T extends `"${infer Schema}".${infer Table}."${infer Col}"`
+    ? [Schema, RemoveQuotes<Table>, Col]
+  // Pattern: "schema".table.column
+  : T extends `"${infer Schema}".${infer Table}.${infer Col}`
+    ? IsSimpleIdentifier<Table> extends true
+      ? IsSimpleIdentifier<Col> extends true
+        ? [Schema, Table, Col]
+        : never
+      : never
+  // Pattern: schema."table"."column"
+  : T extends `${infer Schema}."${infer Table}"."${infer Col}"`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? [Schema, Table, Col]
+      : never
+  // Pattern: schema."table".column
+  : T extends `${infer Schema}."${infer Table}".${infer Col}`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? [Schema, Table, RemoveQuotes<Col>]
+      : never
+  // Pattern: schema.table."column"
+  : T extends `${infer Schema}.${infer Table}."${infer Col}"`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? IsSimpleIdentifier<Table> extends true
+        ? [Schema, Table, Col]
+        : never
+      : never
+  // Pattern: schema.table.column (all unquoted)
+  : T extends `${infer Part1}.${infer Part2}.${infer Part3}`
+    ? IsSimpleIdentifier<Part1> extends true
+      ? IsSimpleIdentifier<Part2> extends true
+        ? IsSimpleIdentifier<Part3> extends true
+          ? [Part1, Part2, Part3]
+          : never
+        : never
+      : never
+  : never
 
 // ============================================================================
 // FROM Clause Parser
@@ -603,16 +784,53 @@ type ParseDerivedTableAlias<T extends string> =
       : ParseError<"Expected alias for derived table">
 
 /**
- * Parse a table reference with optional alias
- * Removes quotes from both table name and alias
+ * Parse a table reference with optional schema and alias
+ * Handles: schema.table, table, schema.table AS alias, table AS alias
+ * Removes quotes from schema, table name, and alias
  */
-type ParseTableRef<T extends string> = Trim<T> extends `${infer Table} AS ${infer Alias}`
-  ? TableRef<RemoveQuotes<Table>, RemoveQuotes<Alias>>
-  : Trim<T> extends `${infer Table} ${infer Alias}`
-  ? Alias extends FromTerminators
-  ? TableRef<RemoveQuotes<Table>, RemoveQuotes<Table>>
-  : TableRef<RemoveQuotes<Table>, RemoveQuotes<Alias>>
-  : TableRef<RemoveQuotes<T>, RemoveQuotes<T>>
+type ParseTableRef<T extends string> = Trim<T> extends `${infer SchemaOrTable} AS ${infer Alias}`
+  ? ParseSchemaTable<SchemaOrTable> extends [infer Schema extends string | undefined, infer Table extends string]
+    ? TableRef<Table, RemoveQuotes<Alias>, Schema>
+    : TableRef<RemoveQuotes<SchemaOrTable>, RemoveQuotes<Alias>, undefined>
+  : Trim<T> extends `${infer SchemaOrTable} ${infer Alias}`
+    ? Alias extends FromTerminators
+      ? ParseSchemaTable<SchemaOrTable> extends [infer Schema extends string | undefined, infer Table extends string]
+        ? TableRef<Table, Table, Schema>
+        : TableRef<RemoveQuotes<SchemaOrTable>, RemoveQuotes<SchemaOrTable>, undefined>
+      : ParseSchemaTable<SchemaOrTable> extends [infer Schema extends string | undefined, infer Table extends string]
+        ? TableRef<Table, RemoveQuotes<Alias>, Schema>
+        : TableRef<RemoveQuotes<SchemaOrTable>, RemoveQuotes<Alias>, undefined>
+    : ParseSchemaTable<T> extends [infer Schema extends string | undefined, infer Table extends string]
+      ? TableRef<Table, Table, Schema>
+      : TableRef<RemoveQuotes<T>, RemoveQuotes<T>, undefined>
+
+/**
+ * Parse schema.table syntax, returns [schema, table] or [undefined, table]
+ * Handles: "schema"."table", schema.table, "table", table
+ */
+type ParseSchemaTable<T extends string> = 
+  // Pattern: "schema"."table"
+  Trim<T> extends `"${infer Schema}"."${infer Table}"`
+    ? [Schema, Table]
+  // Pattern: schema."table"
+  : Trim<T> extends `${infer Schema}."${infer Table}"`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? [Schema, Table]
+      : [undefined, RemoveQuotes<T>]
+  // Pattern: "schema".table
+  : Trim<T> extends `"${infer Schema}".${infer Table}`
+    ? IsSimpleIdentifier<Table> extends true
+      ? [Schema, RemoveQuotes<Table>]
+      : [undefined, RemoveQuotes<T>]
+  // Pattern: schema.table (both unquoted)
+  : Trim<T> extends `${infer Schema}.${infer Table}`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? IsSimpleIdentifier<Table> extends true
+        ? [Schema, Table]
+        : [undefined, RemoveQuotes<T>]
+      : [undefined, RemoveQuotes<T>]
+  // No schema, just table
+  : [undefined, RemoveQuotes<T>]
 
 // ============================================================================
 // Build Select Clause with Optional Parts

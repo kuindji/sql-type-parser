@@ -50,6 +50,8 @@ A TypeScript type-level parser that transforms SQL SELECT query string literals 
 | JSON operators       | ✅     | `data->>'key'`               |
 | Quoted identifiers   | ✅     | `"firstName"`, `"user-id"`   |
 | camelCase (quoted)   | ✅     | `"userAccounts"."firstName"` |
+| Schema prefix        | ✅     | `FROM public.users`          |
+| Cross-schema JOINs   | ✅     | `JOIN audit.logs ON...`      |
 
 ## Installation
 
@@ -73,19 +75,22 @@ import type {
 
 ```typescript
 type MySchema = {
-    tables: {
-        users: {
-            id: number;
-            name: string;
-            email: string;
-            role: "admin" | "user";
-            created_at: string;
-        };
-        orders: {
-            id: number;
-            user_id: number;
-            total: number;
-            status: "pending" | "completed";
+    defaultSchema: "public"; // Optional, defaults to first schema
+    schemas: {
+        public: {
+            users: {
+                id: number;
+                name: string;
+                email: string;
+                role: "admin" | "user";
+                created_at: string;
+            };
+            orders: {
+                id: number;
+                user_id: number;
+                total: number;
+                status: "pending" | "completed";
+            };
         };
     };
 };
@@ -203,6 +208,66 @@ type Multi = QueryResult<
     MySchema
 >;
 // Result: { name: string; total: number; product: string }
+```
+
+### Schema-Qualified Queries
+
+When your database has multiple schemas, you can use schema-qualified identifiers:
+
+```typescript
+// Multi-schema example
+type MultiSchema = {
+    defaultSchema: "public";
+    schemas: {
+        public: {
+            users: { id: number; name: string; email: string };
+            posts: { id: number; user_id: number; title: string };
+        };
+        audit: {
+            logs: { id: number; user_id: number; action: string; created_at: string };
+        };
+        analytics: {
+            events: { id: number; event_type: string; user_id: number };
+        };
+    };
+};
+
+// Query uses default schema (public) when no schema specified
+type DefaultSchema = QueryResult<"SELECT id, name FROM users", MultiSchema>;
+// Result: { id: number; name: string }
+
+// Explicit schema prefix
+type ExplicitSchema = QueryResult<"SELECT id, email FROM public.users", MultiSchema>;
+// Result: { id: number; email: string }
+
+// Query non-default schema
+type AuditSchema = QueryResult<
+    "SELECT id, action, created_at FROM audit.logs",
+    MultiSchema
+>;
+// Result: { id: number; action: string; created_at: string }
+
+// Cross-schema JOIN
+type CrossSchemaJoin = QueryResult<
+    `
+  SELECT u.name, al.action, al.created_at
+  FROM public.users AS u
+  INNER JOIN audit.logs AS al ON u.id = al.user_id
+`,
+    MultiSchema
+>;
+// Result: { name: string; action: string; created_at: string }
+
+// Schema-qualified column reference
+type SchemaColumn = QueryResult<
+    "SELECT public.users.name, audit.logs.action FROM public.users JOIN audit.logs ON public.users.id = audit.logs.user_id",
+    MultiSchema
+>;
+// Result: { name: string; action: string }
+
+// Schema.table.* wildcard
+type SchemaWildcard = QueryResult<"SELECT public.users.* FROM public.users", MultiSchema>;
+// Result: { id: number; name: string; email: string }
 ```
 
 ### Aggregates
@@ -511,13 +576,16 @@ type Error = MatchError<"Column 'x' not found">;
 
 #### `DatabaseSchema`
 
-Expected structure of a database schema.
+Expected structure of a database schema with schema support.
 
 ```typescript
 type Schema = {
-    tables: {
-        [tableName: string]: {
-            [columnName: string]: any;
+    defaultSchema?: string; // Optional, defaults to first schema key
+    schemas: {
+        [schemaName: string]: {
+            [tableName: string]: {
+                [columnName: string]: any;
+            };
         };
     };
 };

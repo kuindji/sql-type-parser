@@ -41,12 +41,39 @@ export type MatchError<Message extends string> = {
 // ============================================================================
 
 /**
- * Expected structure of a database schema
+ * Expected structure of a database schema with schema support
  * Uses a generic object constraint to allow interfaces without index signatures
+ * 
+ * Structure:
+ * {
+ *   schemas: {
+ *     public: { users: {...}, posts: {...} },
+ *     other: { ... }
+ *   },
+ *   defaultSchema?: "public" // optional, defaults to first schema key
+ * }
  */
 export type DatabaseSchema = {
-  tables: object
+  schemas: {
+    [schemaName: string]: {
+      [tableName: string]: object
+    }
+  }
+  defaultSchema?: string
 }
+
+/**
+ * Get the default schema name from a DatabaseSchema
+ * Uses defaultSchema if specified, otherwise uses the first schema key
+ */
+type GetDefaultSchema<Schema extends DatabaseSchema> = 
+  Schema["defaultSchema"] extends string
+    ? Schema["defaultSchema"]
+    : keyof Schema["schemas"] extends infer Keys
+      ? Keys extends string
+        ? Keys
+        : never
+      : never
 
 // ============================================================================
 // Main Matcher
@@ -182,9 +209,9 @@ type ExtractSingleColumnAsObject<
 > = Col extends ColumnRef<infer Ref, infer Alias>
   ? { [K in Alias]: ResolveColumnRef<Ref, Context, Schema> }
   : Col extends AggregateExpr<infer Func, infer Arg, infer Alias>
-    ? { [K in Alias]: GetAggregateResultType<Func, Arg, Context> }
-    : Col extends TableWildcard<infer TableOrAlias>
-      ? ResolveTableWildcard<TableOrAlias, Context>
+    ? { [K in Alias]: GetAggregateResultType<Func, Arg, Context, Schema> }
+    : Col extends TableWildcard<infer TableOrAlias, infer WildcardSchema>
+      ? ResolveTableWildcard<TableOrAlias, WildcardSchema, Context, Schema>
       : {}
 
 /**
@@ -219,23 +246,52 @@ type ResolveTableSource<
   CTEContext = {},
 > = Source extends DerivedTableRef<infer Query, infer Alias>
   ? ResolveDerivedTable<Query, Alias, Schema, CTEContext>
-  : Source extends TableRef<infer Table, infer Alias>
-    ? ResolveTableRefOrCTE<Table, Alias, Schema, CTEContext>
+  : Source extends TableRef<infer Table, infer Alias, infer TableSchema>
+    ? ResolveTableRefOrCTE<Table, Alias, TableSchema, Schema, CTEContext>
     : MatchError<"Invalid table source">
 
 /**
  * Resolve a table reference, checking CTEs first, then schema
+ * TableSchema is the schema specified in the query (undefined if not specified)
  */
 type ResolveTableRefOrCTE<
   Table extends string,
   Alias extends string,
+  TableSchema extends string | undefined,
   Schema extends DatabaseSchema,
   CTEContext,
 > = Table extends keyof CTEContext
   ? { [K in Alias]: CTEContext[Table] }
-  : Table extends keyof Schema["tables"]
-    ? { [K in Alias]: Schema["tables"][Table] }
-    : MatchError<`Table '${Table}' not found in schema`>
+  : ResolveTableInSchema<Table, Alias, TableSchema, Schema>
+
+/**
+ * Resolve a table within the database schema structure
+ * If TableSchema is undefined, use the default schema
+ * Note: We check for undefined first due to TypeScript 5.9+ behavior where
+ * `undefined extends string` can be true in some contexts
+ */
+type ResolveTableInSchema<
+  Table extends string,
+  Alias extends string,
+  TableSchema extends string | undefined,
+  Schema extends DatabaseSchema,
+> = TableSchema extends undefined
+  // No schema specified, use default
+  ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
+    ? DefaultSchema extends keyof Schema["schemas"]
+      ? Table extends keyof Schema["schemas"][DefaultSchema]
+        ? { [K in Alias]: Schema["schemas"][DefaultSchema][Table] }
+        : MatchError<`Table '${Table}' not found in default schema '${DefaultSchema}'`>
+      : MatchError<`Default schema not found`>
+    : MatchError<`Cannot determine default schema`>
+  // Explicit schema specified
+  : TableSchema extends string
+    ? TableSchema extends keyof Schema["schemas"]
+      ? Table extends keyof Schema["schemas"][TableSchema]
+        ? { [K in Alias]: Schema["schemas"][TableSchema][Table] }
+        : MatchError<`Table '${Table}' not found in schema '${TableSchema}'`>
+      : MatchError<`Schema '${TableSchema}' not found`>
+    : MatchError<`Invalid schema type`>
 
 /**
  * Resolve a derived table (subquery in FROM)
@@ -262,10 +318,8 @@ type ResolveDerivedTable<
 type ResolveTableRef<
   Ref extends TableRef,
   Schema extends DatabaseSchema,
-> = Ref extends TableRef<infer Table, infer Alias>
-  ? Table extends keyof Schema["tables"]
-  ? { [K in Alias]: Schema["tables"][Table] }
-  : MatchError<`Table '${Table}' not found in schema`>
+> = Ref extends TableRef<infer Table, infer Alias, infer TableSchema>
+  ? ResolveTableInSchema<Table, Alias, TableSchema, Schema>
   : never
 
 /**
@@ -351,21 +405,43 @@ type MatchSingleColumn<
       ? { [K in Alias]: ColType }
       : { [K in Alias]: ColType }
     : never
-  : Col extends TableWildcard<infer TableOrAlias>
-    ? ResolveTableWildcard<TableOrAlias, Context>
+  : Col extends TableWildcard<infer TableOrAlias, infer WildcardSchema>
+    ? ResolveTableWildcard<TableOrAlias, WildcardSchema, Context, Schema>
     : Col extends AggregateExpr<infer Func, infer Arg, infer Alias>
-      ? { [K in Alias]: GetAggregateResultType<Func, Arg, Context> }
+      ? { [K in Alias]: GetAggregateResultType<Func, Arg, Context, Schema> }
       : MatchError<"Unknown column type">
 
 /**
- * Resolve a table.* or alias.* wildcard to all columns from that table
+ * Resolve a table.* or alias.* or schema.table.* wildcard to all columns from that table
+ * Note: We check for undefined first due to TypeScript 5.9+ behavior
  */
 type ResolveTableWildcard<
   TableOrAlias extends string,
+  WildcardSchema extends string | undefined,
   Context,
-> = TableOrAlias extends keyof Context
-  ? Context[TableOrAlias]
-  : MatchError<`Table or alias '${TableOrAlias}' not found`>
+  Schema extends DatabaseSchema = DatabaseSchema,
+> = WildcardSchema extends undefined
+  // No schema specified - use context
+  ? TableOrAlias extends keyof Context
+    ? Context[TableOrAlias]
+    : MatchError<`Table or alias '${TableOrAlias}' not found`>
+  // Schema-qualified: schema.table.* - look up directly in schema
+  : WildcardSchema extends string
+    ? ResolveSchemaTableWildcard<WildcardSchema, TableOrAlias, Schema>
+    : MatchError<`Invalid schema type`>
+
+/**
+ * Resolve schema.table.* wildcard directly from schema
+ */
+type ResolveSchemaTableWildcard<
+  SchemaName extends string,
+  TableName extends string,
+  Schema extends DatabaseSchema,
+> = SchemaName extends keyof Schema["schemas"]
+  ? TableName extends keyof Schema["schemas"][SchemaName]
+    ? Schema["schemas"][SchemaName][TableName]
+    : MatchError<`Table '${TableName}' not found in schema '${SchemaName}'`>
+  : MatchError<`Schema '${SchemaName}' not found`>
 
 /**
  * Resolve a column reference to its type
@@ -377,9 +453,9 @@ type ResolveColumnRef<
 > = Ref extends SubqueryExpr<infer Query, infer CastType>
   ? ResolveSubqueryExpr<Query, CastType, Context, Schema>
   : Ref extends ComplexExpr<infer ColumnRefs, infer CastType>
-  ? ResolveComplexExpr<ColumnRefs, CastType, Context>
-  : Ref extends TableColumnRef<infer Table, infer Column>
-  ? ResolveTableColumn<Table, Column, Context>
+  ? ResolveComplexExpr<ColumnRefs, CastType, Context, Schema>
+  : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+  ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
   : Ref extends UnboundColumnRef<infer Column>
   ? ResolveUnboundColumn<Column, Context>
   : MatchError<"Invalid column reference">
@@ -392,7 +468,8 @@ type ResolveComplexExpr<
   ColumnRefs,
   CastType,
   Context,
-> = ValidateAllColumnRefs<ColumnRefs, Context> extends infer ValidationResult
+  Schema extends DatabaseSchema = DatabaseSchema,
+> = ValidateAllColumnRefs<ColumnRefs, Context, Schema> extends infer ValidationResult
   ? ValidationResult extends MatchError<string>
     ? ValidationResult
     : CastType extends string
@@ -481,7 +558,7 @@ type MatchSingleSubqueryColumn<
 > = Col extends ColumnRef<infer Ref, infer _Alias>
   ? ResolveColumnRef<Ref, Context, Schema>
   : Col extends AggregateExpr<infer Func, infer Arg, infer _Alias>
-  ? GetAggregateResultType<Func, Arg, Context>
+  ? GetAggregateResultType<Func, Arg, Context, Schema>
   : unknown
 
 /**
@@ -491,33 +568,58 @@ type MatchSingleSubqueryColumn<
 type ValidateAllColumnRefs<
   ColumnRefs,
   Context,
+  Schema extends DatabaseSchema = DatabaseSchema,
 > = ColumnRefs extends []
   ? true
   : ColumnRefs extends [infer First, ...infer Rest]
-    ? ValidateSingleColumnRef<First, Context> extends infer FirstResult
+    ? ValidateSingleColumnRef<First, Context, Schema> extends infer FirstResult
       ? FirstResult extends MatchError<string>
         ? FirstResult
-        : ValidateAllColumnRefs<Rest, Context>
+        : ValidateAllColumnRefs<Rest, Context, Schema>
       : never
     : true
 
 /**
  * Validate a single column reference exists in context
+ * Note: We check for undefined first due to TypeScript 5.9+ behavior
  */
 type ValidateSingleColumnRef<
   Ref,
   Context,
-> = Ref extends TableColumnRef<infer Table, infer Column>
-  ? Table extends keyof Context
-    ? Context[Table] extends infer TableType
-      ? Column extends keyof TableType
-        ? true
-        : MatchError<`Column '${Column}' not found in '${Table}'`>
-      : never
-    : MatchError<`Table or alias '${Table}' not found`>
+  Schema extends DatabaseSchema = DatabaseSchema,
+> = Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+  ? ColSchema extends undefined
+    // Use context
+    ? Table extends keyof Context
+      ? Context[Table] extends infer TableType
+        ? Column extends keyof TableType
+          ? true
+          : MatchError<`Column '${Column}' not found in '${Table}'`>
+        : never
+      : MatchError<`Table or alias '${Table}' not found`>
+    // Schema-qualified: validate directly against schema
+    : ColSchema extends string
+      ? ValidateSchemaTableColumn<ColSchema, Table, Column, Schema>
+      : MatchError<`Invalid schema type`>
   : Ref extends UnboundColumnRef<infer Column>
     ? FindColumnExists<Column, Context, keyof Context>
     : true
+
+/**
+ * Validate a schema.table.column reference exists
+ */
+type ValidateSchemaTableColumn<
+  SchemaName extends string,
+  TableName extends string,
+  ColumnName extends string,
+  Schema extends DatabaseSchema,
+> = SchemaName extends keyof Schema["schemas"]
+  ? TableName extends keyof Schema["schemas"][SchemaName]
+    ? ColumnName extends keyof Schema["schemas"][SchemaName][TableName]
+      ? true
+      : MatchError<`Column '${ColumnName}' not found in '${SchemaName}.${TableName}'`>
+    : MatchError<`Table '${TableName}' not found in schema '${SchemaName}'`>
+  : MatchError<`Schema '${SchemaName}' not found`>
 
 /**
  * Check if an unbound column exists in any table
@@ -551,19 +653,45 @@ type MapSQLTypeToTS<T extends string> =
   unknown
 
 /**
- * Resolve a table-qualified column (table.column or alias.column)
+ * Resolve a table-qualified column (table.column, alias.column, or schema.table.column)
+ * ColSchema is the schema from the query (undefined if not specified)
+ * Note: We check for undefined first due to TypeScript 5.9+ behavior
  */
 type ResolveTableColumn<
   TableOrAlias extends string,
   Column extends string,
+  ColSchema extends string | undefined,
   Context,
-> = TableOrAlias extends keyof Context
-  ? Context[TableOrAlias] extends infer Table
-  ? Column extends keyof Table
-  ? Table[Column]
-  : MatchError<`Column '${Column}' not found in '${TableOrAlias}'`>
-  : never
-  : MatchError<`Table or alias '${TableOrAlias}' not found`>
+  Schema extends DatabaseSchema = DatabaseSchema,
+> = ColSchema extends undefined
+  // No schema specified - use context (which already has resolved aliases)
+  ? TableOrAlias extends keyof Context
+    ? Context[TableOrAlias] extends infer Table
+      ? Column extends keyof Table
+        ? Table[Column]
+        : MatchError<`Column '${Column}' not found in '${TableOrAlias}'`>
+      : never
+    : MatchError<`Table or alias '${TableOrAlias}' not found`>
+  // Schema-qualified: schema.table.column - look up directly in schema
+  : ColSchema extends string
+    ? ResolveSchemaTableColumn<ColSchema, TableOrAlias, Column, Schema>
+    : MatchError<`Invalid schema type`>
+
+/**
+ * Resolve a fully qualified schema.table.column reference directly from schema
+ */
+type ResolveSchemaTableColumn<
+  SchemaName extends string,
+  TableName extends string,
+  ColumnName extends string,
+  Schema extends DatabaseSchema,
+> = SchemaName extends keyof Schema["schemas"]
+  ? TableName extends keyof Schema["schemas"][SchemaName]
+    ? ColumnName extends keyof Schema["schemas"][SchemaName][TableName]
+      ? Schema["schemas"][SchemaName][TableName][ColumnName]
+      : MatchError<`Column '${ColumnName}' not found in '${SchemaName}.${TableName}'`>
+    : MatchError<`Table '${TableName}' not found in schema '${SchemaName}'`>
+  : MatchError<`Schema '${SchemaName}' not found`>
 
 /**
  * Resolve an unbound column by searching all tables in context
@@ -602,13 +730,14 @@ type GetAggregateResultType<
   Func extends string,
   Arg,
   Context,
+  Schema extends DatabaseSchema = DatabaseSchema,
 > = Func extends "COUNT"
   ? number
   : Func extends "SUM" | "AVG"
   ? Arg extends "*"
   ? number
-  : Arg extends TableColumnRef<infer T, infer C>
-  ? ResolveTableColumn<T, C, Context> extends number
+  : Arg extends TableColumnRef<infer T, infer C, infer ColSchema>
+  ? ResolveTableColumn<T, C, ColSchema, Context, Schema> extends number
   ? number
   : MatchError<`SUM/AVG requires numeric column`>
   : Arg extends UnboundColumnRef<infer C>
@@ -619,8 +748,8 @@ type GetAggregateResultType<
   : Func extends "MIN" | "MAX"
   ? Arg extends "*"
   ? unknown
-  : Arg extends TableColumnRef<infer T, infer C>
-  ? ResolveTableColumn<T, C, Context>
+  : Arg extends TableColumnRef<infer T, infer C, infer ColSchema>
+  ? ResolveTableColumn<T, C, ColSchema, Context, Schema>
   : Arg extends UnboundColumnRef<infer C>
   ? ResolveUnboundColumn<C, Context>
   : unknown

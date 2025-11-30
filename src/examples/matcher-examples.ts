@@ -626,6 +626,103 @@ type ComplexCamelCase = QueryResult<`
 // Result: { firstName: string; lastName: string; Account_Status: "active" | "suspended" | "deleted"; Last_Login_Date: string | null; unitPrice: number; Item_Status: "pending" | "shipped" | "delivered"; categoryDisplay: string }
 
 // ============================================================================
+// 23. Schema-Qualified Queries
+// ============================================================================
+
+import type { MultiSchemaExample } from "./schema.js"
+
+/** Query table from default schema (public) */
+type DefaultSchemaQuery = QueryResult<
+  "SELECT id, name, email FROM users",
+  MultiSchemaExample
+>
+// Result: { id: number; name: string; email: string }
+
+/** Query table with explicit schema prefix */
+type ExplicitSchemaQuery = QueryResult<
+  "SELECT id, email FROM public.users",
+  MultiSchemaExample
+>
+// Result: { id: number; email: string }
+
+/** Query table from non-default schema */
+type AuditSchemaQuery = QueryResult<
+  "SELECT id, action, table_name FROM audit.logs",
+  MultiSchemaExample
+>
+// Result: { id: number; action: string; table_name: string }
+
+/** Query analytics schema */
+type AnalyticsSchemaQuery = QueryResult<
+  "SELECT id, page, viewed_at FROM analytics.page_views",
+  MultiSchemaExample
+>
+// Result: { id: number; page: string; viewed_at: string }
+
+/** Cross-schema JOIN */
+type CrossSchemaJoin = QueryResult<`
+  SELECT 
+    u.name AS user_name,
+    u.email,
+    al.action,
+    al.created_at AS log_time
+  FROM public.users AS u
+  INNER JOIN audit.logs AS al ON u.id = al.user_id
+`, MultiSchemaExample>
+// Result: { user_name: string; email: string; action: string; log_time: string }
+
+/** Mix schema-qualified and alias-qualified columns */
+type MixedQualifiers = QueryResult<`
+  SELECT 
+    public.users.id AS user_id,
+    u.name,
+    audit.logs.action
+  FROM public.users AS u
+  INNER JOIN audit.logs ON u.id = audit.logs.user_id
+`, MultiSchemaExample>
+// Result: { user_id: number; name: string; action: string } - note: schema.table.column defaults to column name only
+
+/** Schema-qualified wildcard */
+type SchemaWildcard = QueryResult<
+  "SELECT public.users.* FROM public.users",
+  MultiSchemaExample
+>
+// Result: { id: number; email: string; name: string; created_at: string }
+
+/** Multiple schema tables in single query */
+type MultiSchemaQuery = QueryResult<`
+  SELECT 
+    p.title AS post_title,
+    pv.page,
+    e.event_type
+  FROM public.posts AS p
+  LEFT JOIN analytics.page_views AS pv ON pv.page = p.title
+  LEFT JOIN analytics.events AS e ON e.user_id = p.user_id
+`, MultiSchemaExample>
+// Result: { post_title: string; page: string; event_type: string }
+
+/** Validate schema-qualified query */
+type ValidSchemaQuery = ValidateSQL<
+  "SELECT id, action FROM audit.logs",
+  MultiSchemaExample
+>
+// Result: true
+
+/** Invalid schema produces error */
+type InvalidSchemaError = ValidateSQL<
+  "SELECT id FROM nonexistent.users",
+  MultiSchemaExample
+>
+// Result: "Schema 'nonexistent' not found"
+
+/** Invalid table in valid schema produces error */
+type InvalidTableInSchemaError = ValidateSQL<
+  "SELECT id FROM audit.nonexistent",
+  MultiSchemaExample
+>
+// Result: "Table 'nonexistent' not found in schema 'audit'"
+
+// ============================================================================
 // Type Verification
 // ============================================================================
 

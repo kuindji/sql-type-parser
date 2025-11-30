@@ -17,13 +17,15 @@ export type UnboundColumnRef<Column extends string = string> = {
 }
 
 /**
- * A column reference with an identified table
+ * A column reference with an identified table and optional schema
  */
 export type TableColumnRef<
   Table extends string = string,
   Column extends string = string,
+  Schema extends string | undefined = string | undefined,
 > = {
   readonly type: "TableColumnRef"
+  readonly schema: Schema
   readonly table: Table
   readonly column: Column
 }
@@ -34,10 +36,14 @@ export type TableColumnRef<
 export type ValidatableColumnRef = UnboundColumnRef | TableColumnRef
 
 /**
- * A wildcard selection for a specific table (table.* or alias.*)
+ * A wildcard selection for a specific table (table.* or alias.* or schema.table.*)
  */
-export type TableWildcard<TableOrAlias extends string = string> = {
+export type TableWildcard<
+  TableOrAlias extends string = string,
+  Schema extends string | undefined = string | undefined,
+> = {
   readonly type: "TableWildcard"
+  readonly schema: Schema
   readonly table: TableOrAlias
 }
 
@@ -104,13 +110,15 @@ export type ColumnRef<
 // ============================================================================
 
 /**
- * A reference to a table
+ * A reference to a table with optional schema
  */
 export type TableRef<
   Table extends string = string,
   Alias extends string = Table,
+  Schema extends string | undefined = string | undefined,
 > = {
   readonly type: "TableRef"
+  readonly schema: Schema
   readonly table: Table
   readonly alias: Alias
 }
