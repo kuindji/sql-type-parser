@@ -400,20 +400,23 @@ In SQL, unquoted identifiers are case-insensitive and typically lowercased by th
 ```typescript
 // Schema with camelCase columns
 type MySchema = {
-    tables: {
-        userAccounts: {
-            id: number;
-            firstName: string;
-            lastName: string;
-            emailAddress: string;
-            createdAt: string;
-            Account_Status: "active" | "suspended";
-        };
-        OrderItems: {
-            id: number;
-            orderId: number;
-            unitPrice: number;
-            Item_Status: "pending" | "shipped";
+    defaultSchema: "public";
+    schemas: {
+        public: {
+            userAccounts: {
+                id: number;
+                firstName: string;
+                lastName: string;
+                emailAddress: string;
+                createdAt: string;
+                Account_Status: "active" | "suspended";
+            };
+            OrderItems: {
+                id: number;
+                orderId: number;
+                unitPrice: number;
+                Item_Status: "pending" | "shipped";
+            };
         };
     };
 };
@@ -492,11 +495,14 @@ type SpacedAlias = QueryResult<
 ```typescript
 // Identifiers with hyphens must be quoted
 type HyphenSchema = {
-    tables: {
-        "user-sessions": {
-            id: number;
-            "ip-address": string;
-            "user-agent": string | null;
+    defaultSchema: "public";
+    schemas: {
+        public: {
+            "user-sessions": {
+                id: number;
+                "ip-address": string;
+                "user-agent": string | null;
+            };
         };
     };
 };
