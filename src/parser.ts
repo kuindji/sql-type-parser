@@ -32,6 +32,9 @@ import type {
   SelectItem,
   SQLQuery,
   UnparsedExpr,
+  UnionClause,
+  UnionClauseAny,
+  UnionOperatorType,
 } from "./ast.js"
 
 import type {
@@ -54,31 +57,132 @@ import type { Trim, ParseError, Flatten, RemoveQuotes, Increment, Decrement } fr
 /**
  * Parse a SQL SELECT query string into an AST
  */
-export type ParseSQL<T extends string> = ParseSelectQuery<NormalizeSQL<T>>
+export type ParseSQL<T extends string> = ParseQueryOrUnion<NormalizeSQL<T>>
 
 /**
- * Parse a normalized SELECT query (handles WITH clause if present)
+ * Parse a query that may contain UNION/INTERSECT/EXCEPT operators
  */
-type ParseSelectQuery<T extends string> = NextToken<T> extends [
+type ParseQueryOrUnion<T extends string> = ParseSelectQueryWithRest<T> extends infer Result
+  ? Result extends { query: infer Q extends SelectClause; rest: infer Rest extends string }
+    ? CheckForUnion<Q, Rest>
+    : Result extends SQLQuery<infer Q>
+      ? Result
+      : Result
+  : never
+
+/**
+ * Parse a normalized SELECT query and return both the query and remaining string
+ */
+type ParseSelectQueryWithRest<T extends string> = NextToken<T> extends [
   infer First extends string,
   infer Rest extends string,
 ]
   ? First extends "WITH"
-    ? ParseWithAndSelect<Rest>
+    ? ParseWithAndSelectWithRest<Rest>
     : First extends "SELECT"
-      ? ParseSelectBodyWithCTEs<Rest, undefined>
+      ? ParseSelectBodyWithCTEsAndRest<Rest, undefined>
       : ParseError<`Expected SELECT or WITH, got: ${First}`>
   : ParseError<"Empty query">
 
 /**
+ * Legacy entry point for backward compatibility with subquery parsing
+ */
+type ParseSelectQuery<T extends string> = ParseSelectQueryWithRest<T> extends infer Result
+  ? Result extends { query: infer Q extends SelectClause; rest: infer Rest extends string }
+    ? CheckForUnion<Q, Rest>
+    : Result
+  : never
+
+/**
  * Parse WITH clause followed by SELECT
  */
-type ParseWithAndSelect<T extends string> = ParseCTEList<T> extends infer CTEResult
+type ParseWithAndSelect<T extends string> = ParseWithAndSelectWithRest<T> extends infer Result
+  ? Result extends { query: infer Q extends SelectClause; rest: infer Rest extends string }
+    ? CheckForUnion<Q, Rest>
+    : Result
+  : never
+
+/**
+ * Parse WITH clause followed by SELECT, returning both query and rest
+ */
+type ParseWithAndSelectWithRest<T extends string> = ParseCTEList<T> extends infer CTEResult
   ? CTEResult extends { ctes: infer CTEs extends CTEDefinition[]; rest: infer AfterCTEs extends string }
     ? NextToken<AfterCTEs> extends ["SELECT", infer SelectRest extends string]
-      ? ParseSelectBodyWithCTEs<SelectRest, CTEs>
+      ? ParseSelectBodyWithCTEsAndRest<SelectRest, CTEs>
       : ParseError<"Expected SELECT after WITH clause">
     : CTEResult
+  : never
+
+// ============================================================================
+// Union Parser
+// ============================================================================
+
+/**
+ * Check if there's a union operator and parse accordingly
+ */
+type CheckForUnion<
+  Left extends SelectClause,
+  Rest extends string,
+> = Trim<Rest> extends ""
+  ? SQLQuery<Left>
+  : ParseUnionOperator<Rest> extends [infer Op extends UnionOperatorType, infer AfterOp extends string]
+    ? ParseSelectQueryWithRest<AfterOp> extends infer RightResult
+      ? RightResult extends { query: infer RightQ extends SelectClause; rest: infer AfterRight extends string }
+        ? CheckForMoreUnions<Left, Op, RightQ, AfterRight>
+        : RightResult extends SQLQuery<infer RightQ>
+          ? RightQ extends SelectClause
+            ? SQLQuery<UnionClause<Left, Op, RightQ>>
+            : RightQ extends UnionClauseAny
+              ? SQLQuery<UnionClause<Left, Op, RightQ>>
+              : ParseError<"Invalid right side of union">
+          : RightResult
+      : never
+    : SQLQuery<Left>
+
+/**
+ * Handle more unions on the right side
+ */
+type CheckForMoreUnions<
+  Left extends SelectClause,
+  Op extends UnionOperatorType,
+  Right extends SelectClause,
+  Rest extends string,
+> = Trim<Rest> extends ""
+  ? SQLQuery<UnionClause<Left, Op, Right>>
+  : ParseUnionOperator<Rest> extends [infer NextOp extends UnionOperatorType, infer AfterNextOp extends string]
+    ? ParseSelectQueryWithRest<AfterNextOp> extends infer NextRightResult
+      ? NextRightResult extends { query: infer NextRightQ extends SelectClause; rest: infer AfterNextRight extends string }
+        ? CheckForMoreUnions<Left, Op, Right, Rest> extends SQLQuery<infer LeftUnion>
+          ? LeftUnion extends UnionClauseAny
+            ? CheckForMoreUnions<Right, NextOp, NextRightQ, AfterNextRight> extends SQLQuery<infer RightUnion>
+              ? SQLQuery<UnionClause<Left, Op, RightUnion>>
+              : ParseError<"Failed to parse chained union">
+            : ParseError<"Invalid union chain">
+          : ParseError<"Failed to parse union chain">
+        : NextRightResult
+      : never
+    : SQLQuery<UnionClause<Left, Op, Right>>
+
+/**
+ * Parse a union operator and return [operator, remaining string]
+ */
+type ParseUnionOperator<T extends string> = NextToken<T> extends [
+  infer First extends string,
+  infer Rest extends string,
+]
+  ? First extends "UNION"
+    ? NextToken<Rest> extends ["ALL", infer AfterAll extends string]
+      ? ["UNION ALL", AfterAll]
+      : ["UNION", Rest]
+    : First extends "INTERSECT"
+      ? NextToken<Rest> extends ["ALL", infer AfterAll extends string]
+        ? ["INTERSECT ALL", AfterAll]
+        : ["INTERSECT", Rest]
+      : First extends "EXCEPT"
+        ? NextToken<Rest> extends ["ALL", infer AfterAll extends string]
+          ? ["EXCEPT ALL", AfterAll]
+          : ["EXCEPT", Rest]
+        : never
   : never
 
 /**
@@ -140,6 +244,18 @@ type ParseSelectBody<T extends string> = ParseSelectBodyWithCTEs<T, undefined>
 type ParseSelectBodyWithCTEs<
   T extends string,
   CTEs extends CTEDefinition[] | undefined
+> = ParseSelectBodyWithCTEsAndRest<T, CTEs> extends infer Result
+  ? Result extends { query: infer Q extends SelectClause; rest: string }
+    ? SQLQuery<Q>
+    : Result
+  : never
+
+/**
+ * Parse the body of a SELECT statement with optional CTEs, returning both query and rest
+ */
+type ParseSelectBodyWithCTEsAndRest<
+  T extends string,
+  CTEs extends CTEDefinition[] | undefined
 > = CheckDistinct<T> extends [
   infer IsDistinct extends boolean,
   infer AfterDistinct extends string,
@@ -158,7 +274,7 @@ type ParseSelectBodyWithCTEs<
     from: infer From extends TableSource
     rest: infer Rest extends string
   }
-  ? BuildSelectClauseWithCTEs<Columns, From, Rest, IsDistinct, CTEs>
+  ? BuildSelectClauseWithCTEsAndRest<Columns, From, Rest, IsDistinct, CTEs>
   : ParseError<"Failed to parse FROM clause">
   : never
   : never
@@ -855,7 +971,22 @@ type BuildSelectClauseWithCTEs<
   Rest extends string,
   Distinct extends boolean,
   CTEs extends CTEDefinition[] | undefined,
-> = ParseOptionalClauses<Rest> extends infer OptionalResult
+> = BuildSelectClauseWithCTEsAndRest<Columns, From, Rest, Distinct, CTEs> extends infer Result
+  ? Result extends { query: infer Q extends SelectClause; rest: string }
+    ? SQLQuery<Q>
+    : Result
+  : never
+
+/**
+ * Build the complete SELECT clause with optional CTEs, returning both query and rest
+ */
+type BuildSelectClauseWithCTEsAndRest<
+  Columns,
+  From extends TableSource,
+  Rest extends string,
+  Distinct extends boolean,
+  CTEs extends CTEDefinition[] | undefined,
+> = ParseOptionalClausesWithRest<Rest> extends infer OptionalResult
   ? OptionalResult extends ParseError<string>
   ? OptionalResult
   : OptionalResult extends {
@@ -866,9 +997,10 @@ type BuildSelectClauseWithCTEs<
     orderBy: infer OrderBy
     limit: infer Limit
     offset: infer Offset
+    rest: infer Remaining extends string
   }
-  ? SQLQuery<
-    SelectClause<
+  ? {
+    query: SelectClause<
       Columns extends "*" ? "*" : Columns extends SelectItem[] ? Columns : never,
       From,
       Joins extends JoinClause[] ? Joins : undefined,
@@ -881,14 +1013,24 @@ type BuildSelectClauseWithCTEs<
       Distinct,
       CTEs
     >
-  >
+    rest: Remaining
+  }
   : never
   : never
 
 /**
  * Parse all optional clauses (JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET)
  */
-type ParseOptionalClauses<T extends string> = ParseJoins<T> extends infer JoinResult
+type ParseOptionalClauses<T extends string> = ParseOptionalClausesWithRest<T> extends infer Result
+  ? Result extends { rest: string }
+    ? Omit<Result, "rest">
+    : Result
+  : never
+
+/**
+ * Parse all optional clauses with remaining rest
+ */
+type ParseOptionalClausesWithRest<T extends string> = ParseJoins<T> extends infer JoinResult
   ? JoinResult extends { joins: infer Joins; rest: infer AfterJoins extends string }
   ? ParseWhereClause<AfterJoins> extends infer WhereResult
   ? WhereResult extends { where: infer Where; rest: infer AfterWhere extends string }
@@ -907,8 +1049,8 @@ type ParseOptionalClauses<T extends string> = ParseJoins<T> extends infer JoinRe
     orderBy: infer OrderBy
     rest: infer AfterOrderBy extends string
   }
-  ? ParseLimitOffset<AfterOrderBy> extends infer LimitResult
-  ? LimitResult extends { limit: infer Limit; offset: infer Offset }
+  ? ParseLimitOffsetWithRest<AfterOrderBy> extends infer LimitResult
+  ? LimitResult extends { limit: infer Limit; offset: infer Offset; rest: infer AfterLimitOffset extends string }
   ? {
     joins: Joins
     where: Where
@@ -917,6 +1059,7 @@ type ParseOptionalClauses<T extends string> = ParseJoins<T> extends infer JoinRe
     orderBy: OrderBy
     limit: Limit
     offset: Offset
+    rest: AfterLimitOffset
   }
   : never
   : never
@@ -1274,18 +1417,27 @@ type ParseOrderByItem<T extends string> = Trim<T> extends `${infer Col} DESC`
 /**
  * Parse LIMIT and OFFSET clauses
  */
-type ParseLimitOffset<T extends string> = ParseLimit<T> extends {
+type ParseLimitOffset<T extends string> = ParseLimitOffsetWithRest<T> extends infer Result
+  ? Result extends { rest: string }
+    ? Omit<Result, "rest">
+    : Result
+  : never
+
+/**
+ * Parse LIMIT and OFFSET clauses, returning remaining rest
+ */
+type ParseLimitOffsetWithRest<T extends string> = ParseLimit<T> extends {
   limit: infer Limit
   rest: infer AfterLimit extends string
 }
-  ? ParseOffset<AfterLimit> extends { offset: infer Offset }
-  ? { limit: Limit; offset: Offset }
-  : { limit: Limit; offset: undefined }
+  ? ParseOffset<AfterLimit> extends { offset: infer Offset; rest: infer AfterOffset extends string }
+    ? { limit: Limit; offset: Offset; rest: AfterOffset }
+    : { limit: Limit; offset: undefined; rest: AfterLimit }
   : ParseOffset<T> extends { offset: infer Offset; rest: infer AfterOffset extends string }
-  ? ParseLimit<AfterOffset> extends { limit: infer Limit }
-  ? { limit: Limit; offset: Offset }
-  : { limit: undefined; offset: Offset }
-  : { limit: undefined; offset: undefined }
+    ? ParseLimit<AfterOffset> extends { limit: infer Limit; rest: infer AfterLimit extends string }
+      ? { limit: Limit; offset: Offset; rest: AfterLimit }
+      : { limit: undefined; offset: Offset; rest: AfterOffset }
+    : { limit: undefined; offset: undefined; rest: T }
 
 /**
  * Parse LIMIT clause

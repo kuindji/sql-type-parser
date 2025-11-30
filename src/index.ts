@@ -82,6 +82,11 @@ export type {
   // Aggregate types
   AggregateExpr,
   AggregateFunc,
+
+  // Union types
+  UnionClause,
+  UnionClauseAny,
+  UnionOperatorType,
 } from "./ast.js"
 
 // Re-export utility types

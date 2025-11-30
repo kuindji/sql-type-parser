@@ -21,6 +21,9 @@ import type {
   JoinClause,
   AggregateExpr,
   SelectItem,
+  UnionClause,
+  UnionClauseAny,
+  UnionOperatorType,
 } from "./ast.js"
 import type { Flatten } from "./utils.js"
 
@@ -85,9 +88,81 @@ type GetDefaultSchema<Schema extends DatabaseSchema> =
 export type MatchQuery<
   Query,
   Schema extends DatabaseSchema,
-> = Query extends SQLQuery<infer Select>
-  ? MatchSelectClause<Select, Schema>
+> = Query extends SQLQuery<infer QueryContent>
+  ? QueryContent extends UnionClauseAny
+    ? MatchUnionClause<QueryContent, Schema>
+    : QueryContent extends SelectClause
+      ? MatchSelectClause<QueryContent, Schema>
+      : MatchError<"Invalid query content type">
   : MatchError<"Invalid query type">
+
+/**
+ * Match a union clause and return the combined result type
+ * For UNION: result is the union of both sides (same shape, TypeScript union of values)
+ * For INTERSECT: result is the intersection (same shape)
+ * For EXCEPT: result is the left side's shape
+ */
+type MatchUnionClause<
+  Union extends UnionClauseAny,
+  Schema extends DatabaseSchema,
+> = Union extends UnionClause<infer Left, infer Op, infer Right>
+  ? MatchSelectClause<Left, Schema> extends infer LeftResult
+    ? LeftResult extends MatchError<string>
+      ? LeftResult
+      : Right extends UnionClauseAny
+        ? MatchUnionClause<Right, Schema> extends infer RightResult
+          ? RightResult extends MatchError<string>
+            ? RightResult
+            : CombineUnionResults<LeftResult, RightResult, Op>
+          : never
+        : Right extends SelectClause
+          ? MatchSelectClause<Right, Schema> extends infer RightResult
+            ? RightResult extends MatchError<string>
+              ? RightResult
+              : CombineUnionResults<LeftResult, RightResult, Op>
+            : never
+          : MatchError<"Invalid right side of union">
+    : never
+  : MatchError<"Invalid union clause">
+
+/**
+ * Combine results from two sides of a union operation
+ * The result columns must have matching names - we return the left side's structure
+ * with types that could come from either side
+ */
+type CombineUnionResults<
+  Left,
+  Right,
+  Op extends UnionOperatorType,
+> = Op extends "UNION" | "UNION ALL"
+  ? UnionResultType<Left, Right>
+  : Op extends "INTERSECT" | "INTERSECT ALL"
+    ? IntersectResultType<Left, Right>
+    : Op extends "EXCEPT" | "EXCEPT ALL"
+      ? Left // EXCEPT returns left side's rows, so use left's type
+      : Left
+
+/**
+ * For UNION: create a type that could be from either side
+ * If both sides have the same column name, the result is the union of their types
+ */
+type UnionResultType<Left, Right> = {
+  [K in keyof Left]: K extends keyof Right
+    ? Left[K] | Right[K]
+    : Left[K]
+}
+
+/**
+ * For INTERSECT: create a type that exists in both sides
+ * If both sides have the same column name, the result is their common type
+ */
+type IntersectResultType<Left, Right> = {
+  [K in keyof Left]: K extends keyof Right
+    ? Left[K] & Right[K] extends never
+      ? Left[K] | Right[K]  // If no intersection, allow either
+      : Left[K] & Right[K]
+    : Left[K]
+}
 
 /**
  * Match a SELECT clause against the schema

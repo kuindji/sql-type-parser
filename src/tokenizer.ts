@@ -50,6 +50,10 @@ type SQLKeyword =
   | "MIN"
   | "MAX"
   | "WITH"
+  | "UNION"
+  | "INTERSECT"
+  | "EXCEPT"
+  | "ALL"
 
 /**
  * Keywords that terminate the FROM clause
@@ -67,16 +71,24 @@ export type FromTerminators =
   | "HAVING"
   | "LIMIT"
   | "OFFSET"
+  | "UNION"
+  | "INTERSECT"
+  | "EXCEPT"
 
 /**
  * Keywords that terminate the WHERE clause
  */
-export type WhereTerminators = "ORDER" | "GROUP" | "HAVING" | "LIMIT" | "OFFSET"
+export type WhereTerminators = "ORDER" | "GROUP" | "HAVING" | "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT"
 
 /**
  * Keywords that terminate ORDER BY
  */
-export type OrderByTerminators = "LIMIT" | "OFFSET"
+export type OrderByTerminators = "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT"
+
+/**
+ * Union operators
+ */
+export type UnionOperator = "UNION" | "UNION ALL" | "INTERSECT" | "INTERSECT ALL" | "EXCEPT" | "EXCEPT ALL"
 
 // ============================================================================
 // Normalization

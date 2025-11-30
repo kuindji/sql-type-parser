@@ -220,14 +220,19 @@ type MultiSchema = {
     defaultSchema: "public";
     schemas: {
         public: {
-            users: { id: number; name: string; email: string };
-            posts: { id: number; user_id: number; title: string };
+            users: { id: number; name: string; email: string; };
+            posts: { id: number; user_id: number; title: string; };
         };
         audit: {
-            logs: { id: number; user_id: number; action: string; created_at: string };
+            logs: {
+                id: number;
+                user_id: number;
+                action: string;
+                created_at: string;
+            };
         };
         analytics: {
-            events: { id: number; event_type: string; user_id: number };
+            events: { id: number; event_type: string; user_id: number; };
         };
     };
 };
@@ -237,7 +242,10 @@ type DefaultSchema = QueryResult<"SELECT id, name FROM users", MultiSchema>;
 // Result: { id: number; name: string }
 
 // Explicit schema prefix
-type ExplicitSchema = QueryResult<"SELECT id, email FROM public.users", MultiSchema>;
+type ExplicitSchema = QueryResult<
+    "SELECT id, email FROM public.users",
+    MultiSchema
+>;
 // Result: { id: number; email: string }
 
 // Query non-default schema
@@ -266,7 +274,10 @@ type SchemaColumn = QueryResult<
 // Result: { name: string; action: string }
 
 // Schema.table.* wildcard
-type SchemaWildcard = QueryResult<"SELECT public.users.* FROM public.users", MultiSchema>;
+type SchemaWildcard = QueryResult<
+    "SELECT public.users.* FROM public.users",
+    MultiSchema
+>;
 // Result: { id: number; name: string; email: string }
 ```
 
@@ -749,7 +760,6 @@ npx tsc --noEmit
 
 Contributions are welcome! Areas that could use improvement:
 
-- More SQL syntax support (UNION, EXCEPT, INTERSECT)
 - Better error messages
 - Performance optimizations for complex queries
 - Additional aggregate functions

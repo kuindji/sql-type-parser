@@ -360,13 +360,48 @@ export type SelectClause<
 }>
 
 // ============================================================================
+// Union Types
+// ============================================================================
+
+/**
+ * Union operator types
+ */
+export type UnionOperatorType = "UNION" | "UNION ALL" | "INTERSECT" | "INTERSECT ALL" | "EXCEPT" | "EXCEPT ALL"
+
+/**
+ * A union clause combining two queries
+ * The left side is always a SelectClause, the right side can be another SelectClause or another UnionClause
+ */
+export type UnionClause<
+  Left extends SelectClause = SelectClause,
+  Op extends UnionOperatorType = UnionOperatorType,
+  Right extends SelectClause | UnionClauseAny = SelectClause | UnionClauseAny,
+> = {
+  readonly type: "UnionClause"
+  readonly left: Left
+  readonly operator: Op
+  readonly right: Right
+}
+
+/**
+ * Base union clause type (to avoid circular reference)
+ */
+export type UnionClauseAny = {
+  readonly type: "UnionClause"
+  readonly left: SelectClause
+  readonly operator: UnionOperatorType
+  readonly right: SelectClause | UnionClauseAny
+}
+
+// ============================================================================
 // SQL Query Wrapper
 // ============================================================================
 
 /**
  * The top-level SQL query AST
+ * Can be either a single SelectClause or a UnionClause
  */
-export type SQLQuery<Query extends SelectClause = SelectClause> = {
+export type SQLQuery<Query extends SelectClause | UnionClauseAny = SelectClause | UnionClauseAny> = {
   readonly type: "SQLQuery"
   readonly query: Query
 }
