@@ -6,20 +6,20 @@
  * all tests pass.
  */
 
-import type { ParseSQL } from "../parser.js"
-import type { QueryResult, ValidateSQL, MatchError } from "../matcher.js"
+import type { ParseSQL } from "../src/parser.js"
+import type { QueryResult, ValidateSQL, MatchError } from "../src/matcher.js"
 import type {
-    SQLQuery,
-    SelectClause,
-    ColumnRef,
-    TableRef,
-    TableColumnRef,
-    UnboundColumnRef,
-    TableWildcard,
-    JoinClause,
-    OrderByItem,
-    AggregateExpr,
-} from "../ast.js"
+  SQLQuery,
+  SelectClause,
+  ColumnRef,
+  TableRef,
+  TableColumnRef,
+  UnboundColumnRef,
+  TableWildcard,
+  JoinClause,
+  OrderByItem,
+  AggregateExpr,
+} from "../src/ast.js"
 import type { BlogSchema, ECommerceSchema, CamelCaseSchema } from "./schema.js"
 
 // ============================================================================
@@ -74,8 +74,8 @@ type _T4 = RequireTrue<AssertExtends<Test_TableAlias, SQLQuery>>
 // Test: DISTINCT
 type Test_Distinct = ParseSQL<"SELECT DISTINCT role FROM users">
 type Test_Distinct_IsDistinct = Test_Distinct extends SQLQuery<infer Q>
-    ? Q extends { distinct: true } ? true : false
-    : false
+  ? Q extends { distinct: true } ? true : false
+  : false
 type _T5 = RequireTrue<Test_Distinct_IsDistinct>
 
 // ============================================================================
@@ -85,8 +85,8 @@ type _T5 = RequireTrue<Test_Distinct_IsDistinct>
 // Test: Simple WHERE
 type Test_Where = ParseSQL<"SELECT * FROM users WHERE id = 1">
 type Test_Where_HasWhere = Test_Where extends SQLQuery<infer Q>
-    ? Q extends { where: object } ? true : false
-    : false
+  ? Q extends { where: object } ? true : false
+  : false
 type _T6 = RequireTrue<Test_Where_HasWhere>
 
 // Test: WHERE with string literal
@@ -108,8 +108,8 @@ type _T9 = RequireTrue<AssertExtends<Test_WhereNull, SQLQuery>>
 // Test: INNER JOIN
 type Test_InnerJoin = ParseSQL<"SELECT u.id FROM users AS u INNER JOIN orders AS o ON u.id = o.user_id">
 type Test_InnerJoin_HasJoin = Test_InnerJoin extends SQLQuery<infer Q>
-    ? Q extends { joins: JoinClause[] } ? true : false
-    : false
+  ? Q extends { joins: JoinClause[] } ? true : false
+  : false
 type _T10 = RequireTrue<Test_InnerJoin_HasJoin>
 
 // Test: LEFT JOIN
@@ -128,8 +128,8 @@ type Test_MultiJoin = ParseSQL<`
   LEFT JOIN posts AS p ON u.id = p.author_id
 `>
 type Test_MultiJoin_Count = Test_MultiJoin extends SQLQuery<infer Q>
-    ? Q extends { joins: [JoinClause, JoinClause] } ? true : false
-    : false
+  ? Q extends { joins: [JoinClause, JoinClause] } ? true : false
+  : false
 type _T13 = RequireTrue<Test_MultiJoin_Count>
 
 // ============================================================================
@@ -139,8 +139,8 @@ type _T13 = RequireTrue<Test_MultiJoin_Count>
 // Test: ORDER BY default (ASC)
 type Test_OrderBy = ParseSQL<"SELECT * FROM users ORDER BY name">
 type Test_OrderBy_Has = Test_OrderBy extends SQLQuery<infer Q>
-    ? Q extends { orderBy: OrderByItem[] } ? true : false
-    : false
+  ? Q extends { orderBy: OrderByItem[] } ? true : false
+  : false
 type _T14 = RequireTrue<Test_OrderBy_Has>
 
 // Test: ORDER BY DESC
@@ -150,8 +150,8 @@ type _T15 = RequireTrue<AssertExtends<Test_OrderByDesc, SQLQuery>>
 // Test: Multiple ORDER BY
 type Test_OrderByMulti = ParseSQL<"SELECT * FROM users ORDER BY role ASC, name DESC">
 type Test_OrderByMulti_Count = Test_OrderByMulti extends SQLQuery<infer Q>
-    ? Q extends { orderBy: [OrderByItem, OrderByItem] } ? true : false
-    : false
+  ? Q extends { orderBy: [OrderByItem, OrderByItem] } ? true : false
+  : false
 type _T16 = RequireTrue<Test_OrderByMulti_Count>
 
 // ============================================================================
@@ -161,15 +161,15 @@ type _T16 = RequireTrue<Test_OrderByMulti_Count>
 // Test: GROUP BY
 type Test_GroupBy = ParseSQL<"SELECT role, COUNT ( * ) FROM users GROUP BY role">
 type Test_GroupBy_Has = Test_GroupBy extends SQLQuery<infer Q>
-    ? Q extends { groupBy: object } ? true : false
-    : false
+  ? Q extends { groupBy: object } ? true : false
+  : false
 type _T17 = RequireTrue<Test_GroupBy_Has>
 
 // Test: GROUP BY with HAVING
 type Test_Having = ParseSQL<"SELECT role, COUNT ( * ) FROM users GROUP BY role HAVING COUNT ( * ) > 5">
 type Test_Having_Has = Test_Having extends SQLQuery<infer Q>
-    ? Q extends { having: object } ? true : false
-    : false
+  ? Q extends { having: object } ? true : false
+  : false
 type _T18 = RequireTrue<Test_Having_Has>
 
 // ============================================================================
@@ -179,15 +179,15 @@ type _T18 = RequireTrue<Test_Having_Has>
 // Test: LIMIT
 type Test_Limit = ParseSQL<"SELECT * FROM users LIMIT 10">
 type Test_Limit_Has = Test_Limit extends SQLQuery<infer Q>
-    ? Q extends { limit: 10 } ? true : false
-    : false
+  ? Q extends { limit: 10 } ? true : false
+  : false
 type _T19 = RequireTrue<Test_Limit_Has>
 
 // Test: OFFSET
 type Test_Offset = ParseSQL<"SELECT * FROM users LIMIT 10 OFFSET 20">
 type Test_Offset_Has = Test_Offset extends SQLQuery<infer Q>
-    ? Q extends { offset: 20 } ? true : false
-    : false
+  ? Q extends { offset: 20 } ? true : false
+  : false
 type _T20 = RequireTrue<Test_Offset_Has>
 
 // ============================================================================
@@ -222,8 +222,8 @@ type Test_CTE = ParseSQL<`
   SELECT * FROM active_users
 `>
 type Test_CTE_Has = Test_CTE extends SQLQuery<infer Q>
-    ? Q extends { ctes: object } ? true : false
-    : false
+  ? Q extends { ctes: object } ? true : false
+  : false
 type _T25 = RequireTrue<Test_CTE_Has>
 
 // Test: Multiple CTEs
@@ -300,8 +300,8 @@ type _M7 = RequireTrue<AssertEqual<Match_NonNullable, { title: string }>>
 
 // Test: JOIN merges columns from both tables
 type Match_Join = QueryResult<
-    "SELECT u.name, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
-    BlogSchema
+  "SELECT u.name, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
+  BlogSchema
 >
 type _M8 = RequireTrue<AssertEqual<Match_Join, { name: string; title: string }>>
 
@@ -446,10 +446,10 @@ type _E2 = RequireTrue<AssertEqual<Match_Order, { order_number: string; quantity
 // Test: Union type - order status
 type Match_OrderStatus = QueryResult<"SELECT status FROM orders", ECommerceSchema>
 type _E3 = RequireTrue<
-    AssertEqual<
-        Match_OrderStatus,
-        { status: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded" }
-    >
+  AssertEqual<
+    Match_OrderStatus,
+    { status: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded" }
+  >
 >
 
 // Test: User role union
@@ -481,16 +481,16 @@ type Match_Complex = QueryResult<`
   LIMIT 100
 `, ECommerceSchema>
 type _C1 = RequireTrue<
-    AssertEqual<
-        Match_Complex,
-        {
-            email: string
-            first_name: string | null
-            last_name: string | null
-            order_count: number
-            total: number
-        }
-    >
+  AssertEqual<
+    Match_Complex,
+    {
+      email: string
+      first_name: string | null
+      last_name: string | null
+      order_count: number
+      total: number
+    }
+  >
 >
 
 // ============================================================================

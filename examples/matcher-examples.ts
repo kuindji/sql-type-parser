@@ -6,8 +6,8 @@
  * produce result types.
  */
 
-import type { QueryResult, ValidateSQL, MatchQuery, MatchError, DatabaseSchema } from "../matcher.js"
-import type { ParseSQL } from "../parser.js"
+import type { QueryResult, ValidateSQL, MatchQuery, MatchError, DatabaseSchema } from "../src/matcher.js"
+import type { ParseSQL } from "../src/parser.js"
 import type { BlogSchema, ECommerceSchema, JsonSchema } from "./schema.js"
 
 // ============================================================================
