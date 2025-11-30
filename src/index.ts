@@ -98,3 +98,53 @@ export type { NormalizeSQL, NextToken, ExtractUntil, SplitByComma } from "./toke
 // Re-export matcher types
 export type { MatchQuery, MatchError, DatabaseSchema, QueryResult, ValidateQuery, ValidateSQL } from "./matcher.js"
 
+// Re-export parameter types
+export type {
+  // Parameter placeholders
+  PositionalParam,
+  NamedParam,
+  ParamPlaceholder,
+  ParamRef,
+
+  // Parameter extraction
+  ExtractParams,
+  ParamCount,
+  MaxParamNumber,
+
+  // Parameter type inference
+  ParamTypeMap,
+  InferParamTypes,
+  ParamTuple,
+  TypedParamTuple,
+
+  // Validation
+  ValidateParamCount,
+  ValidateParamTypes,
+
+  // Utility
+  QueryWithParams,
+} from "./params.js"
+
+// Re-export database integration types
+export type {
+  // Core validation type
+  ValidQuery,
+
+  // Query result types
+  SelectResult,
+  SelectResultArray,
+
+  // Handler types
+  QueryHandler,
+
+  // Validation utilities
+  IsValidSelect,
+
+  // Parameter utilities
+  HasParameters,
+  ExpectedParamCount,
+} from "./db.js"
+
+// Re-export factory functions
+export { createSelectFn } from "./db.js"
+

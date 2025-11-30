@@ -752,6 +752,131 @@ type PostsWithComments = QueryResult<
 // }
 ```
 
+## Database Integration
+
+This library provides factory functions to create type-safe query wrappers. Write your query **once**, get full type inference and validation.
+
+### Quick Start
+
+```typescript
+import { createSelectFn } from "@kuindji/sql-type-parser";
+
+type Schema = {
+    defaultSchema: "public";
+    schemas: {
+        public: {
+            users: {
+                id: number;
+                name: string;
+                email: string;
+                role: "admin" | "user";
+            };
+        };
+    };
+};
+
+// Create a typed select function wrapping your database client
+const select = createSelectFn<Schema>((sql, params) => db.query(sql, params));
+
+// Query written ONCE - result fully typed
+const users = await select("SELECT id, name FROM users WHERE role = $1", [
+    "admin",
+]);
+// users: Array<{ id: number; name: string }>
+
+// Invalid queries cause compile errors (not runtime!)
+const bad = await select("SELECT unknown FROM users");
+// Error: Argument of type '"SELECT unknown FROM users"' is not assignable...
+```
+
+### Factory Functions
+
+#### `createSelectFn`
+
+```typescript
+import { createSelectFn } from "@kuindji/sql-type-parser";
+
+const select = createSelectFn<Schema>((sql, params) => db.query(sql, params));
+
+const users = await select(
+    "SELECT id, name, email FROM users WHERE is_active = $1",
+    [ true ],
+);
+// users: Array<{ id: number; name: string; email: string }>
+
+// Union types are preserved
+const roles = await select("SELECT role FROM users");
+// roles: Array<{ role: "admin" | "user" }>
+```
+
+### Create Your Own Wrapper
+
+Use the `ValidQuery` type to build custom wrappers:
+
+```typescript
+import type {
+    DatabaseSchema,
+    SelectResultArray,
+    ValidQuery,
+} from "@kuindji/sql-type-parser";
+
+function createMyWrapper<Schema extends DatabaseSchema>(
+    handler: (
+        sql: string,
+        params?: unknown[],
+    ) => Promise<{ rows: unknown[]; count: number; }>,
+) {
+    return function query<Q extends string>(
+        sql: ValidQuery<Q, Schema>,
+        params?: unknown[],
+    ): Promise<{ rows: SelectResultArray<Q, Schema>; count: number; }> {
+        return handler(sql, params) as Promise<{
+            rows: SelectResultArray<Q, Schema>;
+            count: number;
+        }>;
+    };
+}
+
+const mySelect = createMyWrapper<Schema>((sql, params) =>
+    customDb.query(sql, params)
+);
+
+const result = await mySelect("SELECT id, name FROM users");
+// result: { rows: Array<{ id: number; name: string }>; count: number }
+```
+
+### Compile-Time Validation
+
+```typescript
+import type { IsValidSelect, ValidateSQL } from "@kuindji/sql-type-parser";
+
+// Returns true or error message
+type Valid = ValidateSQL<"SELECT id FROM users", Schema>; // true
+type Invalid = ValidateSQL<"SELECT bad FROM users", Schema>; // "Column 'bad' not found..."
+
+// Returns boolean
+type IsValid = IsValidSelect<"SELECT id FROM users", Schema>; // true
+```
+
+### Parameter Extraction
+
+```typescript
+import type {
+    ExtractParams,
+    HasParameters,
+    MaxParamNumber,
+} from "@kuindji/sql-type-parser";
+
+type Params = ExtractParams<"SELECT * FROM users WHERE id = $1 AND name = $2">;
+// ["$1", "$2"]
+
+type Max = MaxParamNumber<"SELECT * FROM users WHERE id = $1 AND x = $3">;
+// 3 (handles gaps)
+
+type HasParams = HasParameters<"SELECT * FROM users WHERE id = $1">;
+// true
+```
+
 ## Running Tests
 
 The tests are type-level assertions. If the project compiles, all tests pass:

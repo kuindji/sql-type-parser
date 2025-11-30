@@ -1,6 +1,6 @@
 {
   "name": "@kuindji/sql-type-parser",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Type-level SQL SELECT parser for TypeScript",
   "author": "Ivan Kuindzhi",
   "license": "MIT",
@@ -27,6 +27,7 @@
     "types"
   ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,11 +36,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./examples": {
-      "types": "./dist/examples/index.d.ts",
-      "import": "./dist/examples/index.js",
-      "default": "./dist/examples/index.js"
     }
   },
   "files": [
