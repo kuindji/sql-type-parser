@@ -1,10 +1,10 @@
 # Type-Level SQL SELECT Parser
 
-> 🎵 *Vibe-coded with Claude Opus 4.5*
+> 🎵 _Vibe-coded with Claude Opus 4.5_
 >
-> 🙏 *Inspired by and built upon [telefrek/sql](https://github.com/telefrek/sql) - a TypeScript SQL parsing series*
+> 🙏 _Inspired by and built upon [telefrek/sql](https://github.com/telefrek/sql) - a TypeScript SQL parsing series_
 
-A TypeScript type-level parser that transforms SQL SELECT query string literals into their corresponding AST types at compile time. 
+A TypeScript type-level parser that transforms SQL SELECT query string literals into their corresponding AST types at compile time.
 
 ## Features
 
@@ -16,40 +16,40 @@ A TypeScript type-level parser that transforms SQL SELECT query string literals 
 
 ### Supported SQL Features
 
-| Feature | Status | Example |
-|---------|--------|---------|
-| SELECT columns | ✅ | `SELECT id, name` |
-| SELECT * | ✅ | `SELECT *` |
-| Column aliases | ✅ | `SELECT id AS user_id` |
-| Table aliases | ✅ | `FROM users AS u` |
-| Table.* wildcard | ✅ | `SELECT u.*` |
-| DISTINCT | ✅ | `SELECT DISTINCT role` |
-| FROM clause | ✅ | `FROM users` |
-| WHERE clause | ✅ | `WHERE id = 1` |
-| AND/OR operators | ✅ | `WHERE a = 1 AND b = 2` |
-| Comparison operators | ✅ | `=, !=, <>, <, >, <=, >=` |
-| LIKE/ILIKE | ✅ | `WHERE name LIKE '%john%'` |
-| IS NULL/IS NOT NULL | ✅ | `WHERE deleted_at IS NULL` |
-| INNER JOIN | ✅ | `INNER JOIN orders ON...` |
-| LEFT JOIN | ✅ | `LEFT JOIN orders ON...` |
-| RIGHT JOIN | ✅ | `RIGHT JOIN orders ON...` |
-| FULL JOIN | ✅ | `FULL JOIN orders ON...` |
-| CROSS JOIN | ✅ | `CROSS JOIN categories` |
-| Multiple JOINs | ✅ | Multiple JOIN clauses |
-| ORDER BY | ✅ | `ORDER BY name DESC` |
-| GROUP BY | ✅ | `GROUP BY role` |
-| HAVING | ✅ | `HAVING COUNT(*) > 5` |
-| LIMIT | ✅ | `LIMIT 10` |
-| OFFSET | ✅ | `OFFSET 20` |
-| COUNT | ✅ | `COUNT(*)` |
-| SUM/AVG/MIN/MAX | ✅ | `SUM(amount)` |
-| WITH (CTEs) | ✅ | `WITH cte AS (...)` |
-| Derived tables | ✅ | `FROM (SELECT...) AS sub` |
-| Scalar subqueries | ✅ | `SELECT (SELECT...)` |
-| Type casting | ✅ | `id::text` |
-| JSON operators | ✅ | `data->>'key'` |
-| Quoted identifiers | ✅ | `"firstName"`, `"user-id"` |
-| camelCase (quoted) | ✅ | `"userAccounts"."firstName"` |
+| Feature              | Status | Example                      |
+| -------------------- | ------ | ---------------------------- |
+| SELECT columns       | ✅     | `SELECT id, name`            |
+| SELECT *             | ✅     | `SELECT *`                   |
+| Column aliases       | ✅     | `SELECT id AS user_id`       |
+| Table aliases        | ✅     | `FROM users AS u`            |
+| Table.* wildcard     | ✅     | `SELECT u.*`                 |
+| DISTINCT             | ✅     | `SELECT DISTINCT role`       |
+| FROM clause          | ✅     | `FROM users`                 |
+| WHERE clause         | ✅     | `WHERE id = 1`               |
+| AND/OR operators     | ✅     | `WHERE a = 1 AND b = 2`      |
+| Comparison operators | ✅     | `=, !=, <>, <, >, <=, >=`    |
+| LIKE/ILIKE           | ✅     | `WHERE name LIKE '%john%'`   |
+| IS NULL/IS NOT NULL  | ✅     | `WHERE deleted_at IS NULL`   |
+| INNER JOIN           | ✅     | `INNER JOIN orders ON...`    |
+| LEFT JOIN            | ✅     | `LEFT JOIN orders ON...`     |
+| RIGHT JOIN           | ✅     | `RIGHT JOIN orders ON...`    |
+| FULL JOIN            | ✅     | `FULL JOIN orders ON...`     |
+| CROSS JOIN           | ✅     | `CROSS JOIN categories`      |
+| Multiple JOINs       | ✅     | Multiple JOIN clauses        |
+| ORDER BY             | ✅     | `ORDER BY name DESC`         |
+| GROUP BY             | ✅     | `GROUP BY role`              |
+| HAVING               | ✅     | `HAVING COUNT(*) > 5`        |
+| LIMIT                | ✅     | `LIMIT 10`                   |
+| OFFSET               | ✅     | `OFFSET 20`                  |
+| COUNT                | ✅     | `COUNT(*)`                   |
+| SUM/AVG/MIN/MAX      | ✅     | `SUM(amount)`                |
+| WITH (CTEs)          | ✅     | `WITH cte AS (...)`          |
+| Derived tables       | ✅     | `FROM (SELECT...) AS sub`    |
+| Scalar subqueries    | ✅     | `SELECT (SELECT...)`         |
+| Type casting         | ✅     | `id::text`                   |
+| JSON operators       | ✅     | `data->>'key'`               |
+| Quoted identifiers   | ✅     | `"firstName"`, `"user-id"`   |
+| camelCase (quoted)   | ✅     | `"userAccounts"."firstName"` |
 
 ## Installation
 
@@ -60,7 +60,11 @@ npm install @kuindji/sql-type-parser
 This is a pure TypeScript type library - just import the types:
 
 ```typescript
-import type { ParseSQL, QueryResult, ValidateSQL } from '@kuindji/sql-type-parser'
+import type {
+    ParseSQL,
+    QueryResult,
+    ValidateSQL,
+} from "@kuindji/sql-type-parser";
 ```
 
 ## Quick Start
@@ -69,61 +73,64 @@ import type { ParseSQL, QueryResult, ValidateSQL } from '@kuindji/sql-type-parse
 
 ```typescript
 type MySchema = {
-  tables: {
-    users: {
-      id: number
-      name: string
-      email: string
-      role: "admin" | "user"
-      created_at: string
-    }
-    orders: {
-      id: number
-      user_id: number
-      total: number
-      status: "pending" | "completed"
-    }
-  }
-}
+    tables: {
+        users: {
+            id: number;
+            name: string;
+            email: string;
+            role: "admin" | "user";
+            created_at: string;
+        };
+        orders: {
+            id: number;
+            user_id: number;
+            total: number;
+            status: "pending" | "completed";
+        };
+    };
+};
 ```
 
 ### 2. Get Typed Query Results
 
 ```typescript
-import type { QueryResult } from '@kuindji/sql-type-parser'
+import type { QueryResult } from "@kuindji/sql-type-parser";
 
 // Simple query
-type UserNames = QueryResult<"SELECT id, name FROM users", MySchema>
+type UserNames = QueryResult<"SELECT id, name FROM users", MySchema>;
 // Result: { id: number; name: string }
 
 // Query with JOIN
-type OrdersWithUsers = QueryResult<`
+type OrdersWithUsers = QueryResult<
+    `
   SELECT u.name, o.total, o.status
   FROM users AS u
   INNER JOIN orders AS o ON u.id = o.user_id
-`, MySchema>
+`,
+    MySchema
+>;
 // Result: { name: string; total: number; status: "pending" | "completed" }
 
 // Union types are preserved!
-type Roles = QueryResult<"SELECT role FROM users", MySchema>
+type Roles = QueryResult<"SELECT role FROM users", MySchema>;
 // Result: { role: "admin" | "user" }
 ```
 
 ### 3. Validate Queries at Compile Time
 
 ```typescript
-import type { ValidateSQL } from '@kuindji/sql-type-parser'
+import type { ValidateSQL } from "@kuindji/sql-type-parser";
 
 // Valid query returns `true`
-type IsValid = ValidateSQL<"SELECT id FROM users", MySchema>
+type IsValid = ValidateSQL<"SELECT id FROM users", MySchema>;
 // Result: true
 
 // Invalid column returns error message
-type HasError = ValidateSQL<"SELECT unknown_col FROM users", MySchema>
+type HasError = ValidateSQL<"SELECT unknown_col FROM users", MySchema>;
 // Result: "Column 'unknown_col' not found in any table"
 
 // Invalid table returns error message
-type TableError = ValidateSQL<"SELECT * FROM bad_table", MySchema>
+type TableError = ValidateSQL<"SELECT * FROM bad_table", MySchema>;
 // Result: "Table 'bad_table' not found in schema"
 ```
 
@@ -133,81 +140,111 @@ type TableError = ValidateSQL<"SELECT * FROM bad_table", MySchema>
 
 ```typescript
 // SELECT all columns
-type All = QueryResult<"SELECT * FROM users", MySchema>
+type All = QueryResult<"SELECT * FROM users", MySchema>;
+// Result: { id: number; name: string; email: string; role: "admin" | "user"; created_at: string }
 
 // SELECT specific columns
-type Specific = QueryResult<"SELECT id, email FROM users", MySchema>
+type Specific = QueryResult<"SELECT id, email FROM users", MySchema>;
+// Result: { id: number; email: string }
 
 // Column aliases
-type Aliased = QueryResult<"SELECT id AS user_id, name AS display_name FROM users", MySchema>
+type Aliased = QueryResult<
+    "SELECT id AS user_id, name AS display_name FROM users",
+    MySchema
+>;
+// Result: { user_id: number; display_name: string }
 
 // Table aliases
-type TableAliased = QueryResult<"SELECT u.id, u.name FROM users AS u", MySchema>
+type TableAliased = QueryResult<
+    "SELECT u.id, u.name FROM users AS u",
+    MySchema
+>;
+// Result: { id: number; name: string }
 
 // DISTINCT
-type Distinct = QueryResult<"SELECT DISTINCT role FROM users", MySchema>
+type Distinct = QueryResult<"SELECT DISTINCT role FROM users", MySchema>;
+// Result: { role: "admin" | "user" }
 ```
 
 ### JOINs
 
 ```typescript
 // INNER JOIN
-type Inner = QueryResult<`
+type Inner = QueryResult<
+    `
   SELECT u.name, o.total
   FROM users AS u
   INNER JOIN orders AS o ON u.id = o.user_id
-`, MySchema>
+`,
+    MySchema
+>;
+// Result: { name: string; total: number }
 
 // LEFT JOIN
-type Left = QueryResult<`
+type Left = QueryResult<
+    `
   SELECT u.name, o.total
   FROM users AS u
   LEFT JOIN orders AS o ON u.id = o.user_id
-`, MySchema>
+`,
+    MySchema
+>;
+// Result: { name: string; total: number | null }
 
 // Multiple JOINs
-type Multi = QueryResult<`
+type Multi = QueryResult<
+    `
   SELECT u.name, o.total, p.name AS product
   FROM users AS u
   INNER JOIN orders AS o ON u.id = o.user_id
   INNER JOIN order_items AS oi ON o.id = oi.order_id
   INNER JOIN products AS p ON oi.product_id = p.id
-`, MySchema>
+`,
+    MySchema
+>;
+// Result: { name: string; total: number; product: string }
 ```
 
 ### Aggregates
 
 ```typescript
 // COUNT
-type Count = QueryResult<"SELECT COUNT ( * ) AS total FROM users", MySchema>
+type Count = QueryResult<"SELECT COUNT ( * ) AS total FROM users", MySchema>;
 // Result: { total: number }
 
 // SUM
-type Sum = QueryResult<"SELECT SUM ( total ) AS revenue FROM orders", MySchema>
+type Sum = QueryResult<"SELECT SUM ( total ) AS revenue FROM orders", MySchema>;
 // Result: { revenue: number }
 
 // GROUP BY with aggregates
-type Grouped = QueryResult<`
+type Grouped = QueryResult<
+    `
   SELECT user_id, COUNT ( * ) AS order_count, SUM ( total ) AS total_spent
   FROM orders
   GROUP BY user_id
-`, MySchema>
+`,
+    MySchema
+>;
 // Result: { user_id: number; order_count: number; total_spent: number }
 ```
 
 ### Common Table Expressions (CTEs)
 
 ```typescript
-type WithCTE = QueryResult<`
+type WithCTE = QueryResult<
+    `
   WITH active_users AS (
     SELECT id, name FROM users WHERE status = 'active'
   )
   SELECT * FROM active_users
-`, MySchema>
+`,
+    MySchema
+>;
 // Result: { id: number; name: string }
 
 // Multiple CTEs
-type MultipleCTEs = QueryResult<`
+type MultipleCTEs = QueryResult<
+    `
   WITH 
     active_users AS (
       SELECT id, name FROM users WHERE status = 'active'
@@ -218,13 +255,17 @@ type MultipleCTEs = QueryResult<`
   SELECT au.name, ot.total
   FROM active_users AS au
   LEFT JOIN order_totals AS ot ON au.id = ot.user_id
-`, MySchema>
+`,
+    MySchema
+>;
+// Result: { name: string; total: number | null }
 ```
 
 ### Derived Tables (Subqueries in FROM)
 
 ```typescript
-type DerivedTable = QueryResult<`
+type DerivedTable = QueryResult<
+    `
   SELECT sub.user_name, sub.order_count
   FROM (
     SELECT u.name AS user_name, COUNT ( o.id ) AS order_count
@@ -233,21 +274,30 @@ type DerivedTable = QueryResult<`
     GROUP BY u.name
   ) AS sub
   WHERE sub.order_count > 5
-`, MySchema>
+`,
+    MySchema
+>;
+// Result: { user_name: string; order_count: number }
 ```
 
 ### PostgreSQL Type Casting
 
 ```typescript
 // Type casts return the cast type, not the underlying column type
-type CastText = QueryResult<"SELECT id::text AS id_str FROM users", MySchema>
+type CastText = QueryResult<"SELECT id::text AS id_str FROM users", MySchema>;
 // Result: { id_str: string } - cast to text returns string
 
-type CastInt = QueryResult<"SELECT amount::integer AS int_amount FROM data", MySchema>
+type CastInt = QueryResult<
+    "SELECT amount::integer AS int_amount FROM data",
+    MySchema
+>;
 // Result: { int_amount: number } - cast to integer returns number
 
 // Cast in complex expressions (JSON, functions) also preserves cast type
-type JsonCast = QueryResult<"SELECT data->>'value'::integer AS val FROM docs", MySchema>
+type JsonCast = QueryResult<
+    "SELECT data->>'value'::integer AS val FROM docs",
+    MySchema
+>;
 // Result: { val: number }
 ```
 
@@ -255,12 +305,16 @@ type JsonCast = QueryResult<"SELECT data->>'value'::integer AS val FROM docs", M
 
 ```typescript
 // Arrow operators for JSON access
-type JsonAccess = QueryResult<`
+type JsonAccess = QueryResult<
+    `
   SELECT 
     data->>'name' AS name,
     metadata#>>'{user,email}' AS email
   FROM documents
-`, JsonSchema>
+`,
+    JsonSchema
+>;
+// Result: { name: string; email: string }
 ```
 
 ### Identifier Case Handling
@@ -270,29 +324,29 @@ In SQL, unquoted identifiers are case-insensitive and typically lowercased by th
 ```typescript
 // Schema with camelCase columns
 type MySchema = {
-  tables: {
-    userAccounts: {
-      id: number
-      firstName: string
-      lastName: string
-      emailAddress: string
-      createdAt: string
-      Account_Status: "active" | "suspended"
-    }
-    OrderItems: {
-      id: number
-      orderId: number
-      unitPrice: number
-      Item_Status: "pending" | "shipped"
-    }
-  }
-}
+    tables: {
+        userAccounts: {
+            id: number;
+            firstName: string;
+            lastName: string;
+            emailAddress: string;
+            createdAt: string;
+            Account_Status: "active" | "suspended";
+        };
+        OrderItems: {
+            id: number;
+            orderId: number;
+            unitPrice: number;
+            Item_Status: "pending" | "shipped";
+        };
+    };
+};
 
 // ❌ WRONG: Unquoted camelCase identifiers (would be lowercased by DB)
-type Wrong = QueryResult<"SELECT firstName FROM userAccounts", MySchema>
+type Wrong = QueryResult<"SELECT firstName FROM userAccounts", MySchema>;
 
 // ✅ CORRECT: Quote identifiers with uppercase letters
-type Correct = QueryResult<'SELECT "firstName" FROM "userAccounts"', MySchema>
+type Correct = QueryResult<'SELECT "firstName" FROM "userAccounts"', MySchema>;
 // Result: { firstName: string }
 ```
 
@@ -301,16 +355,16 @@ type Correct = QueryResult<'SELECT "firstName" FROM "userAccounts"', MySchema>
 ```typescript
 // Quote both table and column names that contain uppercase
 type CamelCase = QueryResult<
-  'SELECT "firstName", "lastName", "emailAddress" FROM "userAccounts"',
-  MySchema
->
+    'SELECT "firstName", "lastName", "emailAddress" FROM "userAccounts"',
+    MySchema
+>;
 // Result: { firstName: string; lastName: string; emailAddress: string }
 
 // With table alias
 type WithAlias = QueryResult<
-  'SELECT ua."firstName", ua."lastName" FROM "userAccounts" AS ua',
-  MySchema
->
+    'SELECT ua."firstName", ua."lastName" FROM "userAccounts" AS ua',
+    MySchema
+>;
 // Result: { firstName: string; lastName: string }
 ```
 
@@ -319,20 +373,23 @@ type WithAlias = QueryResult<
 ```typescript
 // Mixed case with underscores
 type MixedCase = QueryResult<
-  'SELECT "Account_Status", "Item_Status" FROM "userAccounts"',
-  MySchema
->
-// Result: { Account_Status: "active" | "suspended"; Item_Status: ... }
+    'SELECT "Account_Status" FROM "userAccounts"',
+    MySchema
+>;
+// Result: { Account_Status: "active" | "suspended" }
 ```
 
 #### JOINs with Quoted Identifiers
 
 ```typescript
-type QuotedJoin = QueryResult<`
+type QuotedJoin = QueryResult<
+    `
   SELECT ua."firstName", oi."unitPrice", oi."Item_Status"
   FROM "userAccounts" AS ua
   INNER JOIN "OrderItems" AS oi ON ua.id = oi."orderId"
-`, MySchema>
+`,
+    MySchema
+>;
 // Result: { firstName: string; unitPrice: number; Item_Status: "pending" | "shipped" }
 ```
 
@@ -341,16 +398,16 @@ type QuotedJoin = QueryResult<`
 ```typescript
 // Alias case is always preserved (quoted or not)
 type AliasCase = QueryResult<
-  'SELECT "firstName" AS "FirstName", "lastName" AS last_name FROM "userAccounts"',
-  MySchema
->
+    'SELECT "firstName" AS "FirstName", "lastName" AS last_name FROM "userAccounts"',
+    MySchema
+>;
 // Result: { FirstName: string; last_name: string }
 
 // Aliases with spaces require quotes
 type SpacedAlias = QueryResult<
-  'SELECT "firstName" AS "First Name" FROM "userAccounts"',
-  MySchema
->
+    'SELECT "firstName" AS "First Name" FROM "userAccounts"',
+    MySchema
+>;
 // Result: { "First Name": string }
 ```
 
@@ -359,19 +416,19 @@ type SpacedAlias = QueryResult<
 ```typescript
 // Identifiers with hyphens must be quoted
 type HyphenSchema = {
-  tables: {
-    "user-sessions": {
-      id: number
-      "ip-address": string
-      "user-agent": string | null
-    }
-  }
-}
+    tables: {
+        "user-sessions": {
+            id: number;
+            "ip-address": string;
+            "user-agent": string | null;
+        };
+    };
+};
 
 type Hyphens = QueryResult<
-  'SELECT id, "ip-address", "user-agent" FROM "user-sessions"',
-  HyphenSchema
->
+    'SELECT id, "ip-address", "user-agent" FROM "user-sessions"',
+    HyphenSchema
+>;
 // Result: { id: number; "ip-address": string; "user-agent": string | null }
 ```
 
@@ -379,85 +436,91 @@ type Hyphens = QueryResult<
 
 ### SQL to TypeScript Type Mapping
 
-| SQL Type | TypeScript Type |
-|----------|-----------------|
-| `text`, `varchar`, `char` | `string` |
-| `int`, `integer`, `bigint`, `smallint`, `serial` | `number` |
-| `float`, `real`, `double precision`, `numeric`, `decimal` | `number` |
-| `bool`, `boolean` | `boolean` |
-| `json`, `jsonb` | `object` |
-| `date`, `timestamp`, `timestamptz`, `time` | `string` |
-| `uuid` | `string` |
-| `bytea` | `Uint8Array` |
+| SQL Type                                                  | TypeScript Type |
+| --------------------------------------------------------- | --------------- |
+| `text`, `varchar`, `char`                                 | `string`        |
+| `int`, `integer`, `bigint`, `smallint`, `serial`          | `number`        |
+| `float`, `real`, `double precision`, `numeric`, `decimal` | `number`        |
+| `bool`, `boolean`                                         | `boolean`       |
+| `json`, `jsonb`                                           | `object`        |
+| `date`, `timestamp`, `timestamptz`, `time`                | `string`        |
+| `uuid`                                                    | `string`        |
+| `bytea`                                                   | `Uint8Array`    |
 
 ### Aggregate Result Types
 
-| Aggregate | Result Type |
-|-----------|-------------|
-| `COUNT(*)` | `number` |
-| `COUNT(column)` | `number` |
-| `SUM(column)` | `number` |
-| `AVG(column)` | `number` |
-| `MIN(column)` | Same as column type |
-| `MAX(column)` | Same as column type |
+| Aggregate       | Result Type         |
+| --------------- | ------------------- |
+| `COUNT(*)`      | `number`            |
+| `COUNT(column)` | `number`            |
+| `SUM(column)`   | `number`            |
+| `AVG(column)`   | `number`            |
+| `MIN(column)`   | Same as column type |
+| `MAX(column)`   | Same as column type |
 
 ## API Reference
 
 ### Main Types
 
 #### `ParseSQL<T>`
+
 Parse a SQL string into an AST type.
 
 ```typescript
-type AST = ParseSQL<"SELECT * FROM users">
+type AST = ParseSQL<"SELECT * FROM users">;
 ```
 
 #### `QueryResult<SQL, Schema>`
+
 Parse SQL and match against schema to get result type.
 
 ```typescript
-type Result = QueryResult<"SELECT id, name FROM users", MySchema>
+type Result = QueryResult<"SELECT id, name FROM users", MySchema>;
 // Result: { id: number; name: string }
 ```
 
 #### `ValidateSQL<SQL, Schema>`
+
 Validate a query at compile time. Returns `true` if valid, or error message string if invalid.
 
 ```typescript
-type Valid = ValidateSQL<"SELECT id FROM users", MySchema>
+type Valid = ValidateSQL<"SELECT id FROM users", MySchema>;
 // Result: true
 
-type Invalid = ValidateSQL<"SELECT bad_col FROM users", MySchema>
+type Invalid = ValidateSQL<"SELECT bad_col FROM users", MySchema>;
 // Result: "Column 'bad_col' not found in any table"
 ```
 
 #### `MatchQuery<AST, Schema>`
+
 Match a parsed AST against a schema (lower level than QueryResult).
 
 ```typescript
-type AST = ParseSQL<"SELECT id FROM users">
-type Result = MatchQuery<AST, MySchema>
+type AST = ParseSQL<"SELECT id FROM users">;
+type Result = MatchQuery<AST, MySchema>;
 ```
 
 #### `MatchError<Message>`
+
 Error type returned when column/table resolution fails.
 
 ```typescript
-type Error = MatchError<"Column 'x' not found">
+type Error = MatchError<"Column 'x' not found">;
 // { __error: true; message: "Column 'x' not found" }
 ```
 
 #### `DatabaseSchema`
+
 Expected structure of a database schema.
 
 ```typescript
 type Schema = {
-  tables: {
-    [tableName: string]: {
-      [columnName: string]: any
-    }
-  }
-}
+    tables: {
+        [tableName: string]: {
+            [columnName: string]: any;
+        };
+    };
+};
 ```
 
 ### AST Types
@@ -529,10 +592,11 @@ parser/type-parser/
 ### E-Commerce Query
 
 ```typescript
-import type { QueryResult } from '@kuindji/sql-type-parser'
-import type { ECommerceSchema } from '@kuindji/sql-type-parser/examples'
+import type { QueryResult } from "@kuindji/sql-type-parser";
+import type { ECommerceSchema } from "@kuindji/sql-type-parser/examples";
 
-type CustomerOrderSummary = QueryResult<`
+type CustomerOrderSummary = QueryResult<
+    `
   WITH order_stats AS (
     SELECT 
       user_id,
@@ -555,7 +619,9 @@ type CustomerOrderSummary = QueryResult<`
   WHERE u.role = 'customer'
   ORDER BY os.lifetime_value DESC
   LIMIT 100
-`, ECommerceSchema>
+`,
+    ECommerceSchema
+>;
 
 // Result type:
 // {
@@ -571,10 +637,11 @@ type CustomerOrderSummary = QueryResult<`
 ### Blog Query
 
 ```typescript
-import type { QueryResult } from '@kuindji/sql-type-parser'
-import type { BlogSchema } from '@kuindji/sql-type-parser/examples'
+import type { QueryResult } from "@kuindji/sql-type-parser";
+import type { BlogSchema } from "@kuindji/sql-type-parser/examples";
 
-type PostsWithComments = QueryResult<`
+type PostsWithComments = QueryResult<
+    `
   SELECT 
     p.title,
     p.status,
@@ -587,7 +654,9 @@ type PostsWithComments = QueryResult<`
   GROUP BY p.id, p.title, p.status, u.name
   ORDER BY comment_count DESC
   LIMIT 10
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 
 // Result type:
 // {
