@@ -6,8 +6,8 @@
  * produce result types.
  */
 
-import type { QueryResult, ValidateSQL, MatchQuery, MatchError, DatabaseSchema, ParseSQL } from "../src/index.js"
-import type { BlogSchema, ECommerceSchema, JsonSchema } from "./schema.js"
+import type { QueryResult, ValidateSQL, MatchQuery, MatchError, DatabaseSchema, ParseSQL } from "../../src/index.js"
+import type { BlogSchema, ECommerceSchema, JsonSchema } from "../schema.js"
 
 // ============================================================================
 // 1. Basic Column Selection
@@ -467,7 +467,7 @@ type InventoryReport = QueryResult<`
 // 17. camelCase Identifiers (quoted to preserve case)
 // ============================================================================
 
-import type { CamelCaseSchema } from "./schema.js"
+import type { CamelCaseSchema } from "../schema.js"
 
 // Note: In SQL, identifiers with uppercase letters must be quoted to preserve case.
 
@@ -628,7 +628,7 @@ type ComplexCamelCase = QueryResult<`
 // 23. Schema-Qualified Queries
 // ============================================================================
 
-import type { MultiSchemaExample } from "./schema.js"
+import type { MultiSchemaExample } from "../schema.js"
 
 /** Query table from default schema (public) */
 type DefaultSchemaQuery = QueryResult<

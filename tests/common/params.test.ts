@@ -15,8 +15,8 @@ import type {
   SelectResult,
   SelectResultArray,
   IsValidSelect,
-} from "../src/index.js"
-import type { AssertEqual, AssertExtends, RequireTrue } from "./helpers.js"
+} from "../../src/index.js"
+import type { AssertEqual, AssertExtends, RequireTrue } from "../helpers.js"
 
 // Schema for testing
 type TestSchema = {
@@ -232,7 +232,8 @@ type _OrderLimitParam = RequireTrue<AssertEqual<
   { id: number; name: string }
 >>
 
-// Export to prevent unused type warnings
-export type {
-  TestSchema,
-}
+// ============================================================================
+// Export for verification
+// ============================================================================
+
+export type ParamsTestsPass = true

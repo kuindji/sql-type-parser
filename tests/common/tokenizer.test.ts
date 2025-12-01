@@ -14,13 +14,13 @@ import type {
     WhereTerminators,
     OrderByTerminators,
     StartsWith,
-} from "../src/index.js"
+} from "../../src/index.js"
 import type {
     CountOpen,
     CountClose,
     ParensBalanced,
-} from "../src/common/tokenizer.js"
-import type { AssertEqual, RequireTrue } from "./helpers.js"
+} from "../../src/common/tokenizer.js"
+import type { AssertEqual, RequireTrue } from "../helpers.js"
 
 // ============================================================================
 // NormalizeSQL Tests

@@ -13,9 +13,9 @@ import type {
     IsParseError,
     Increment,
     Decrement,
-} from "../src/index.js"
-import type { Join, ToUpperCase } from "../src/common/utils.js"
-import type { AssertEqual, RequireTrue, AssertIsParseError, AssertNotParseError } from "./helpers.js"
+} from "../../src/index.js"
+import type { Join, ToUpperCase } from "../../src/common/utils.js"
+import type { AssertEqual, RequireTrue, AssertIsParseError, AssertNotParseError } from "../helpers.js"
 
 // ============================================================================
 // Trim Tests

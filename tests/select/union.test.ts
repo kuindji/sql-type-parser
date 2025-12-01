@@ -17,8 +17,8 @@ import type {
     TableRef,
     QueryResult,
     DatabaseSchema,
-} from "../src/index.js"
-import type { AssertEqual, AssertExtends, RequireTrue, AssertIsParseError, AssertNotMatchError } from "./helpers.js"
+} from "../../src/index.js"
+import type { AssertEqual, AssertExtends, RequireTrue, AssertIsParseError, AssertNotMatchError } from "../helpers.js"
 
 // ============================================================================
 // Test Schema

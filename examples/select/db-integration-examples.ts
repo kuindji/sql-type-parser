@@ -14,9 +14,9 @@ import type {
     IsValidSelect,
     HasParameters,
     ValidQuery,
-} from "../src/index.js"
+} from "../../src/index.js"
 
-import { createSelectFn } from "../src/db.js"
+import { createSelectFn } from "../../src/db.js"
 
 /**
  * Force TypeScript to expand a type for better IDE display

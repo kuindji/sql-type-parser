@@ -38,8 +38,8 @@ import type {
     SelectItem,
     SelectColumns,
     UnionClauseAny,
-} from "../src/index.js"
-import type { AssertEqual, AssertExtends, RequireTrue, HasProperty } from "./helpers.js"
+} from "../../src/index.js"
+import type { AssertEqual, AssertExtends, RequireTrue, HasProperty } from "../helpers.js"
 
 // ============================================================================
 // Column Reference Types Tests

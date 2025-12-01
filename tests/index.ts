@@ -7,14 +7,13 @@
  * Run tests with: npm run test (or tsc --noEmit)
  */
 
-export type { ParserTestsPass } from "./parser.test.js"
-export type { MatcherTestsPass } from "./matcher.test.js"
-export type { UtilsTestsPass } from "./utils.test.js"
-export type { TokenizerTestsPass } from "./tokenizer.test.js"
-export type { ASTTestsPass } from "./ast.test.js"
+// Common utilities tests (shared by all query types)
+export type { CommonTestsPass, TokenizerTestsPass, UtilsTestsPass, ParamsTestsPass } from "./common/index.js"
+
+// SELECT query tests
+export type { SelectTestsPass, ParserTestsPass, MatcherTestsPass, ASTTestsPass, UnionTestsPass, IntegrationTestsPass } from "./select/index.js"
 
 /**
  * Master test result - true if all tests pass
  */
 export type AllTestsPass = true
-

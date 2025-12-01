@@ -5,9 +5,9 @@
  * If this file compiles without errors, all tests pass.
  */
 
-import type { QueryResult, ValidateSQL, MatchError, DatabaseSchema } from "../src/index.js"
-import type { ValidQuery } from "../src/db.js"
-import type { AssertEqual, AssertExtends, RequireTrue, AssertIsMatchError, AssertNotMatchError, IsNever } from "./helpers.js"
+import type { QueryResult, ValidateSQL, MatchError, DatabaseSchema } from "../../src/index.js"
+import type { ValidQuery } from "../../src/db.js"
+import type { AssertEqual, AssertExtends, RequireTrue, AssertIsMatchError, AssertNotMatchError, IsNever } from "../helpers.js"
 
 // ============================================================================
 // Test Schemas
@@ -626,7 +626,7 @@ type V_ValidAllClauses = ValidateSQL<
 type _V14 = RequireTrue<AssertEqual<V_ValidAllClauses, true>>
 
 // Test: Invalid WHERE column is allowed when validateAllFields is false
-import type { ValidateSelectSQL } from "../src/index.js"
+import type { ValidateSelectSQL } from "../../src/index.js"
 
 type V_InvalidWhereCol_NoFullCheck = ValidateSelectSQL<
     "SELECT id FROM users WHERE bad_column = 1",

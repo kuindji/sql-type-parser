@@ -1,20 +1,21 @@
 /**
  * Examples Index
  * 
- * Re-exports all example types for easy importing
+ * Re-exports all example types for easy importing.
+ * These are schema definitions and type examples - tests are in the /tests folder.
  */
 
-// Schema examples
+// Shared schema definitions (used by all examples and tests)
 export type {
   ECommerceSchema,
   BlogSchema,
   JsonSchema,
   CamelCaseSchema,
+  MultiSchemaExample,
   UUID,
   Timestamp,
   JSONObject,
 } from "./schema.js"
 
-// All tests pass if this compiles
-export type { TestsPass } from "./tests.js"
-
+// SELECT query examples
+export * from "./select/index.js"

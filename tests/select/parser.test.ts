@@ -24,8 +24,8 @@ import type {
     UnparsedExpr,
     ParsedCondition,
     ParseError,
-} from "../src/index.js"
-import type { AssertEqual, AssertExtends, RequireTrue, AssertIsParseError } from "./helpers.js"
+} from "../../src/index.js"
+import type { AssertEqual, AssertExtends, RequireTrue, AssertIsParseError } from "../helpers.js"
 
 // ============================================================================
 // Basic SELECT Tests
