@@ -251,12 +251,77 @@ export type IsMatchError<T> = T extends { readonly __error: true } ? true : fals
  * This is used to detect dynamic queries that can't be parsed at compile time.
  * 
  * When T is a literal like "SELECT * FROM users", this returns true.
- * When T is `string` (the type) or contains unresolvable template parts, this returns false.
+ * When T is `string` (the type), this returns false.
  * 
- * The trick is that `string extends T` is only true when T is exactly `string`,
- * not when T is a literal like "hello".
+ * Note: Template literal types like `hello ${string}` are still considered literals
+ * by this check because they're specific types (not plain `string`). The parser
+ * will handle these by parsing the static parts and ignoring the dynamic parts.
  */
 export type IsStringLiteral<T extends string> = string extends T ? false : true
+
+/**
+ * Check if a string type contains template literal holes (like ${string}).
+ * 
+ * Template literals like `hello ${string}` are NOT plain `string`, but they
+ * contain dynamic parts that can't be validated at compile time.
+ * 
+ * This is more aggressive than IsStringLiteral and is used by validators
+ * to skip validation when dynamic parts are present.
+ * 
+ * Detection strategy:
+ * 1. Check for trailing ${string}: can we append characters and still match?
+ * 2. Check for leading ${string}: can we prepend characters and still match?
+ * 3. Check for internal ${string}: recursively check space-separated segments
+ */
+export type HasTemplateHoles<T extends string> = 
+  // First check plain string
+  string extends T
+    ? true
+    // Check for trailing ${string} - appending still matches
+    : `${T}_` extends T
+      ? true
+      // Check for leading ${string} - prepending still matches
+      : `_${T}` extends T
+        ? true
+        // Check for internal ${string} by trying to find a segment that accepts multiple values
+        : HasInternalHole<T>
+
+/**
+ * Check for internal ${string} holes by testing if different values can fill the same position.
+ * For SQL queries, ${string} is typically surrounded by spaces, so we split on spaces
+ * and check if any segment can accept multiple values.
+ */
+type HasInternalHole<T extends string> =
+  // Try matching with space-separated pattern
+  T extends `${infer Before} ${infer After}`
+    ? // Test if we can insert different values at this space boundary
+      `${Before} __X__ ${After}` extends T
+        ? `${Before} __Y__ ${After}` extends T
+          ? true  // Found a hole! Both test values match
+          : HasInternalHole<After>  // Try next segment
+        : HasInternalHole<After>  // Try next segment
+    : // Also check for holes at other common SQL boundaries
+      HasHoleAtOtherBoundaries<T>
+
+/**
+ * Check for holes at non-space boundaries (commas, equals, parentheses)
+ */
+type HasHoleAtOtherBoundaries<T extends string> =
+  // Check comma boundaries
+  T extends `${infer A},${infer B}`
+    ? `${A},__X__,${B}` extends T
+      ? `${A},__Y__,${B}` extends T
+        ? true
+        : HasHoleAtOtherBoundaries<B>
+      : HasHoleAtOtherBoundaries<B>
+    : // Check equals boundaries  
+      T extends `${infer A}=${infer B}`
+        ? `${A}=__X__=${B}` extends T
+          ? `${A}=__Y__=${B}` extends T
+            ? true
+            : false
+          : false
+        : false
 
 /**
  * Marker for dynamic/non-literal queries that can't be validated at compile time.

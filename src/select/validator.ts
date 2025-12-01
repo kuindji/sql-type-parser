@@ -52,7 +52,7 @@ import type {
   OrderByItem,
 } from "../common/ast.js"
 
-import type { Flatten, MatchError, IsMatchError, ParseError, IsParseError, IsStringLiteral, DynamicQuery } from "../common/utils.js"
+import type { Flatten, MatchError, IsMatchError, ParseError, IsParseError, HasTemplateHoles, DynamicQuery } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseSelectSQL } from "./parser.js"
@@ -139,7 +139,7 @@ export type ValidateSelectSQL<
   SQL extends string,
   Schema extends DatabaseSchema,
   Options extends ValidateSelectOptions = DefaultValidateOptions,
-> = IsStringLiteral<SQL> extends false
+> = HasTemplateHoles<SQL> extends true
   ? true  // Dynamic queries bypass validation - can't validate at compile time
   : ParseSelectSQL<SQL> extends infer Parsed
     ? Parsed extends ParseError<infer E>

@@ -27,7 +27,7 @@ import type {
   UnboundColumnRef,
 } from "../common/ast.js"
 
-import type { MatchError, IsMatchError, ParseError, IsParseError, IsStringLiteral } from "../common/utils.js"
+import type { MatchError, IsMatchError, ParseError, IsParseError, HasTemplateHoles } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseInsertSQL } from "./parser.js"
@@ -83,7 +83,7 @@ export type ValidateInsertSQL<
   SQL extends string,
   Schema extends DatabaseSchema,
   Options extends ValidateInsertOptions = DefaultValidateOptions,
-> = IsStringLiteral<SQL> extends false
+> = HasTemplateHoles<SQL> extends true
   ? true  // Dynamic queries bypass validation
   : ParseInsertSQL<SQL> extends infer Parsed
     ? Parsed extends ParseError<infer E>

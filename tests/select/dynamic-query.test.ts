@@ -68,10 +68,17 @@ type _Q2 = RequireTrue<AssertEqual<Test_QueryResultLiteral, { id: number; name: 
 // Test: DynamicQueryResult is Record<string, unknown>
 type _Q3 = RequireTrue<AssertEqual<DynamicQueryResult, Record<string, unknown>>>
 
-const queryPart = "WHERE id = 1";
-const query = `SELECT id FROM users ${queryPart}` as const;
-type Test_QueryResultDynamic2 = QueryResult<typeof query, BlogSchema>
-type _Q4 = RequireTrue<AssertEqual<Test_QueryResultDynamic2, { id: number }>>
+let queryWherePart = "";
+queryWherePart = `and "id" = $1`;
+const queryDynamicWhere = `SELECT id FROM users WHERE "id" = 1 ${queryWherePart} order by "id" desc` as const;
+type Test_QueryResultDynamicWhere = QueryResult<typeof queryDynamicWhere, BlogSchema>
+type _Q4 = RequireTrue<AssertEqual<Test_QueryResultDynamicWhere, { id: number }>>
+
+let queryBetweenPart = "";
+queryBetweenPart = `join posts on posts.user_id = users.id`;
+const queryDynamicInBetween = `SELECT id FROM users ${queryBetweenPart} WHERE "id" = 1  order by "id" desc` as const;
+type Test_QueryResultDynamicInBetween = QueryResult<typeof queryDynamicInBetween, BlogSchema>
+type _Q5 = RequireTrue<AssertEqual<Test_QueryResultDynamicInBetween, { id: number }>>
 
 // ============================================================================
 // ValidateSQL with Dynamic Queries
@@ -89,8 +96,11 @@ type _V2 = RequireTrue<AssertEqual<Test_ValidateLiteralValid, true>>
 type Test_ValidateLiteralInvalid = ValidateSQL<"SELECT bad_col FROM users", BlogSchema>
 type _V3 = RequireTrue<AssertExtends<Test_ValidateLiteralInvalid, string>>
 
-type Test_ValidateDynamic2 = ValidateSQL<typeof query, BlogSchema>
-type _V4 = RequireTrue<AssertEqual<Test_ValidateDynamic2, true>>
+type Test_ValidateDynamicWhere = ValidateSQL<typeof queryDynamicWhere, BlogSchema>
+type _V4 = RequireTrue<AssertEqual<Test_ValidateDynamicWhere, true>>
+
+type Test_ValidateDynamicInBetween = ValidateSQL<typeof queryDynamicInBetween, BlogSchema>
+type _V5 = RequireTrue<AssertEqual<Test_ValidateDynamicInBetween, true>>
 // ============================================================================
 // Real-world Usage Pattern
 // ============================================================================

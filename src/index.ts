@@ -103,6 +103,7 @@ export type {
 
   // Dynamic query support
   IsStringLiteral,
+  HasTemplateHoles,
   DynamicQuery,
   IsDynamicQuery,
   DynamicQueryResult,

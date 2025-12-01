@@ -25,7 +25,7 @@ import type {
   ParsedCondition,
 } from "../common/ast.js"
 
-import type { MatchError, IsMatchError, ParseError, IsParseError, IsStringLiteral } from "../common/utils.js"
+import type { MatchError, IsMatchError, ParseError, IsParseError, HasTemplateHoles } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseDeleteSQL } from "./parser.js"
@@ -77,7 +77,7 @@ export type ValidateDeleteSQL<
   SQL extends string,
   Schema extends DatabaseSchema,
   Options extends ValidateDeleteOptions = DefaultValidateOptions,
-> = IsStringLiteral<SQL> extends false
+> = HasTemplateHoles<SQL> extends true
   ? true  // Dynamic queries bypass validation
   : ParseDeleteSQL<SQL> extends infer Parsed
     ? Parsed extends ParseError<infer E>

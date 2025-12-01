@@ -36,6 +36,7 @@ export type {
   IsMatchError,
   // Dynamic query support
   IsStringLiteral,
+  HasTemplateHoles,
   DynamicQuery,
   IsDynamicQuery,
   DynamicQueryResult,
