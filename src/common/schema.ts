@@ -71,10 +71,11 @@ export type Relations = {
 /**
  * Definition of a single table's columns
  * Maps column names to their TypeScript types
+ * 
+ * Uses `object` instead of index signature to allow both
+ * `interface` and `type` declarations as table definitions
  */
-export type TableDefinition = {
-    [columnName: string]: unknown
-}
+export type TableDefinition = object
 
 /**
  * Definition of tables within a database schema
