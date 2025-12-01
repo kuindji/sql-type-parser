@@ -642,21 +642,25 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
  * that should not be treated as a column
  */
 type IsKeywordOrOperator<T extends string> =
-  // SQL keywords
-  T extends "SELECT" | "FROM" | "WHERE" | "AND" | "OR" | "NOT" | "IN" | "IS" | "NULL"
-    | "TRUE" | "FALSE" | "LIKE" | "ILIKE" | "BETWEEN" | "EXISTS" | "CASE" | "WHEN"
-    | "THEN" | "ELSE" | "END" | "AS" | "ON" | "JOIN" | "LEFT" | "RIGHT" | "INNER"
-    | "OUTER" | "FULL" | "CROSS" | "GROUP" | "BY" | "HAVING" | "ORDER" | "ASC" | "DESC"
-    | "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT" | "ALL" | "DISTINCT"
-    | "COUNT" | "SUM" | "AVG" | "MIN" | "MAX" | "COALESCE" | "NULLIF" | "CAST"
+  // String literals (single-quoted values are values, not identifiers)
+  // Note: Double quotes are for identifiers, single quotes are for string values
+  T extends `'${string}'`
     ? true
-    // Parameter placeholders ($1, $2, etc. or :name)
-    : T extends `$${number}` | `$${string}` | `:${string}`
+    // SQL keywords
+    : T extends "SELECT" | "FROM" | "WHERE" | "AND" | "OR" | "NOT" | "IN" | "IS" | "NULL"
+      | "TRUE" | "FALSE" | "LIKE" | "ILIKE" | "BETWEEN" | "EXISTS" | "CASE" | "WHEN"
+      | "THEN" | "ELSE" | "END" | "AS" | "ON" | "JOIN" | "LEFT" | "RIGHT" | "INNER"
+      | "OUTER" | "FULL" | "CROSS" | "GROUP" | "BY" | "HAVING" | "ORDER" | "ASC" | "DESC"
+      | "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT" | "ALL" | "DISTINCT"
+      | "COUNT" | "SUM" | "AVG" | "MIN" | "MAX" | "COALESCE" | "NULLIF" | "CAST"
       ? true
-      // Numeric literals
-      : T extends `${number}`
+      // Parameter placeholders ($1, $2, etc. or :name)
+      : T extends `$${number}` | `$${string}` | `:${string}`
         ? true
-        : false
+        // Numeric literals
+        : T extends `${number}`
+          ? true
+          : false
 
 /**
  * Extract the column name before the :: cast operator

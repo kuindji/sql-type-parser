@@ -702,7 +702,7 @@ type MultiSchemaQuery = QueryResult<`
 
 /** Validate schema-qualified query */
 type ValidSchemaQuery = ValidateSQL<
-  "SELECT id, action FROM audit.logs",
+  "SELECT id, action FROM audit.logs where id = '122'",
   MultiSchemaExample
 >
 // Result: true
