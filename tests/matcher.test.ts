@@ -6,7 +6,8 @@
  */
 
 import type { QueryResult, ValidateSQL, MatchError, DatabaseSchema } from "../src/matcher.js"
-import type { AssertEqual, AssertExtends, RequireTrue, AssertIsMatchError, AssertNotMatchError } from "./helpers.js"
+import type { ValidQuery } from "../src/db.js"
+import type { AssertEqual, AssertExtends, RequireTrue, AssertIsMatchError, AssertNotMatchError, IsNever } from "./helpers.js"
 
 // ============================================================================
 // Test Schemas
@@ -485,6 +486,98 @@ type _M45 = RequireTrue<AssertNotMatchError<M_NoMatch>>
 // Test: Select same column twice with different aliases
 type M_SameColTwice = QueryResult<"SELECT id AS id1, id AS id2 FROM users", TestSchema>
 type _M46 = RequireTrue<AssertEqual<M_SameColTwice, { id1: number; id2: number }>>
+
+// ============================================================================
+// Complex Object / JSON Field Tests
+// ============================================================================
+
+// Schema with complex object types (JSON fields)
+type JsonFieldSchema = {
+    defaultSchema: "public"
+    schemas: {
+        public: {
+            items: {
+                id: number
+                name: string
+                // Nested object type (like a JSON field)
+                metadata: { foo: string; bar: number }
+                // Deeply nested object
+                config: { 
+                    settings: { 
+                        enabled: boolean
+                        values: number[] 
+                    }
+                    tags: string[]
+                }
+                // Nullable object
+                extra: { key: string } | null
+                // Record type (common for JSON)
+                data: Record<string, unknown>
+            }
+        }
+    }
+}
+
+// Test: Query with nested object field returns correct type (not never)
+type M_JsonField = QueryResult<"SELECT metadata FROM items", JsonFieldSchema>
+type _M47 = RequireTrue<AssertEqual<M_JsonField, { metadata: { foo: string; bar: number } }>>
+
+// Test: Query with deeply nested object field
+type M_DeepJsonField = QueryResult<"SELECT config FROM items", JsonFieldSchema>
+type _M48 = RequireTrue<AssertEqual<
+    M_DeepJsonField, 
+    { config: { settings: { enabled: boolean; values: number[] }; tags: string[] } }
+>>
+
+// Test: Query with nullable object field
+type M_NullableJsonField = QueryResult<"SELECT extra FROM items", JsonFieldSchema>
+type _M49 = RequireTrue<AssertEqual<M_NullableJsonField, { extra: { key: string } | null }>>
+
+// Test: Query with Record type field
+type M_RecordField = QueryResult<"SELECT data FROM items", JsonFieldSchema>
+type _M50 = RequireTrue<AssertEqual<M_RecordField, { data: Record<string, unknown> }>>
+
+// Test: ValidateSQL returns true for JSON field queries (not never)
+type V_JsonValid = ValidateSQL<"SELECT metadata FROM items", JsonFieldSchema>
+type _V6 = RequireTrue<AssertEqual<V_JsonValid, true>>
+
+// Test: ValidateSQL returns true for deeply nested JSON field queries
+type V_DeepJsonValid = ValidateSQL<"SELECT config FROM items", JsonFieldSchema>
+type _V7 = RequireTrue<AssertEqual<V_DeepJsonValid, true>>
+
+// Test: Multiple JSON fields in one query
+type M_MultiJsonFields = QueryResult<"SELECT id, metadata, config FROM items", JsonFieldSchema>
+type _M51 = RequireTrue<AssertEqual<
+    M_MultiJsonFields,
+    { 
+        id: number
+        metadata: { foo: string; bar: number }
+        config: { settings: { enabled: boolean; values: number[] }; tags: string[] }
+    }
+>>
+
+// Test: SELECT * with JSON fields
+type M_StarWithJson = QueryResult<"SELECT * FROM items", JsonFieldSchema>
+type _M52 = RequireTrue<AssertExtends<M_StarWithJson, { id: number; metadata: { foo: string; bar: number } }>>
+
+// Test: ValidateSQL for SELECT * with JSON fields returns true
+type V_StarJsonValid = ValidateSQL<"SELECT * FROM items", JsonFieldSchema>
+type _V8 = RequireTrue<AssertEqual<V_StarJsonValid, true>>
+
+// Test: ValidQuery returns query string (not never) for JSON field queries
+type VQ_JsonField = ValidQuery<"SELECT metadata FROM items", JsonFieldSchema>
+type _VQ1 = RequireTrue<AssertEqual<IsNever<VQ_JsonField>, false>>
+type _VQ2 = RequireTrue<AssertExtends<VQ_JsonField, string>>
+
+// Test: ValidQuery returns query string for deeply nested JSON field queries
+type VQ_DeepJsonField = ValidQuery<"SELECT config FROM items", JsonFieldSchema>
+type _VQ3 = RequireTrue<AssertEqual<IsNever<VQ_DeepJsonField>, false>>
+type _VQ4 = RequireTrue<AssertExtends<VQ_DeepJsonField, string>>
+
+// Test: ValidQuery returns query string for SELECT * with JSON fields
+type VQ_StarJson = ValidQuery<"SELECT * FROM items", JsonFieldSchema>
+type _VQ5 = RequireTrue<AssertEqual<IsNever<VQ_StarJson>, false>>
+type _VQ6 = RequireTrue<AssertExtends<VQ_StarJson, string>>
 
 // ============================================================================
 // Export for verification
