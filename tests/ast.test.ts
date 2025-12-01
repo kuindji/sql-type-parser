@@ -6,7 +6,7 @@
  */
 
 import type {
-    SQLQuery,
+    SQLSelectQuery,
     SelectClause,
     SubquerySelectClause,
     ColumnRef,
@@ -279,11 +279,11 @@ type SSC_Check = SubquerySelectClause extends { type: "SelectClause"; distinct: 
 type _SSC1 = RequireTrue<SSC_Check>
 
 // ============================================================================
-// SQLQuery Tests
+// SQLSelectQuery Tests
 // ============================================================================
 
-// Test: SQLQuery structure - can contain SelectClause or UnionClauseAny
-type SQ_Check = SQLQuery extends { type: "SQLQuery"; query: SelectClause | UnionClauseAny } ? true : false
+// Test: SQLSelectQuery structure - can contain SelectClause or UnionClauseAny
+type SQ_Check = SQLSelectQuery extends { type: "SQLQuery"; query: SelectClause | UnionClauseAny } ? true : false
 type _SQ1 = RequireTrue<SQ_Check>
 
 // ============================================================================

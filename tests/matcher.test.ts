@@ -416,7 +416,7 @@ type V_ValidComplex = ValidateSQL<
   FROM users AS u
   INNER JOIN posts AS p ON u.id = p.author_id
   WHERE u.is_active = TRUE
-  ORDER BY p.created_at DESC
+  ORDER BY p.views DESC
   LIMIT 10
 `,
     TestSchema
@@ -578,6 +578,86 @@ type _VQ4 = RequireTrue<AssertExtends<VQ_DeepJsonField, string>>
 type VQ_StarJson = ValidQuery<"SELECT * FROM items", JsonFieldSchema>
 type _VQ5 = RequireTrue<AssertEqual<IsNever<VQ_StarJson>, false>>
 type _VQ6 = RequireTrue<AssertExtends<VQ_StarJson, string>>
+
+// ============================================================================
+// Full Field Validation Tests (validateAllFields option)
+// ============================================================================
+
+// Test: Invalid WHERE column detected with full validation (default)
+type V_InvalidWhereCol = ValidateSQL<"SELECT id FROM users WHERE bad_column = 1", TestSchema>
+type _V9 = RequireTrue<AssertExtends<V_InvalidWhereCol, string>>
+
+// Test: Invalid ORDER BY column detected with full validation (default)
+type V_InvalidOrderByCol = ValidateSQL<"SELECT id FROM users ORDER BY bad_column", TestSchema>
+type _V10 = RequireTrue<AssertExtends<V_InvalidOrderByCol, string>>
+
+// Test: Invalid GROUP BY column detected with full validation (default)
+type V_InvalidGroupByCol = ValidateSQL<"SELECT id FROM users GROUP BY bad_column", TestSchema>
+type _V11 = RequireTrue<AssertExtends<V_InvalidGroupByCol, string>>
+
+// Test: Invalid JOIN ON column detected with full validation (default)
+type V_InvalidJoinOnCol = ValidateSQL<
+    "SELECT u.id FROM users AS u INNER JOIN posts AS p ON u.bad_column = p.author_id",
+    TestSchema
+>
+type _V12 = RequireTrue<AssertExtends<V_InvalidJoinOnCol, string>>
+
+// Test: Invalid HAVING column detected with full validation (default)
+type V_InvalidHavingCol = ValidateSQL<
+    "SELECT author_id FROM posts GROUP BY author_id HAVING bad_column > 0",
+    TestSchema
+>
+type _V13 = RequireTrue<AssertExtends<V_InvalidHavingCol, string>>
+
+// Test: Valid query with all clauses passes full validation
+type V_ValidAllClauses = ValidateSQL<
+    `
+  SELECT u.name, p.title
+  FROM users AS u
+  INNER JOIN posts AS p ON u.id = p.author_id
+  WHERE u.is_active = TRUE
+  GROUP BY u.name, p.title
+  HAVING u.name IS NOT NULL
+  ORDER BY p.title
+  LIMIT 10
+`,
+    TestSchema
+>
+type _V14 = RequireTrue<AssertEqual<V_ValidAllClauses, true>>
+
+// Test: Invalid WHERE column is allowed when validateAllFields is false
+import type { ValidateSelectSQL } from "../src/index.js"
+
+type V_InvalidWhereCol_NoFullCheck = ValidateSelectSQL<
+    "SELECT id FROM users WHERE bad_column = 1",
+    TestSchema,
+    { validateAllFields: false }
+>
+type _V15 = RequireTrue<AssertEqual<V_InvalidWhereCol_NoFullCheck, true>>
+
+// Test: Invalid ORDER BY column is allowed when validateAllFields is false
+type V_InvalidOrderByCol_NoFullCheck = ValidateSelectSQL<
+    "SELECT id FROM users ORDER BY bad_column",
+    TestSchema,
+    { validateAllFields: false }
+>
+type _V16 = RequireTrue<AssertEqual<V_InvalidOrderByCol_NoFullCheck, true>>
+
+// Test: Invalid JOIN ON column is allowed when validateAllFields is false
+type V_InvalidJoinOnCol_NoFullCheck = ValidateSelectSQL<
+    "SELECT u.id FROM users AS u INNER JOIN posts AS p ON u.bad_column = p.author_id",
+    TestSchema,
+    { validateAllFields: false }
+>
+type _V17 = RequireTrue<AssertEqual<V_InvalidJoinOnCol_NoFullCheck, true>>
+
+// Test: Invalid SELECT column still fails even when validateAllFields is false
+type V_InvalidSelectCol_NoFullCheck = ValidateSelectSQL<
+    "SELECT bad_column FROM users",
+    TestSchema,
+    { validateAllFields: false }
+>
+type _V18 = RequireTrue<AssertExtends<V_InvalidSelectCol_NoFullCheck, string>>
 
 // ============================================================================
 // Export for verification

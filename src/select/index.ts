@@ -24,7 +24,6 @@ export type { ParseSelectSQL } from "./parser.js"
 export type {
   // Query wrapper types
   SQLSelectQuery,
-  SQLQuery,
 
   // Column types
   ColumnRef,
@@ -64,5 +63,6 @@ export type { DatabaseSchema } from "../common/schema.js"
 // Re-export validator types (comprehensive validation)
 export type {
   ValidateSelectSQL,
+  ValidateSelectOptions,
 } from "./validator.js"
 

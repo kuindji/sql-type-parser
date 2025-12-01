@@ -88,6 +88,7 @@ export type {
   LiteralValue,
   BinaryExpr,
   UnparsedExpr,
+  ParsedCondition,
   LogicalExprAny,
   WhereExpr,
   LogicalExpr,

@@ -7,7 +7,6 @@
 
 import type {
   SQLSelectQuery,
-  SQLQuery,
   SelectClause,
   ColumnRef,
   SubqueryExpr,
@@ -55,16 +54,10 @@ export type MatchSelectQuery<
   Schema extends DatabaseSchema,
 > = Query extends SQLSelectQuery<infer QueryContent>
   ? QueryContent extends UnionClauseAny
-  ? MatchUnionClause<QueryContent, Schema>
-  : QueryContent extends SelectClause
-  ? MatchSelectClause<QueryContent, Schema>
-  : MatchError<"Invalid query content type">
-  : Query extends SQLQuery<infer QueryContent>
-  ? QueryContent extends UnionClauseAny
-  ? MatchUnionClause<QueryContent, Schema>
-  : QueryContent extends SelectClause
-  ? MatchSelectClause<QueryContent, Schema>
-  : MatchError<"Invalid query content type">
+    ? MatchUnionClause<QueryContent, Schema>
+    : QueryContent extends SelectClause
+      ? MatchSelectClause<QueryContent, Schema>
+      : MatchError<"Invalid query content type">
   : MatchError<"Invalid query type">
 
 /**

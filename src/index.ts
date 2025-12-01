@@ -135,6 +135,7 @@ export type {
   LiteralValue,
   BinaryExpr,
   UnparsedExpr,
+  ParsedCondition,
   LogicalExprAny,
   WhereExpr,
   LogicalExpr,
@@ -155,7 +156,6 @@ export type {
 export type {
   // Query wrapper types
   SQLSelectQuery,
-  SQLQuery,  // Legacy alias
 
   // Column types
   ColumnRef,
@@ -179,7 +179,8 @@ export type {
 
   // Validator types (comprehensive validation)
   ValidateSelectSQL,
-  ValidateSQL,  // Legacy alias for ValidateSelectSQL
+  ValidateSelectOptions,
+  ValidateSQL,
 } from "./select/index.js"
 
 // ============================================================================

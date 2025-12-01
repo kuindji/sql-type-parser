@@ -5,7 +5,7 @@
  * Each example shows the SQL query and the expected AST type.
  */
 
-import type { ParseSQL, SQLQuery, SelectClause } from "../src/index.js"
+import type { ParseSQL, SQLSelectQuery, SelectClause } from "../src/index.js"
 
 // ============================================================================
 // 1. Basic SELECT Queries
@@ -636,12 +636,12 @@ type ComplexMixedCase = ParseSQL<`
 /**
  * Helper to verify a query parses successfully
  */
-type AssertParses<T extends SQLQuery> = T
+type AssertParses<T extends SQLSelectQuery> = T
 
 /**
  * Helper to verify a query parses to a specific select clause
  */
-type AssertSelectClause<T extends SQLQuery<SelectClause>> = T
+type AssertSelectClause<T extends SQLSelectQuery<SelectClause>> = T
 
 // Verify some queries parse correctly
 type _Verify1 = AssertParses<BasicSelectAll>

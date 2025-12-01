@@ -12,6 +12,7 @@ A TypeScript type-level parser that transforms SQL SELECT query string literals 
 - **📊 Full AST representation**: Returns a complete Abstract Syntax Tree as a type
 - **🎯 Type-safe results**: Match queries against your schema to get result types
 - **✅ Query validation**: Catch errors at compile time
+- **🔍 Full field validation**: Validates field references in WHERE, JOIN ON, HAVING, GROUP BY, ORDER BY clauses
 - **🚫 Zero runtime**: Pure type-level operations, no runtime code
 
 ### Supported SQL Features
@@ -138,6 +139,69 @@ type HasError = ValidateSQL<"SELECT unknown_col FROM users", MySchema>;
 type TableError = ValidateSQL<"SELECT * FROM bad_table", MySchema>;
 // Result: "Table 'bad_table' not found in schema"
 ```
+
+### 4. Full Field Validation
+
+By default, `ValidateSQL` validates field references in **all** SQL clauses, not just the SELECT columns:
+
+```typescript
+import type { ValidateSQL, ValidateSelectSQL } from "@kuindji/sql-type-parser";
+
+// Invalid WHERE column is caught
+type WhereError = ValidateSQL<"SELECT id FROM users WHERE bad_col = 1", MySchema>;
+// Result: "Column 'bad_col' not found in any table"
+
+// Invalid JOIN ON column is caught
+type JoinError = ValidateSQL<
+    "SELECT u.id FROM users AS u JOIN orders AS o ON u.bad_col = o.user_id",
+    MySchema
+>;
+// Result: "Column 'bad_col' not found in 'u'"
+
+// Invalid ORDER BY column is caught
+type OrderError = ValidateSQL<"SELECT id FROM users ORDER BY bad_col", MySchema>;
+// Result: "Column 'bad_col' not found in any table"
+
+// Invalid GROUP BY column is caught
+type GroupError = ValidateSQL<"SELECT id FROM users GROUP BY bad_col", MySchema>;
+// Result: "Column 'bad_col' not found in any table"
+
+// Invalid HAVING column is caught
+type HavingError = ValidateSQL<
+    "SELECT user_id FROM orders GROUP BY user_id HAVING bad_col > 0",
+    MySchema
+>;
+// Result: "Column 'bad_col' not found in any table"
+```
+
+#### Disabling Full Field Validation
+
+For complex queries that may hit TypeScript's recursion limits, you can disable full field validation while still validating SELECT columns:
+
+```typescript
+import type { ValidateSelectSQL } from "@kuindji/sql-type-parser";
+
+// Disable full validation - only SELECT columns are validated
+type Result = ValidateSelectSQL<
+    "SELECT id FROM users WHERE complex_expr...",
+    MySchema,
+    { validateAllFields: false }
+>;
+// Only validates that 'id' exists, ignores WHERE clause fields
+
+// SELECT column errors are still caught
+type SelectError = ValidateSelectSQL<
+    "SELECT bad_col FROM users WHERE anything...",
+    MySchema,
+    { validateAllFields: false }
+>;
+// Result: "Column 'bad_col' not found in any table"
+```
+
+This is useful when:
+- The query is too complex for TypeScript's type system
+- You only care about the result type, not full query correctness
+- You're migrating legacy code and want gradual validation
 
 ## Detailed Usage
 
@@ -563,7 +627,7 @@ type Result = QueryResult<"SELECT id, name FROM users", MySchema>;
 
 #### `ValidateSQL<SQL, Schema>`
 
-Validate a query at compile time. Returns `true` if valid, or error message string if invalid.
+Validate a query at compile time. Returns `true` if valid, or error message string if invalid. Validates all field references by default (SELECT, WHERE, JOIN ON, etc.).
 
 ```typescript
 type Valid = ValidateSQL<"SELECT id FROM users", MySchema>;
@@ -571,6 +635,37 @@ type Valid = ValidateSQL<"SELECT id FROM users", MySchema>;
 
 type Invalid = ValidateSQL<"SELECT bad_col FROM users", MySchema>;
 // Result: "Column 'bad_col' not found in any table"
+```
+
+#### `ValidateSelectSQL<SQL, Schema, Options>`
+
+Full validation type with configurable options. `ValidateSQL` is an alias for this with default options.
+
+```typescript
+// Full validation (default)
+type FullValidation = ValidateSelectSQL<
+    "SELECT id FROM users WHERE name = 'test'",
+    MySchema
+>;
+// Validates all clauses
+
+// Selective validation - only SELECT columns
+type SelectOnly = ValidateSelectSQL<
+    "SELECT id FROM users WHERE bad_col = 1",
+    MySchema,
+    { validateAllFields: false }
+>;
+// Result: true (ignores WHERE clause errors)
+```
+
+#### `ValidateSelectOptions`
+
+Options type for controlling validation depth.
+
+```typescript
+type ValidateSelectOptions = {
+    validateAllFields?: boolean;  // default: true
+}
 ```
 
 #### `MatchQuery<AST, Schema>`
@@ -610,13 +705,14 @@ type Schema = {
 
 ### AST Types
 
-- `SQLQuery` - Top-level query wrapper
+- `SQLSelectQuery` - Top-level SELECT query wrapper
 - `SelectClause` - SELECT statement AST
 - `ColumnRef`, `TableColumnRef`, `UnboundColumnRef` - Column references
 - `TableRef`, `DerivedTableRef` - Table references
 - `CTEDefinition` - Common Table Expression
 - `JoinClause`, `JoinType` - JOIN clause types
 - `WhereExpr`, `BinaryExpr`, `LogicalExpr` - Expression types
+- `ParsedCondition` - Condition with extracted column references (for validation)
 - `OrderByItem`, `SortDirection` - ORDER BY types
 - `AggregateExpr`, `AggregateFunc` - Aggregate function types
 - `LiteralValue` - Literal value wrapper

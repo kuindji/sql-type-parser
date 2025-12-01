@@ -11,7 +11,7 @@ import type {
   QueryResult,
   ValidateSQL,
   MatchError,
-  SQLQuery,
+  SQLSelectQuery,
   SelectClause,
   ColumnRef,
   TableRef,
@@ -59,23 +59,23 @@ type AssertIsError<T> = T extends { __error: true } ? true : false
 
 // Test: SELECT * FROM table
 type Test_SelectAll = ParseSQL<"SELECT * FROM users">
-type _T1 = RequireTrue<AssertExtends<Test_SelectAll, SQLQuery>>
+type _T1 = RequireTrue<AssertExtends<Test_SelectAll, SQLSelectQuery>>
 
 // Test: SELECT columns FROM table
 type Test_SelectColumns = ParseSQL<"SELECT id, name FROM users">
-type _T2 = RequireTrue<AssertExtends<Test_SelectColumns, SQLQuery>>
+type _T2 = RequireTrue<AssertExtends<Test_SelectColumns, SQLSelectQuery>>
 
 // Test: SELECT with column alias
 type Test_ColumnAlias = ParseSQL<"SELECT id AS user_id FROM users">
-type _T3 = RequireTrue<AssertExtends<Test_ColumnAlias, SQLQuery>>
+type _T3 = RequireTrue<AssertExtends<Test_ColumnAlias, SQLSelectQuery>>
 
 // Test: SELECT with table alias
 type Test_TableAlias = ParseSQL<"SELECT u.id FROM users AS u">
-type _T4 = RequireTrue<AssertExtends<Test_TableAlias, SQLQuery>>
+type _T4 = RequireTrue<AssertExtends<Test_TableAlias, SQLSelectQuery>>
 
 // Test: DISTINCT
 type Test_Distinct = ParseSQL<"SELECT DISTINCT role FROM users">
-type Test_Distinct_IsDistinct = Test_Distinct extends SQLQuery<infer Q>
+type Test_Distinct_IsDistinct = Test_Distinct extends SQLSelectQuery<infer Q>
   ? Q extends { distinct: true } ? true : false
   : false
 type _T5 = RequireTrue<Test_Distinct_IsDistinct>
@@ -86,22 +86,22 @@ type _T5 = RequireTrue<Test_Distinct_IsDistinct>
 
 // Test: Simple WHERE
 type Test_Where = ParseSQL<"SELECT * FROM users WHERE id = 1">
-type Test_Where_HasWhere = Test_Where extends SQLQuery<infer Q>
+type Test_Where_HasWhere = Test_Where extends SQLSelectQuery<infer Q>
   ? Q extends { where: object } ? true : false
   : false
 type _T6 = RequireTrue<Test_Where_HasWhere>
 
 // Test: WHERE with string literal
 type Test_WhereString = ParseSQL<"SELECT * FROM users WHERE name = 'John'">
-type _T7 = RequireTrue<AssertExtends<Test_WhereString, SQLQuery>>
+type _T7 = RequireTrue<AssertExtends<Test_WhereString, SQLSelectQuery>>
 
 // Test: WHERE with boolean
 type Test_WhereBool = ParseSQL<"SELECT * FROM users WHERE is_active = TRUE">
-type _T8 = RequireTrue<AssertExtends<Test_WhereBool, SQLQuery>>
+type _T8 = RequireTrue<AssertExtends<Test_WhereBool, SQLSelectQuery>>
 
 // Test: WHERE IS NULL
 type Test_WhereNull = ParseSQL<"SELECT * FROM users WHERE deleted_at IS NULL">
-type _T9 = RequireTrue<AssertExtends<Test_WhereNull, SQLQuery>>
+type _T9 = RequireTrue<AssertExtends<Test_WhereNull, SQLSelectQuery>>
 
 // ============================================================================
 // Parser Tests - JOINs
@@ -109,18 +109,18 @@ type _T9 = RequireTrue<AssertExtends<Test_WhereNull, SQLQuery>>
 
 // Test: INNER JOIN
 type Test_InnerJoin = ParseSQL<"SELECT u.id FROM users AS u INNER JOIN orders AS o ON u.id = o.user_id">
-type Test_InnerJoin_HasJoin = Test_InnerJoin extends SQLQuery<infer Q>
+type Test_InnerJoin_HasJoin = Test_InnerJoin extends SQLSelectQuery<infer Q>
   ? Q extends { joins: JoinClause[] } ? true : false
   : false
 type _T10 = RequireTrue<Test_InnerJoin_HasJoin>
 
 // Test: LEFT JOIN
 type Test_LeftJoin = ParseSQL<"SELECT * FROM users AS u LEFT JOIN orders AS o ON u.id = o.user_id">
-type _T11 = RequireTrue<AssertExtends<Test_LeftJoin, SQLQuery>>
+type _T11 = RequireTrue<AssertExtends<Test_LeftJoin, SQLSelectQuery>>
 
 // Test: RIGHT JOIN
 type Test_RightJoin = ParseSQL<"SELECT * FROM users AS u RIGHT JOIN orders AS o ON u.id = o.user_id">
-type _T12 = RequireTrue<AssertExtends<Test_RightJoin, SQLQuery>>
+type _T12 = RequireTrue<AssertExtends<Test_RightJoin, SQLSelectQuery>>
 
 // Test: Multiple JOINs
 type Test_MultiJoin = ParseSQL<`
@@ -129,7 +129,7 @@ type Test_MultiJoin = ParseSQL<`
   LEFT JOIN orders AS o ON u.id = o.user_id
   LEFT JOIN posts AS p ON u.id = p.author_id
 `>
-type Test_MultiJoin_Count = Test_MultiJoin extends SQLQuery<infer Q>
+type Test_MultiJoin_Count = Test_MultiJoin extends SQLSelectQuery<infer Q>
   ? Q extends { joins: [JoinClause, JoinClause] } ? true : false
   : false
 type _T13 = RequireTrue<Test_MultiJoin_Count>
@@ -140,18 +140,18 @@ type _T13 = RequireTrue<Test_MultiJoin_Count>
 
 // Test: ORDER BY default (ASC)
 type Test_OrderBy = ParseSQL<"SELECT * FROM users ORDER BY name">
-type Test_OrderBy_Has = Test_OrderBy extends SQLQuery<infer Q>
+type Test_OrderBy_Has = Test_OrderBy extends SQLSelectQuery<infer Q>
   ? Q extends { orderBy: OrderByItem[] } ? true : false
   : false
 type _T14 = RequireTrue<Test_OrderBy_Has>
 
 // Test: ORDER BY DESC
 type Test_OrderByDesc = ParseSQL<"SELECT * FROM users ORDER BY created_at DESC">
-type _T15 = RequireTrue<AssertExtends<Test_OrderByDesc, SQLQuery>>
+type _T15 = RequireTrue<AssertExtends<Test_OrderByDesc, SQLSelectQuery>>
 
 // Test: Multiple ORDER BY
 type Test_OrderByMulti = ParseSQL<"SELECT * FROM users ORDER BY role ASC, name DESC">
-type Test_OrderByMulti_Count = Test_OrderByMulti extends SQLQuery<infer Q>
+type Test_OrderByMulti_Count = Test_OrderByMulti extends SQLSelectQuery<infer Q>
   ? Q extends { orderBy: [OrderByItem, OrderByItem] } ? true : false
   : false
 type _T16 = RequireTrue<Test_OrderByMulti_Count>
@@ -162,14 +162,14 @@ type _T16 = RequireTrue<Test_OrderByMulti_Count>
 
 // Test: GROUP BY
 type Test_GroupBy = ParseSQL<"SELECT role, COUNT ( * ) FROM users GROUP BY role">
-type Test_GroupBy_Has = Test_GroupBy extends SQLQuery<infer Q>
+type Test_GroupBy_Has = Test_GroupBy extends SQLSelectQuery<infer Q>
   ? Q extends { groupBy: object } ? true : false
   : false
 type _T17 = RequireTrue<Test_GroupBy_Has>
 
 // Test: GROUP BY with HAVING
 type Test_Having = ParseSQL<"SELECT role, COUNT ( * ) FROM users GROUP BY role HAVING COUNT ( * ) > 5">
-type Test_Having_Has = Test_Having extends SQLQuery<infer Q>
+type Test_Having_Has = Test_Having extends SQLSelectQuery<infer Q>
   ? Q extends { having: object } ? true : false
   : false
 type _T18 = RequireTrue<Test_Having_Has>
@@ -180,14 +180,14 @@ type _T18 = RequireTrue<Test_Having_Has>
 
 // Test: LIMIT
 type Test_Limit = ParseSQL<"SELECT * FROM users LIMIT 10">
-type Test_Limit_Has = Test_Limit extends SQLQuery<infer Q>
+type Test_Limit_Has = Test_Limit extends SQLSelectQuery<infer Q>
   ? Q extends { limit: 10 } ? true : false
   : false
 type _T19 = RequireTrue<Test_Limit_Has>
 
 // Test: OFFSET
 type Test_Offset = ParseSQL<"SELECT * FROM users LIMIT 10 OFFSET 20">
-type Test_Offset_Has = Test_Offset extends SQLQuery<infer Q>
+type Test_Offset_Has = Test_Offset extends SQLSelectQuery<infer Q>
   ? Q extends { offset: 20 } ? true : false
   : false
 type _T20 = RequireTrue<Test_Offset_Has>
@@ -198,19 +198,19 @@ type _T20 = RequireTrue<Test_Offset_Has>
 
 // Test: COUNT(*)
 type Test_Count = ParseSQL<"SELECT COUNT ( * ) AS total FROM users">
-type _T21 = RequireTrue<AssertExtends<Test_Count, SQLQuery>>
+type _T21 = RequireTrue<AssertExtends<Test_Count, SQLSelectQuery>>
 
 // Test: SUM
 type Test_Sum = ParseSQL<"SELECT SUM ( amount ) AS total FROM orders">
-type _T22 = RequireTrue<AssertExtends<Test_Sum, SQLQuery>>
+type _T22 = RequireTrue<AssertExtends<Test_Sum, SQLSelectQuery>>
 
 // Test: AVG
 type Test_Avg = ParseSQL<"SELECT AVG ( price ) AS average FROM products">
-type _T23 = RequireTrue<AssertExtends<Test_Avg, SQLQuery>>
+type _T23 = RequireTrue<AssertExtends<Test_Avg, SQLSelectQuery>>
 
 // Test: MIN/MAX
 type Test_MinMax = ParseSQL<"SELECT MIN ( price ) AS low, MAX ( price ) AS high FROM products">
-type _T24 = RequireTrue<AssertExtends<Test_MinMax, SQLQuery>>
+type _T24 = RequireTrue<AssertExtends<Test_MinMax, SQLSelectQuery>>
 
 // ============================================================================
 // Parser Tests - CTEs
@@ -223,7 +223,7 @@ type Test_CTE = ParseSQL<`
   )
   SELECT * FROM active_users
 `>
-type Test_CTE_Has = Test_CTE extends SQLQuery<infer Q>
+type Test_CTE_Has = Test_CTE extends SQLSelectQuery<infer Q>
   ? Q extends { ctes: object } ? true : false
   : false
 type _T25 = RequireTrue<Test_CTE_Has>
@@ -235,7 +235,7 @@ type Test_MultipleCTEs = ParseSQL<`
     cte2 AS ( SELECT id FROM posts )
   SELECT * FROM cte1 LEFT JOIN cte2 ON cte1.id = cte2.id
 `>
-type _T26 = RequireTrue<AssertExtends<Test_MultipleCTEs, SQLQuery>>
+type _T26 = RequireTrue<AssertExtends<Test_MultipleCTEs, SQLSelectQuery>>
 
 // ============================================================================
 // Parser Tests - Derived Tables
@@ -246,7 +246,7 @@ type Test_DerivedTable = ParseSQL<`
   SELECT sub.count
   FROM ( SELECT COUNT ( * ) AS count FROM users ) AS sub
 `>
-type _T27 = RequireTrue<AssertExtends<Test_DerivedTable, SQLQuery>>
+type _T27 = RequireTrue<AssertExtends<Test_DerivedTable, SQLSelectQuery>>
 
 // ============================================================================
 // Parser Tests - Table Wildcard
@@ -254,7 +254,7 @@ type _T27 = RequireTrue<AssertExtends<Test_DerivedTable, SQLQuery>>
 
 // Test: table.*
 type Test_TableWildcard = ParseSQL<"SELECT u.* FROM users AS u">
-type _T28 = RequireTrue<AssertExtends<Test_TableWildcard, SQLQuery>>
+type _T28 = RequireTrue<AssertExtends<Test_TableWildcard, SQLSelectQuery>>
 
 // ============================================================================
 // Matcher Tests - Basic Type Inference

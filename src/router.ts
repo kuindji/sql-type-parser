@@ -24,7 +24,7 @@ import type { ParseError } from "./common/utils.js"
 import type { QueryType } from "./common/ast.js"
 
 // Import parsers from each query type module
-import type { ParseSelectSQL, SQLSelectQuery, SQLQuery } from "./select/index.js"
+import type { ParseSelectSQL, SQLSelectQuery } from "./select/index.js"
 
 // ============================================================================
 // Query Type Detection

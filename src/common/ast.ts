@@ -200,6 +200,18 @@ export type BinaryExpr<
 export type UnparsedExpr = { readonly __unparsed: true }
 
 /**
+ * A parsed condition that stores extracted column references
+ * Used for validating field references in WHERE, JOIN ON, HAVING clauses
+ * without fully parsing the expression structure
+ */
+export type ParsedCondition<
+  ColumnRefs extends ValidatableColumnRef[] = ValidatableColumnRef[],
+> = {
+  readonly type: "ParsedCondition"
+  readonly columnRefs: ColumnRefs
+}
+
+/**
  * Base logical expression type (to avoid circular reference)
  */
 export type LogicalExprAny = {
@@ -213,7 +225,7 @@ export type LogicalExprAny = {
  * Any expression that can appear in a WHERE clause
  * Note: We use a simplified structure to avoid circular references
  */
-export type WhereExpr = BinaryExpr | LogicalExprAny | UnparsedExpr
+export type WhereExpr = BinaryExpr | LogicalExprAny | UnparsedExpr | ParsedCondition
 
 /**
  * A logical expression combining conditions

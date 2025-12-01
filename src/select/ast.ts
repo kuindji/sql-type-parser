@@ -154,9 +154,3 @@ export type SQLSelectQuery<Query extends SelectClause | UnionClauseAny = SelectC
   readonly query: Query
 }
 
-/**
- * Legacy wrapper type for backward compatibility
- * @deprecated Use SQLSelectQuery instead
- */
-export type SQLQuery<Query extends SelectClause | UnionClauseAny = SelectClause | UnionClauseAny> = SQLSelectQuery<Query>
-

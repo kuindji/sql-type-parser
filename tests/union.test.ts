@@ -7,7 +7,7 @@
 
 import type {
     ParseSQL,
-    SQLQuery,
+    SQLSelectQuery,
     SelectClause,
     UnionClause,
     UnionClauseAny,
@@ -42,10 +42,10 @@ type TestSchema = {
 
 // Test: Simple UNION
 type P_Union = ParseSQL<"SELECT id, name FROM users UNION SELECT id, name FROM admins">
-type _U1 = RequireTrue<AssertExtends<P_Union, SQLQuery<UnionClauseAny>>>
+type _U1 = RequireTrue<AssertExtends<P_Union, SQLSelectQuery<UnionClauseAny>>>
 
 // Test: UNION query has correct structure
-type P_Union_Check = P_Union extends SQLQuery<infer Q>
+type P_Union_Check = P_Union extends SQLSelectQuery<infer Q>
     ? Q extends UnionClause<SelectClause, "UNION", SelectClause>
     ? true
     : false
@@ -54,7 +54,7 @@ type _U2 = RequireTrue<P_Union_Check>
 
 // Test: UNION ALL
 type P_UnionAll = ParseSQL<"SELECT id, name FROM users UNION ALL SELECT id, name FROM admins">
-type P_UnionAll_Check = P_UnionAll extends SQLQuery<infer Q>
+type P_UnionAll_Check = P_UnionAll extends SQLSelectQuery<infer Q>
     ? Q extends UnionClause<SelectClause, "UNION ALL", SelectClause>
     ? true
     : false
@@ -67,7 +67,7 @@ type _U3 = RequireTrue<P_UnionAll_Check>
 
 // Test: INTERSECT
 type P_Intersect = ParseSQL<"SELECT id, name FROM users INTERSECT SELECT id, name FROM admins">
-type P_Intersect_Check = P_Intersect extends SQLQuery<infer Q>
+type P_Intersect_Check = P_Intersect extends SQLSelectQuery<infer Q>
     ? Q extends UnionClause<SelectClause, "INTERSECT", SelectClause>
     ? true
     : false
@@ -76,7 +76,7 @@ type _U4 = RequireTrue<P_Intersect_Check>
 
 // Test: INTERSECT ALL
 type P_IntersectAll = ParseSQL<"SELECT id, name FROM users INTERSECT ALL SELECT id, name FROM admins">
-type P_IntersectAll_Check = P_IntersectAll extends SQLQuery<infer Q>
+type P_IntersectAll_Check = P_IntersectAll extends SQLSelectQuery<infer Q>
     ? Q extends UnionClause<SelectClause, "INTERSECT ALL", SelectClause>
     ? true
     : false
@@ -89,7 +89,7 @@ type _U5 = RequireTrue<P_IntersectAll_Check>
 
 // Test: EXCEPT
 type P_Except = ParseSQL<"SELECT id, name FROM users EXCEPT SELECT id, name FROM admins">
-type P_Except_Check = P_Except extends SQLQuery<infer Q>
+type P_Except_Check = P_Except extends SQLSelectQuery<infer Q>
     ? Q extends UnionClause<SelectClause, "EXCEPT", SelectClause>
     ? true
     : false
@@ -98,7 +98,7 @@ type _U6 = RequireTrue<P_Except_Check>
 
 // Test: EXCEPT ALL
 type P_ExceptAll = ParseSQL<"SELECT id, name FROM users EXCEPT ALL SELECT id, name FROM admins">
-type P_ExceptAll_Check = P_ExceptAll extends SQLQuery<infer Q>
+type P_ExceptAll_Check = P_ExceptAll extends SQLSelectQuery<infer Q>
     ? Q extends UnionClause<SelectClause, "EXCEPT ALL", SelectClause>
     ? true
     : false
@@ -115,7 +115,7 @@ type P_UnionWhere = ParseSQL<`
     UNION
     SELECT id, name FROM admins WHERE level > 1
 `>
-type _U8 = RequireTrue<AssertExtends<P_UnionWhere, SQLQuery<UnionClauseAny>>>
+type _U8 = RequireTrue<AssertExtends<P_UnionWhere, SQLSelectQuery<UnionClauseAny>>>
 
 // Test: UNION with ORDER BY on first query (typically needs parentheses in real SQL)
 type P_UnionOrdered = ParseSQL<`
@@ -123,7 +123,7 @@ type P_UnionOrdered = ParseSQL<`
     UNION
     SELECT id, name FROM admins
 `>
-type _U9 = RequireTrue<AssertExtends<P_UnionOrdered, SQLQuery<UnionClauseAny>>>
+type _U9 = RequireTrue<AssertExtends<P_UnionOrdered, SQLSelectQuery<UnionClauseAny>>>
 
 // Test: UNION with LIMIT
 type P_UnionLimit = ParseSQL<`
@@ -131,7 +131,7 @@ type P_UnionLimit = ParseSQL<`
     UNION
     SELECT id, name FROM admins
 `>
-type _U10 = RequireTrue<AssertExtends<P_UnionLimit, SQLQuery<UnionClauseAny>>>
+type _U10 = RequireTrue<AssertExtends<P_UnionLimit, SQLSelectQuery<UnionClauseAny>>>
 
 // Test: UNION with aliased columns
 type P_UnionAliased = ParseSQL<`
@@ -139,7 +139,7 @@ type P_UnionAliased = ParseSQL<`
     UNION
     SELECT id AS user_id, name AS user_name FROM admins
 `>
-type _U11 = RequireTrue<AssertExtends<P_UnionAliased, SQLQuery<UnionClauseAny>>>
+type _U11 = RequireTrue<AssertExtends<P_UnionAliased, SQLSelectQuery<UnionClauseAny>>>
 
 // ============================================================================
 // UNION with JOINs
@@ -151,7 +151,7 @@ type P_UnionJoin = ParseSQL<`
     UNION
     SELECT id, name FROM admins
 `>
-type _U12 = RequireTrue<AssertExtends<P_UnionJoin, SQLQuery<UnionClauseAny>>>
+type _U12 = RequireTrue<AssertExtends<P_UnionJoin, SQLSelectQuery<UnionClauseAny>>>
 
 // ============================================================================
 // Matcher Tests - UNION Result Types
@@ -184,11 +184,11 @@ type _M4 = RequireTrue<R_Except_Check>
 
 // Test: lowercase union
 type P_LowerUnion = ParseSQL<"select id from users union select id from admins">
-type _C1 = RequireTrue<AssertExtends<P_LowerUnion, SQLQuery<UnionClauseAny>>>
+type _C1 = RequireTrue<AssertExtends<P_LowerUnion, SQLSelectQuery<UnionClauseAny>>>
 
 // Test: mixed case
 type P_MixedUnion = ParseSQL<"SELECT id FROM users Union All SELECT id FROM admins">
-type _C2 = RequireTrue<AssertExtends<P_MixedUnion, SQLQuery<UnionClauseAny>>>
+type _C2 = RequireTrue<AssertExtends<P_MixedUnion, SQLSelectQuery<UnionClauseAny>>>
 
 // ============================================================================
 // Whitespace Handling Tests
@@ -202,7 +202,7 @@ type P_WhitespaceUnion = ParseSQL<`
     
     SELECT id FROM admins
 `>
-type _W1 = RequireTrue<AssertExtends<P_WhitespaceUnion, SQLQuery<UnionClauseAny>>>
+type _W1 = RequireTrue<AssertExtends<P_WhitespaceUnion, SQLSelectQuery<UnionClauseAny>>>
 
 // ============================================================================
 // Non-UNION Query Still Works
@@ -210,7 +210,7 @@ type _W1 = RequireTrue<AssertExtends<P_WhitespaceUnion, SQLQuery<UnionClauseAny>
 
 // Test: Regular SELECT still works
 type P_Regular = ParseSQL<"SELECT id, name FROM users">
-type P_Regular_Check = P_Regular extends SQLQuery<infer Q>
+type P_Regular_Check = P_Regular extends SQLSelectQuery<infer Q>
     ? Q extends SelectClause
     ? true
     : false
@@ -219,7 +219,7 @@ type _N1 = RequireTrue<P_Regular_Check>
 
 // Test: Regular SELECT with WHERE still works
 type P_RegularWhere = ParseSQL<"SELECT id FROM users WHERE status = 'active'">
-type _N2 = RequireTrue<AssertExtends<P_RegularWhere, SQLQuery<SelectClause>>>
+type _N2 = RequireTrue<AssertExtends<P_RegularWhere, SQLSelectQuery<SelectClause>>>
 
 // Test: Regular SELECT with all clauses still works
 type P_RegularFull = ParseSQL<`
@@ -231,7 +231,7 @@ type P_RegularFull = ParseSQL<`
     LIMIT 10
     OFFSET 5
 `>
-type _N3 = RequireTrue<AssertExtends<P_RegularFull, SQLQuery<SelectClause>>>
+type _N3 = RequireTrue<AssertExtends<P_RegularFull, SQLSelectQuery<SelectClause>>>
 
 // ============================================================================
 // Export for verification

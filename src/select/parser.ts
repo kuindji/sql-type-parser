@@ -16,7 +16,6 @@ import type {
   UnionClauseAny,
   UnionOperatorType,
   SQLSelectQuery,
-  SQLQuery,
 } from "./ast.js"
 
 import type {
@@ -39,6 +38,7 @@ import type {
   AggregateExpr,
   AggregateFunc,
   UnparsedExpr,
+  ParsedCondition,
 } from "../common/ast.js"
 
 import type {
@@ -606,6 +606,9 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
     ? UnboundColumnRef<Col>
   : T extends `"${infer Col}"->${string}`
     ? UnboundColumnRef<Col>
+  // Pattern: "column" (quoted simple column, no cast)
+  : T extends `"${infer Col}"`
+    ? UnboundColumnRef<Col>
   // Pattern: table.column::type (unquoted with cast) - but NOT schema.table.column
   : T extends `${infer Table}.${infer Col}::${string}`
     ? Col extends `${string}.${string}`
@@ -627,7 +630,33 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
     ? IsSimpleIdentifier<ExtractBeforeCast<Col>> extends true
       ? UnboundColumnRef<ExtractBeforeCast<Col>>
       : never
+  // Pattern: simple unquoted identifier (unbound column)
+  : IsSimpleIdentifier<T> extends true
+    ? IsKeywordOrOperator<T> extends true
+      ? never  // Skip SQL keywords and operators
+      : UnboundColumnRef<T>
   : never
+
+/**
+ * Check if a string is a SQL keyword, operator, literal, or parameter placeholder
+ * that should not be treated as a column
+ */
+type IsKeywordOrOperator<T extends string> =
+  // SQL keywords
+  T extends "SELECT" | "FROM" | "WHERE" | "AND" | "OR" | "NOT" | "IN" | "IS" | "NULL"
+    | "TRUE" | "FALSE" | "LIKE" | "ILIKE" | "BETWEEN" | "EXISTS" | "CASE" | "WHEN"
+    | "THEN" | "ELSE" | "END" | "AS" | "ON" | "JOIN" | "LEFT" | "RIGHT" | "INNER"
+    | "OUTER" | "FULL" | "CROSS" | "GROUP" | "BY" | "HAVING" | "ORDER" | "ASC" | "DESC"
+    | "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT" | "ALL" | "DISTINCT"
+    | "COUNT" | "SUM" | "AVG" | "MIN" | "MAX" | "COALESCE" | "NULLIF" | "CAST"
+    ? true
+    // Parameter placeholders ($1, $2, etc. or :name)
+    : T extends `$${number}` | `$${string}` | `:${string}`
+      ? true
+      // Numeric literals
+      : T extends `${number}`
+        ? true
+        : false
 
 /**
  * Extract the column name before the :: cast operator
@@ -1127,7 +1156,7 @@ type ParseSingleJoin<T extends string> =
 
 /**
  * Parse a plain JOIN (without INNER/LEFT/etc prefix) - treated as INNER JOIN
- * Note: ON conditions are not fully parsed since they don't affect type inference
+ * Extracts column references from ON conditions for validation
  */
 type ParsePlainJoin<T extends string> = 
   NextToken<T> extends ["JOIN", infer AfterJoin extends string]
@@ -1138,15 +1167,15 @@ type ParsePlainJoin<T extends string> =
       ? StartsWith<OnPart, "ON"> extends true
         ? NextToken<OnPart> extends ["ON", infer ConditionPart extends string]
           ? ExtractUntil<ConditionPart, FromTerminators | "JOIN" | "INNER" | "LEFT" | "RIGHT" | "FULL" | "CROSS"> extends [
-              infer _Condition extends string,
+              infer Condition extends string,
               infer Rest extends string,
             ]
             ? {
-                join: JoinClause<"INNER", ParseTableRef<TablePart>, UnparsedExpr>
+                join: JoinClause<"INNER", ParseTableRef<TablePart>, ParsedCondition<ScanTokensForColumnRefs<Trim<Condition>, []>>>
                 rest: Rest
               }
             : {
-                join: JoinClause<"INNER", ParseTableRef<TablePart>, UnparsedExpr>
+                join: JoinClause<"INNER", ParseTableRef<TablePart>, ParsedCondition<ScanTokensForColumnRefs<Trim<ConditionPart>, []>>>
                 rest: ""
               }
           : never
@@ -1160,7 +1189,7 @@ type ParsePlainJoin<T extends string> =
 
 /**
  * Parse a typed JOIN (INNER/LEFT/RIGHT/FULL/CROSS JOIN)
- * Note: ON conditions are not fully parsed since they don't affect type inference
+ * Extracts column references from ON conditions for validation
  */
 type ParseTypedJoin<T extends string, JoinTypeResult> =
   JoinTypeResult extends [infer JType extends JoinType, infer AfterType extends string]
@@ -1172,15 +1201,15 @@ type ParseTypedJoin<T extends string, JoinTypeResult> =
   ? StartsWith<OnPart, "ON"> extends true
   ? NextToken<OnPart> extends ["ON", infer ConditionPart extends string]
   ? ExtractUntil<ConditionPart, FromTerminators | "JOIN" | "INNER" | "LEFT" | "RIGHT" | "FULL" | "CROSS"> extends [
-    infer _Condition extends string,
+    infer Condition extends string,
     infer Rest extends string,
   ]
   ? {
-    join: JoinClause<JType, ParseTableRef<TablePart>, UnparsedExpr>
+    join: JoinClause<JType, ParseTableRef<TablePart>, ParsedCondition<ScanTokensForColumnRefs<Trim<Condition>, []>>>
     rest: Rest
   }
   : {
-    join: JoinClause<JType, ParseTableRef<TablePart>, UnparsedExpr>
+    join: JoinClause<JType, ParseTableRef<TablePart>, ParsedCondition<ScanTokensForColumnRefs<Trim<ConditionPart>, []>>>
     rest: ""
   }
   : never
@@ -1227,18 +1256,17 @@ type ExtractJoinType<T extends string> = NextToken<T> extends [
 
 /**
  * Parse WHERE clause
- * Note: We don't fully parse WHERE expressions since they're not used for type inference.
- * This significantly reduces recursion depth for complex queries.
+ * Extracts column references for validation without fully parsing the expression structure.
  */
 type ParseWhereClause<T extends string> = Trim<T> extends ""
   ? { where: undefined; rest: "" }
   : NextToken<T> extends ["WHERE", infer Rest extends string]
     ? ExtractUntil<Rest, WhereTerminators> extends [
-        infer _WherePart extends string,
+        infer WherePart extends string,
         infer Remaining extends string,
       ]
-      ? { where: UnparsedExpr; rest: Remaining }
-      : { where: UnparsedExpr; rest: "" }
+      ? { where: ParsedCondition<ScanTokensForColumnRefs<Trim<WherePart>, []>>; rest: Remaining }
+      : { where: ParsedCondition<ScanTokensForColumnRefs<Trim<Rest>, []>>; rest: "" }
     : { where: undefined; rest: T }
 
 
@@ -1356,6 +1384,7 @@ type ParseGroupByColumns<T extends string[]> = T extends [
 
 /**
  * Parse HAVING clause
+ * Extracts column references for validation
  */
 type ParseHaving<T extends string> = Trim<T> extends ""
   ? { having: undefined; rest: "" }
@@ -1364,8 +1393,8 @@ type ParseHaving<T extends string> = Trim<T> extends ""
     infer HavingPart extends string,
     infer Remaining extends string,
   ]
-  ? { having: ParseWhereExpr<HavingPart>; rest: Remaining }
-  : { having: ParseWhereExpr<Rest>; rest: "" }
+  ? { having: ParsedCondition<ScanTokensForColumnRefs<Trim<HavingPart>, []>>; rest: Remaining }
+  : { having: ParsedCondition<ScanTokensForColumnRefs<Trim<Rest>, []>>; rest: "" }
   : { having: undefined; rest: T }
 
 // ============================================================================
