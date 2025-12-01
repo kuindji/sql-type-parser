@@ -12,8 +12,8 @@
  * - common/    - Shared utilities (tokenizer, AST nodes, utils)
  * - select/    - SELECT query parser and matcher
  * - insert/    - INSERT query parser and matcher
+ * - delete/    - DELETE query parser and matcher
  * - update/    - UPDATE query parser and matcher (planned)
- * - delete/    - DELETE query parser and matcher (planned)
  * 
  * Each query type has its own execution tree in the type system
  * to avoid TypeScript performance issues.
@@ -62,6 +62,7 @@ export type {
   DetectQueryType,
   ParseSelectSQL,
   ParseInsertSQL,
+  ParseDeleteSQL,
   IsSelectQuery,
   IsInsertQuery,
   IsUpdateQuery,
@@ -223,6 +224,31 @@ export type {
   IsValidInsert,
   GetInsertTableColumns,
 } from "./insert/index.js"
+
+// ============================================================================
+// DELETE Query Types
+// ============================================================================
+
+// Re-export DELETE-specific types
+export type {
+  // Delete clause types
+  DeleteClause,
+  UsingClause,
+
+  // RETURNING clause (re-exported, same structure as INSERT)
+  ReturningClause as DeleteReturningClause,
+
+  // Matcher types (lightweight type extraction)
+  MatchDeleteQuery,
+  DeleteResult,
+  ValidateDeleteResult,
+
+  // Validator types (comprehensive validation)
+  ValidateDeleteSQL,
+  ValidateDeleteOptions,
+  IsValidDelete,
+  GetDeleteTableColumns,
+} from "./delete/index.js"
 
 // ============================================================================
 // Parameter Types
