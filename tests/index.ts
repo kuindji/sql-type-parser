@@ -13,6 +13,15 @@ export type { CommonTestsPass, TokenizerTestsPass, UtilsTestsPass, ParamsTestsPa
 // SELECT query tests
 export type { SelectTestsPass, ParserTestsPass, MatcherTestsPass, ASTTestsPass, UnionTestsPass, IntegrationTestsPass } from "./select/index.js"
 
+// INSERT query tests
+export type { InsertTestsPass } from "./insert/index.js"
+
+// UPDATE query tests
+export type { UpdateTestsPass } from "./update/index.js"
+
+// DELETE query tests
+export type { DeleteTestsPass } from "./delete/index.js"
+
 /**
  * Master test result - true if all tests pass
  */

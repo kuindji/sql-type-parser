@@ -20,12 +20,13 @@
  */
 
 import type { NormalizeSQL, NextToken } from "./common/tokenizer.js"
-import type { ParseError } from "./common/utils.js"
+import type { ParseError, Increment, Decrement } from "./common/utils.js"
 import type { QueryType } from "./common/ast.js"
 
 // Import parsers from each query type module
 import type { ParseSelectSQL, SQLSelectQuery } from "./select/index.js"
 import type { ParseInsertSQL, SQLInsertQuery } from "./insert/index.js"
+import type { ParseUpdateSQL, SQLUpdateQuery } from "./update/index.js"
 import type { ParseDeleteSQL, SQLDeleteQuery } from "./delete/index.js"
 
 // ============================================================================
@@ -34,35 +35,60 @@ import type { ParseDeleteSQL, SQLDeleteQuery } from "./delete/index.js"
 
 /**
  * Detect the type of SQL query from the first keyword
+ * 
+ * For WITH (CTE) queries, looks ahead to find the actual query type
  */
 export type DetectQueryType<T extends string> = 
-  NextToken<NormalizeSQL<T>> extends [infer First extends string, infer _Rest]
-    ? First extends "SELECT" | "WITH"
-      ? "SELECT"
-      : First extends "INSERT"
-        ? "INSERT"
-        : First extends "UPDATE"
-          ? "UPDATE"
-          : First extends "DELETE"
-            ? "DELETE"
-            : "UNKNOWN"
+  NextToken<NormalizeSQL<T>> extends [infer First extends string, infer Rest extends string]
+    ? First extends "WITH"
+      ? DetectQueryTypeAfterWith<Rest>
+      : First extends "SELECT"
+        ? "SELECT"
+        : First extends "INSERT"
+          ? "INSERT"
+          : First extends "UPDATE"
+            ? "UPDATE"
+            : First extends "DELETE"
+              ? "DELETE"
+              : "UNKNOWN"
     : "UNKNOWN"
+
+/**
+ * Detect query type after WITH clause by finding the main query keyword
+ */
+type DetectQueryTypeAfterWith<T extends string> = 
+  FindMainQueryKeyword<T> extends infer Keyword
+    ? Keyword extends "SELECT" ? "SELECT"
+      : Keyword extends "INSERT" ? "INSERT"
+      : Keyword extends "UPDATE" ? "UPDATE"
+      : Keyword extends "DELETE" ? "DELETE"
+      : "SELECT"  // Default to SELECT for backwards compatibility
+    : "SELECT"
+
+/**
+ * Find the main query keyword after CTEs by scanning for SELECT/INSERT/UPDATE/DELETE
+ * that is not inside parentheses
+ */
+type FindMainQueryKeyword<T extends string, Depth extends number = 0> = 
+  T extends ""
+    ? "UNKNOWN"
+    : T extends `(${infer Rest}`
+      ? FindMainQueryKeyword<Rest, Increment<Depth>>
+      : T extends `)${infer Rest}`
+        ? FindMainQueryKeyword<Rest, Decrement<Depth>>
+        : Depth extends 0
+          ? NextToken<T> extends [infer Token extends string, infer Rest extends string]
+            ? Token extends "SELECT" | "INSERT" | "UPDATE" | "DELETE"
+              ? Token
+              : FindMainQueryKeyword<Rest, Depth>
+            : "UNKNOWN"
+          : NextToken<T> extends [infer _Token, infer Rest extends string]
+            ? FindMainQueryKeyword<Rest, Depth>
+            : "UNKNOWN"
 
 // ============================================================================
 // Unified Query AST Types
 // ============================================================================
-
-/**
- * Placeholder AST type for UPDATE queries (to be implemented)
- */
-export type SQLUpdateQuery = {
-  readonly type: "SQLQuery"
-  readonly queryType: "UPDATE"
-  readonly query: {
-    readonly type: "UpdateClause"
-    // Will be expanded when UPDATE is implemented
-  }
-}
 
 /**
  * Union of all SQL query AST types
@@ -85,7 +111,13 @@ export type AnySQLQuery = SQLSelectQuery | SQLInsertQuery | SQLUpdateQuery | SQL
  * // Returns SQLSelectQuery<SelectClause<...>>
  * 
  * type InsertAST = ParseSQL<"INSERT INTO users (id) VALUES (1)">
- * // Returns ParseError (INSERT not yet implemented)
+ * // Returns SQLInsertQuery<InsertClause<...>>
+ * 
+ * type UpdateAST = ParseSQL<"UPDATE users SET name = 'John' WHERE id = 1">
+ * // Returns SQLUpdateQuery<UpdateClause<...>>
+ * 
+ * type DeleteAST = ParseSQL<"DELETE FROM users WHERE id = 1">
+ * // Returns SQLDeleteQuery<DeleteClause<...>>
  * ```
  */
 export type ParseSQL<T extends string> = 
@@ -95,7 +127,7 @@ export type ParseSQL<T extends string> =
       : QType extends "INSERT"
         ? ParseInsertSQL<T>
         : QType extends "UPDATE"
-          ? ParseError<"UPDATE queries are not yet supported">
+          ? ParseUpdateSQL<T>
           : QType extends "DELETE"
             ? ParseDeleteSQL<T>
             : ParseError<"Unknown query type">
@@ -134,6 +166,9 @@ export type { ParseSelectSQL } from "./select/index.js"
 
 // Re-export the INSERT-specific parser and types for direct use
 export type { ParseInsertSQL, SQLInsertQuery } from "./insert/index.js"
+
+// Re-export the UPDATE-specific parser and types for direct use
+export type { ParseUpdateSQL, SQLUpdateQuery } from "./update/index.js"
 
 // Re-export the DELETE-specific parser and types for direct use
 export type { ParseDeleteSQL, SQLDeleteQuery } from "./delete/index.js"

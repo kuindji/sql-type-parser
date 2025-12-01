@@ -12,8 +12,8 @@
  * - common/    - Shared utilities (tokenizer, AST nodes, utils)
  * - select/    - SELECT query parser and matcher
  * - insert/    - INSERT query parser and matcher
+ * - update/    - UPDATE query parser and matcher
  * - delete/    - DELETE query parser and matcher
- * - update/    - UPDATE query parser and matcher (planned)
  * 
  * Each query type has its own execution tree in the type system
  * to avoid TypeScript performance issues.
@@ -62,6 +62,7 @@ export type {
   DetectQueryType,
   ParseSelectSQL,
   ParseInsertSQL,
+  ParseUpdateSQL,
   ParseDeleteSQL,
   IsSelectQuery,
   IsInsertQuery,
@@ -224,6 +225,38 @@ export type {
   IsValidInsert,
   GetInsertTableColumns,
 } from "./insert/index.js"
+
+// ============================================================================
+// UPDATE Query Types
+// ============================================================================
+
+// Re-export UPDATE-specific types
+export type {
+  // Update clause types
+  UpdateClause,
+  SetClause,
+  SetAssignment,
+  SetValue,
+  UpdateFromClause,
+
+  // RETURNING clause (PostgreSQL 17+ OLD/NEW support)
+  ReturningClause as UpdateReturningClause,
+  ReturningQualifier,
+  QualifiedColumnRef,
+  QualifiedWildcard,
+  ReturningItem,
+
+  // Matcher types (lightweight type extraction)
+  MatchUpdateQuery,
+  UpdateResult,
+  ValidateUpdateResult,
+
+  // Validator types (comprehensive validation)
+  ValidateUpdateSQL,
+  ValidateUpdateOptions,
+  IsValidUpdate,
+  GetUpdateTableColumns,
+} from "./update/index.js"
 
 // ============================================================================
 // DELETE Query Types
