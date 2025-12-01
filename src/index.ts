@@ -11,7 +11,7 @@
  * The parser is organized into modules by query type:
  * - common/    - Shared utilities (tokenizer, AST nodes, utils)
  * - select/    - SELECT query parser and matcher
- * - insert/    - INSERT query parser and matcher (planned)
+ * - insert/    - INSERT query parser and matcher
  * - update/    - UPDATE query parser and matcher (planned)
  * - delete/    - DELETE query parser and matcher (planned)
  * 
@@ -61,6 +61,7 @@ export type {
   ParseSQL,
   DetectQueryType,
   ParseSelectSQL,
+  ParseInsertSQL,
   IsSelectQuery,
   IsInsertQuery,
   IsUpdateQuery,
@@ -182,6 +183,46 @@ export type {
   ValidateSelectOptions,
   ValidateSQL,
 } from "./select/index.js"
+
+// ============================================================================
+// INSERT Query Types
+// ============================================================================
+
+// Re-export INSERT-specific types
+export type {
+  // Insert clause types
+  InsertClause,
+  InsertColumnList,
+  InsertColumnRef,
+
+  // Value types
+  InsertValuesClause,
+  InsertSelectClause,
+  InsertValueRow,
+  InsertValue,
+  InsertSource,
+
+  // RETURNING clause
+  ReturningClause,
+
+  // ON CONFLICT clause
+  OnConflictClause,
+  ConflictTarget,
+  ConflictAction,
+  ConflictUpdateSet,
+
+  // Matcher types (lightweight type extraction)
+  MatchInsertQuery,
+  InsertResult,
+  InsertInput,
+  ValidateInsertResult,
+
+  // Validator types (comprehensive validation)
+  ValidateInsertSQL,
+  ValidateInsertOptions,
+  IsValidInsert,
+  GetInsertTableColumns,
+} from "./insert/index.js"
 
 // ============================================================================
 // Parameter Types

@@ -25,6 +25,7 @@ import type { QueryType } from "./common/ast.js"
 
 // Import parsers from each query type module
 import type { ParseSelectSQL, SQLSelectQuery } from "./select/index.js"
+import type { ParseInsertSQL, SQLInsertQuery } from "./insert/index.js"
 
 // ============================================================================
 // Query Type Detection
@@ -49,18 +50,6 @@ export type DetectQueryType<T extends string> =
 // ============================================================================
 // Unified Query AST Types
 // ============================================================================
-
-/**
- * Placeholder AST type for INSERT queries (to be implemented)
- */
-export type SQLInsertQuery = {
-  readonly type: "SQLQuery"
-  readonly queryType: "INSERT"
-  readonly query: {
-    readonly type: "InsertClause"
-    // Will be expanded when INSERT is implemented
-  }
-}
 
 /**
  * Placeholder AST type for UPDATE queries (to be implemented)
@@ -115,7 +104,7 @@ export type ParseSQL<T extends string> =
     ? QType extends "SELECT"
       ? ParseSelectSQL<T>
       : QType extends "INSERT"
-        ? ParseError<"INSERT queries are not yet supported">
+        ? ParseInsertSQL<T>
         : QType extends "UPDATE"
           ? ParseError<"UPDATE queries are not yet supported">
           : QType extends "DELETE"
@@ -153,4 +142,7 @@ export type IsDeleteQuery<T> = T extends SQLDeleteQuery ? true : false
 
 // Re-export the SELECT-specific parser for direct use
 export type { ParseSelectSQL } from "./select/index.js"
+
+// Re-export the INSERT-specific parser and types for direct use
+export type { ParseInsertSQL, SQLInsertQuery } from "./insert/index.js"
 

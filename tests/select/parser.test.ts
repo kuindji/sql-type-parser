@@ -699,8 +699,8 @@ type _P58 = RequireTrue<AssertIsParseError<P_Empty>>
 type P_NoFrom = ParseSQL<"SELECT id">
 type _P59 = RequireTrue<AssertIsParseError<P_NoFrom>>
 
-// Test: Invalid keyword start returns error
-type P_InvalidStart = ParseSQL<"INSERT INTO users VALUES (1)">
+// Test: Invalid keyword start returns error (UPDATE not yet implemented)
+type P_InvalidStart = ParseSQL<"UPDATE users SET name = 'John'">
 type _P60 = RequireTrue<AssertIsParseError<P_InvalidStart>>
 
 // ============================================================================
