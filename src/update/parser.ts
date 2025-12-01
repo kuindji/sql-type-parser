@@ -526,24 +526,68 @@ type ScanTokensForColumnRefs<
     : Acc
 
 /**
+ * Extract the base column from a JSON operator expression (recursively)
+ * Handles nested JSON operators: config->'a'->>'b' -> config
+ * e.g., config->>'settings' -> config, table.col->'key' -> table.col
+ */
+type ExtractBaseColumnFromJsonExpr<T extends string> =
+  T extends `${infer Base}->>${string}`
+    ? ExtractBaseColumnFromJsonExpr<Base>
+  : T extends `${infer Base}->${string}`
+    ? ExtractBaseColumnFromJsonExpr<Base>
+  : T extends `${infer Base}#>>${string}`
+    ? ExtractBaseColumnFromJsonExpr<Base>
+  : T extends `${infer Base}#>${string}`
+    ? ExtractBaseColumnFromJsonExpr<Base>
+  : T
+
+/**
+ * Check if the token contains a JSON operator
+ */
+type HasJsonOperator<T extends string> =
+  T extends `${string}->>${string}` ? true :
+  T extends `${string}->${string}` ? true :
+  T extends `${string}#>>${string}` ? true :
+  T extends `${string}#>${string}` ? true :
+  false
+
+/**
  * Try to extract a column reference from a token
  */
 type ExtractColumnFromToken<T extends string> =
-  T extends `${infer Table}.${infer Col}`
-    ? IsSimpleIdentifier<Table> extends true
-      ? IsSimpleIdentifier<Col> extends true
-        ? TableColumnRef<RemoveQuotes<Table>, RemoveQuotes<Col>, undefined>
+  // Pattern: table.column with JSON operator (e.g., t.col->>'key')
+  T extends `${infer Table}.${infer Rest}`
+    ? HasJsonOperator<Rest> extends true
+      ? IsSimpleIdentifier<Table> extends true
+        ? ExtractBaseColumnFromJsonExpr<Rest> extends infer BaseCol extends string
+          ? IsSimpleIdentifier<BaseCol> extends true
+            ? TableColumnRef<RemoveQuotes<Table>, RemoveQuotes<BaseCol>, undefined>
+            : never
+          : never
         : never
-      : never
+      : IsSimpleIdentifier<Table> extends true
+        ? IsSimpleIdentifier<Rest> extends true
+          ? TableColumnRef<RemoveQuotes<Table>, RemoveQuotes<Rest>, undefined>
+          : never
+        : never
     : T extends `"${infer Table}"."${infer Col}"`
       ? TableColumnRef<Table, Col, undefined>
-      : IsSimpleIdentifier<T> extends true
-        ? IsKeywordOrOperator<T> extends true
-          ? never
-          : UnboundColumnRef<RemoveQuotes<T>>
-        : T extends `"${infer Col}"`
-          ? UnboundColumnRef<Col>
+      // Pattern: column with JSON operator (e.g., config->>'key')
+      : HasJsonOperator<T> extends true
+        ? ExtractBaseColumnFromJsonExpr<T> extends infer BaseCol extends string
+          ? IsSimpleIdentifier<BaseCol> extends true
+            ? IsKeywordOrOperator<BaseCol> extends true
+              ? never
+              : UnboundColumnRef<RemoveQuotes<BaseCol>>
+            : never
           : never
+        : IsSimpleIdentifier<T> extends true
+          ? IsKeywordOrOperator<T> extends true
+            ? never
+            : UnboundColumnRef<RemoveQuotes<T>>
+          : T extends `"${infer Col}"`
+            ? UnboundColumnRef<Col>
+            : never
 
 /**
  * Check if a string is a simple identifier

@@ -579,6 +579,33 @@ type ExtractThreePartColumnRef<T extends string> =
   : never
 
 /**
+ * Extract the base column from a JSON operator expression (recursively)
+ * Handles nested JSON operators: config->'a'->>'b' -> config
+ * e.g., config->>'settings' -> config, table.col->'key' -> table.col
+ */
+type ExtractBaseColumnFromJsonExpr<T extends string> =
+  // Pattern: base->> or base->
+  T extends `${infer Base}->>${string}`
+    ? ExtractBaseColumnFromJsonExpr<Base>  // Recurse in case there are more operators
+  : T extends `${infer Base}->${string}`
+    ? ExtractBaseColumnFromJsonExpr<Base>
+  : T extends `${infer Base}#>>${string}`
+    ? ExtractBaseColumnFromJsonExpr<Base>
+  : T extends `${infer Base}#>${string}`
+    ? ExtractBaseColumnFromJsonExpr<Base>
+  : T  // No more operators, return as-is
+
+/**
+ * Check if the token contains a JSON operator
+ */
+type HasJsonOperator<T extends string> =
+  T extends `${string}->>${string}` ? true :
+  T extends `${string}->${string}` ? true :
+  T extends `${string}#>>${string}` ? true :
+  T extends `${string}#>${string}` ? true :
+  false
+
+/**
  * Extract two-part (table.column) or simple column reference
  */
 type ExtractTwoPartOrSimpleColumnRef<T extends string> =
@@ -606,6 +633,10 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
     ? UnboundColumnRef<Col>
   : T extends `"${infer Col}"->${string}`
     ? UnboundColumnRef<Col>
+  : T extends `"${infer Col}"#>>${string}`
+    ? UnboundColumnRef<Col>
+  : T extends `"${infer Col}"#>${string}`
+    ? UnboundColumnRef<Col>
   // Pattern: "column" (quoted simple column, no cast)
   : T extends `"${infer Col}"`
     ? UnboundColumnRef<Col>
@@ -616,16 +647,33 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
       : IsSimpleIdentifier<Table> extends true
         ? TableColumnRef<Table, ExtractBeforeCast<Col>, undefined>
         : never
-  // Pattern: table.column (unquoted, no cast) - but NOT schema.table.column  
-  : T extends `${infer Table}.${infer Col}`
-    ? Col extends `${string}.${string}`
-      ? never  // This is schema.table.column, handled above
-      : IsSimpleIdentifier<Table> extends true
-        ? IsSimpleIdentifier<Col> extends true
-          ? TableColumnRef<Table, Col, undefined>
+  // Pattern: table.column with JSON operator (e.g., t.col->>'key')
+  : T extends `${infer Table}.${infer Rest}`
+    ? HasJsonOperator<Rest> extends true
+      ? IsSimpleIdentifier<Table> extends true
+        ? ExtractBaseColumnFromJsonExpr<Rest> extends infer BaseCol extends string
+          ? IsSimpleIdentifier<BaseCol> extends true
+            ? TableColumnRef<Table, BaseCol, undefined>
+            : never
           : never
         : never
-  // Pattern: column::type (unquoted simple column with cast)
+      : Rest extends `${string}.${string}`
+        ? never  // This is schema.table.column, handled above
+        : IsSimpleIdentifier<Table> extends true
+          ? IsSimpleIdentifier<Rest> extends true
+            ? TableColumnRef<Table, Rest, undefined>
+            : never
+          : never
+  // Pattern: column with JSON operator (e.g., config->>'key') - MUST come before ::type pattern
+  : HasJsonOperator<T> extends true
+    ? ExtractBaseColumnFromJsonExpr<T> extends infer BaseCol extends string
+      ? IsSimpleIdentifier<BaseCol> extends true
+        ? IsKeywordOrOperator<BaseCol> extends true
+          ? never
+          : UnboundColumnRef<BaseCol>
+        : never
+      : never
+  // Pattern: column::type (unquoted simple column with cast) - after JSON check
   : T extends `${infer Col}::${string}`
     ? IsSimpleIdentifier<ExtractBeforeCast<Col>> extends true
       ? UnboundColumnRef<ExtractBeforeCast<Col>>
@@ -707,10 +755,54 @@ type ExtractTypeName<T extends string> =
 
 /**
  * Extract column name for complex expressions (for default alias)
+ * For JSON operators, extracts the last key as the alias (without quotes)
  */
 type ExtractComplexColumnName<T extends string> = 
   T extends `${string} AS ${infer Alias}` ? RemoveQuotes<Alias> :
-  "expr"
+  // Extract the last JSON key from the expression
+  ExtractJsonKeyForAlias<T> extends infer Key extends string
+    ? Key extends "" ? "expr" : Key
+    : "expr"
+
+/**
+ * Extract the JSON key from a JSON operator expression for use as alias
+ * e.g., config->>'settings' -> settings, data->'items'->>'name' -> name
+ */
+type ExtractJsonKeyForAlias<T extends string> =
+  // Strip any type cast at the end first
+  StripTypeCast<T> extends infer Stripped extends string
+    ? ExtractLastJsonKey<Stripped>
+    : ""
+
+/**
+ * Extract the last JSON key from an expression (handles nested accessors)
+ */
+type ExtractLastJsonKey<T extends string> =
+  // Pattern: ...->>'key' (last accessor with ->>)
+  T extends `${string}->>'${infer Key}'`
+    ? Key
+  : T extends `${string}->>"${infer Key}"`
+    ? Key
+  : T extends `${string}->>${infer Key}`
+    ? IsSimpleIdentifier<Key> extends true ? Key : ""
+  // Pattern: ...->'key' (last accessor with ->)
+  : T extends `${string}->'${infer Key}'`
+    ? Key
+  : T extends `${string}->"${infer Key}"`
+    ? Key
+  : T extends `${string}->${infer Key}`
+    ? IsSimpleIdentifier<Key> extends true ? Key : ""
+  // Pattern: ...#>>'key' (last accessor with #>>)
+  : T extends `${string}#>>'${infer Key}'`
+    ? Key
+  : T extends `${string}#>>"${infer Key}"`
+    ? Key
+  // Pattern: ...#>'key' (last accessor with #>)
+  : T extends `${string}#>'${infer Key}'`
+    ? Key
+  : T extends `${string}#>"${infer Key}"`
+    ? Key
+  : ""
 
 /**
  * Strip PostgreSQL type cast syntax (::type) from a column reference

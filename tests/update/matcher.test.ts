@@ -280,6 +280,31 @@ type UR_QuotedColumn = UpdateResult<'UPDATE users SET name = \'John\' WHERE id =
 type _UR20 = RequireTrue<AssertEqual<UR_QuotedColumn, { id: number; name: string }>>
 
 // ============================================================================
+// JSON Operator Tests
+// ============================================================================
+
+// Schema with JSON fields
+type JsonSchema = {
+    defaultSchema: "public"
+    schemas: {
+        public: {
+            items: {
+                id: number
+                data: { settings: { enabled: boolean }; tags: string[] }
+            }
+        }
+    }
+}
+
+// Test: JSON accessor in WHERE clause validates base column
+type UR_JsonWhere = UpdateResult<"UPDATE items SET id = 1 WHERE data->>'key' = 'value' RETURNING id", JsonSchema>
+type _UR21 = RequireTrue<AssertEqual<UR_JsonWhere, { id: number }>>
+
+// Test: Nested JSON accessor in WHERE validates base column
+type UR_JsonWhereNested = UpdateResult<"UPDATE items SET id = 1 WHERE data->'settings'->>'enabled' = 'true' RETURNING id", JsonSchema>
+type _UR22 = RequireTrue<AssertEqual<UR_JsonWhereNested, { id: number }>>
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

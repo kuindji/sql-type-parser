@@ -502,10 +502,10 @@ type JsonFieldSchema = {
                 // Nested object type (like a JSON field)
                 metadata: { foo: string; bar: number }
                 // Deeply nested object
-                config: { 
-                    settings: { 
+                config: {
+                    settings: {
                         enabled: boolean
-                        values: number[] 
+                        values: number[]
                     }
                     tags: string[]
                 }
@@ -525,9 +525,25 @@ type _M47 = RequireTrue<AssertEqual<M_JsonField, { metadata: { foo: string; bar:
 // Test: Query with deeply nested object field
 type M_DeepJsonField = QueryResult<"SELECT config FROM items", JsonFieldSchema>
 type _M48 = RequireTrue<AssertEqual<
-    M_DeepJsonField, 
+    M_DeepJsonField,
     { config: { settings: { enabled: boolean; values: number[] }; tags: string[] } }
 >>
+
+// Test: JSON field accessor returns unknown (no type cast)
+type M_DeepJsonFieldProperty = QueryResult<"SELECT config->>'settings' FROM items", JsonFieldSchema>
+type _M48_1 = RequireTrue<AssertEqual<M_DeepJsonFieldProperty, { settings: unknown }>>
+
+// Test: JSON field accessor with type cast returns casted type
+type M_JsonFieldWithCast = QueryResult<"SELECT (config)->>'settings'::text FROM items", JsonFieldSchema>
+type _M48_2 = RequireTrue<AssertEqual<M_JsonFieldWithCast, { settings: string }>>
+
+// Test: Nested JSON accessor
+type M_NestedJsonField = QueryResult<"SELECT config->'settings'->>'enabled' FROM items", JsonFieldSchema>
+type _M48_3 = RequireTrue<AssertEqual<M_NestedJsonField, { enabled: unknown }>>
+
+// Test: JSON accessor with explicit alias
+type M_JsonFieldAlias = QueryResult<"SELECT config->>'settings' AS cfg_settings FROM items", JsonFieldSchema>
+type _M48_4 = RequireTrue<AssertEqual<M_JsonFieldAlias, { cfg_settings: unknown }>>
 
 // Test: Query with nullable object field
 type M_NullableJsonField = QueryResult<"SELECT extra FROM items", JsonFieldSchema>
@@ -545,11 +561,31 @@ type _V6 = RequireTrue<AssertEqual<V_JsonValid, true>>
 type V_DeepJsonValid = ValidateSQL<"SELECT config FROM items", JsonFieldSchema>
 type _V7 = RequireTrue<AssertEqual<V_DeepJsonValid, true>>
 
+// Test: JSON accessor in SELECT validates the base column
+type V_JsonAccessorValid = ValidateSQL<"SELECT (config)->>'settings' FROM items", JsonFieldSchema>
+type _V7_1 = RequireTrue<AssertEqual<V_JsonAccessorValid, true>>
+
+// Test: Invalid base column in JSON accessor returns error
+type V_JsonAccessorInvalid = ValidateSQL<"SELECT bad_field->>'settings' FROM items", JsonFieldSchema>
+type _V7_2 = RequireTrue<AssertExtends<V_JsonAccessorInvalid, string>>
+
+// Test: JSON accessor in WHERE clause validates base column
+type V_JsonWhereValid = ValidateSQL<"SELECT id FROM items WHERE config->>'key' = 'value'", JsonFieldSchema>
+type _V7_3 = RequireTrue<AssertEqual<V_JsonWhereValid, true>>
+
+// Test: Nested JSON accessor in WHERE validates base column
+type V_JsonWhereNestedValid = ValidateSQL<"SELECT id FROM items WHERE config->'settings'->>'enabled' = 'true'", JsonFieldSchema>
+type _V7_4 = RequireTrue<AssertEqual<V_JsonWhereNestedValid, true>>
+
+// Test: Table-qualified JSON accessor works
+type M_TableQualifiedJson = QueryResult<"SELECT i.config->>'settings' FROM items i", JsonFieldSchema>
+type _M48_5 = RequireTrue<AssertEqual<M_TableQualifiedJson, { settings: unknown }>>
+
 // Test: Multiple JSON fields in one query
 type M_MultiJsonFields = QueryResult<"SELECT id, metadata, config FROM items", JsonFieldSchema>
 type _M51 = RequireTrue<AssertEqual<
     M_MultiJsonFields,
-    { 
+    {
         id: number
         metadata: { foo: string; bar: number }
         config: { settings: { enabled: boolean; values: number[] }; tags: string[] }

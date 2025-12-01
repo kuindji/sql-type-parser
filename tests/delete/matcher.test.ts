@@ -224,6 +224,31 @@ type DR_QuotedColumn = DeleteResult<'DELETE FROM users WHERE id = 1 RETURNING "i
 type _DR20 = RequireTrue<AssertEqual<DR_QuotedColumn, { id: number; name: string }>>
 
 // ============================================================================
+// JSON Operator Tests
+// ============================================================================
+
+// Schema with JSON fields
+type JsonSchema = {
+    defaultSchema: "public"
+    schemas: {
+        public: {
+            items: {
+                id: number
+                data: { settings: { enabled: boolean }; tags: string[] }
+            }
+        }
+    }
+}
+
+// Test: JSON accessor in WHERE clause validates base column
+type DR_JsonWhere = DeleteResult<"DELETE FROM items WHERE data->>'key' = 'value' RETURNING id", JsonSchema>
+type _DR21 = RequireTrue<AssertEqual<DR_JsonWhere, { id: number }>>
+
+// Test: Nested JSON accessor in WHERE validates base column
+type DR_JsonWhereNested = DeleteResult<"DELETE FROM items WHERE data->'settings'->>'enabled' = 'true' RETURNING id", JsonSchema>
+type _DR22 = RequireTrue<AssertEqual<DR_JsonWhereNested, { id: number }>>
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 
