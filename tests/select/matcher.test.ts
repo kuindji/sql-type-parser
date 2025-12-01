@@ -542,7 +542,7 @@ type M_NestedJsonField = QueryResult<"SELECT config->'settings'->>'enabled' FROM
 type _M48_3 = RequireTrue<AssertEqual<M_NestedJsonField, { enabled: unknown }>>
 
 // Test: JSON accessor with explicit alias
-type M_JsonFieldAlias = QueryResult<"SELECT config->>'settings' AS cfg_settings FROM items", JsonFieldSchema>
+type M_JsonFieldAlias = QueryResult<`SELECT ("config"::json)->>'settings' AS cfg_settings FROM items`, JsonFieldSchema>
 type _M48_4 = RequireTrue<AssertEqual<M_JsonFieldAlias, { cfg_settings: unknown }>>
 
 // Test: Query with nullable object field
@@ -562,7 +562,7 @@ type V_DeepJsonValid = ValidateSQL<"SELECT config FROM items", JsonFieldSchema>
 type _V7 = RequireTrue<AssertEqual<V_DeepJsonValid, true>>
 
 // Test: JSON accessor in SELECT validates the base column
-type V_JsonAccessorValid = ValidateSQL<"SELECT (config)->>'settings' FROM items", JsonFieldSchema>
+type V_JsonAccessorValid = ValidateSQL<`SELECT ("config"::json)->>'settings' FROM items`, JsonFieldSchema>
 type _V7_1 = RequireTrue<AssertEqual<V_JsonAccessorValid, true>>
 
 // Test: Invalid base column in JSON accessor returns error
@@ -574,7 +574,11 @@ type V_JsonWhereValid = ValidateSQL<"SELECT id FROM items WHERE config->>'key' =
 type _V7_3 = RequireTrue<AssertEqual<V_JsonWhereValid, true>>
 
 // Test: Nested JSON accessor in WHERE validates base column
-type V_JsonWhereNestedValid = ValidateSQL<"SELECT id FROM items WHERE config->'settings'->>'enabled' = 'true'", JsonFieldSchema>
+type V_JsonWhereNestedValid = ValidateSQL<`
+    SELECT id FROM items 
+    WHERE ("config"::json)->>'settings'->>'enabled' = 'true'
+    order by ("config"::json)->>'settings'->>'enabled' asc
+    `, JsonFieldSchema>
 type _V7_4 = RequireTrue<AssertEqual<V_JsonWhereNestedValid, true>>
 
 // Test: Table-qualified JSON accessor works

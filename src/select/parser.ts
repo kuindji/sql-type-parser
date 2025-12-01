@@ -596,6 +596,30 @@ type ExtractBaseColumnFromJsonExpr<T extends string> =
   : T  // No more operators, return as-is
 
 /**
+ * Extract column name from a potentially parenthesized and/or type-casted expression
+ * Handles patterns like:
+ *   - ("config"::json) -> config
+ *   - (config::json) -> config
+ *   - "config"::json -> config
+ *   - config::json -> config
+ *   - ("config") -> config
+ *   - "config" -> config
+ *   - config -> config
+ */
+type ExtractColumnFromParenExpr<T extends string> =
+  // Strip outer parentheses first
+  Trim<T> extends `(${infer Inner})`
+    ? ExtractColumnFromParenExpr<Trim<Inner>>
+  // Strip type cast (::type)
+  : Trim<T> extends `${infer Col}::${string}`
+    ? ExtractColumnFromParenExpr<Trim<Col>>
+  // Extract from quoted identifier
+  : Trim<T> extends `"${infer Col}"`
+    ? Col
+  // Simple identifier
+  : Trim<T>
+
+/**
  * Check if the token contains a JSON operator
  */
 type HasJsonOperator<T extends string> =
@@ -665,13 +689,21 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
             : never
           : never
   // Pattern: column with JSON operator (e.g., config->>'key') - MUST come before ::type pattern
+  // Also handles parenthesized expressions like ("config"::json)->>'key'
   : HasJsonOperator<T> extends true
     ? ExtractBaseColumnFromJsonExpr<T> extends infer BaseCol extends string
       ? IsSimpleIdentifier<BaseCol> extends true
         ? IsKeywordOrOperator<BaseCol> extends true
           ? never
           : UnboundColumnRef<BaseCol>
-        : never
+        // Handle parenthesized/casted expressions like ("config"::json)
+        : ExtractColumnFromParenExpr<BaseCol> extends infer ExtractedCol extends string
+          ? IsSimpleIdentifier<ExtractedCol> extends true
+            ? IsKeywordOrOperator<ExtractedCol> extends true
+              ? never
+              : UnboundColumnRef<ExtractedCol>
+            : never
+          : never
       : never
   // Pattern: column::type (unquoted simple column with cast) - after JSON check
   : T extends `${infer Col}::${string}`
@@ -1534,10 +1566,24 @@ type ParseOrderByItems<T extends string[]> = T extends [
  * Parse a single ORDER BY item
  */
 type ParseOrderByItem<T extends string> = Trim<T> extends `${infer Col} DESC`
-  ? OrderByItem<ParseColumnRefType<Col>, "DESC">
+  ? OrderByItem<ParseOrderByColumnRef<Col>, "DESC">
   : Trim<T> extends `${infer Col} ASC`
-  ? OrderByItem<ParseColumnRefType<Col>, "ASC">
-  : OrderByItem<ParseColumnRefType<Trim<T>>, "ASC">
+  ? OrderByItem<ParseOrderByColumnRef<Col>, "ASC">
+  : OrderByItem<ParseOrderByColumnRef<Trim<T>>, "ASC">
+
+/**
+ * Parse column reference for ORDER BY, handling JSON accessors
+ * This extracts the base column from JSON accessor expressions like:
+ *   - config->>'settings'
+ *   - ("config"::json)->>'key'->>'subkey'
+ *   - table.column->>'field'
+ */
+type ParseOrderByColumnRef<T extends string> =
+  // First try to extract from JSON expression using the token-based extractor
+  // which handles JSON accessors properly
+  ExtractColumnFromToken<Trim<T>> extends infer Result extends ValidatableColumnRef
+    ? Result
+    : ParseColumnRefType<T>  // Fallback to regular parsing for non-JSON columns
 
 // ============================================================================
 // LIMIT/OFFSET Parser
