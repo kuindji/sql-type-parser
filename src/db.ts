@@ -21,7 +21,8 @@
  * ```
  */
 
-import type { DatabaseSchema, QueryResult, ValidateSQL } from "./matcher.js"
+import type { DatabaseSchema, QueryResult } from "./select/matcher.js"
+import type { ValidateSelectSQL } from "./select/validator.js"
 import type { MaxParamNumber } from "./params.js"
 
 
@@ -33,14 +34,18 @@ import type { MaxParamNumber } from "./params.js"
  * Validates a query at compile time.
  * If valid, returns the query string type.
  * If invalid, returns an error message type that will be shown in IDE tooltips.
+ * 
+ * Uses the comprehensive validator (ValidateSelectSQL) which performs
+ * all validation checks. This is separate from QueryResult which only
+ * extracts the result type.
  */
 export type ValidQuery<
     Q extends string,
     Schema extends DatabaseSchema,
-> = ValidateSQL<Q, Schema> extends infer V
+> = ValidateSelectSQL<Q, Schema> extends infer V
     ? V extends true
-    ? Q
-    : `[SQL Error] ${V & string}`
+      ? Q
+      : `[SQL Error] ${V & string}`
     : never
 
 /**
@@ -135,11 +140,12 @@ export function createSelectFn<Schema extends DatabaseSchema>(handler: QueryHand
 
 /**
  * Check if a query is valid
+ * Uses the comprehensive validator (ValidateSelectSQL)
  */
 export type IsValidSelect<
     SQL extends string,
     Schema extends DatabaseSchema,
-> = ValidateSQL<SQL, Schema> extends true ? true : false
+> = ValidateSelectSQL<SQL, Schema> extends true ? true : false
 
 /**
  * Check if a query has parameters

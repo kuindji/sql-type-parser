@@ -1,5 +1,7 @@
 /**
  * Type-level string and number utilities for the SQL parser
+ * 
+ * These utilities are shared across all query type parsers.
  */
 
 // ============================================================================
@@ -215,7 +217,7 @@ export type Decrement<N extends number> = N extends 20
 export type Flatten<T> = { [K in keyof T]: T[K] } & {}
 
 /**
- * Error marker type
+ * Error marker type for parse errors
  */
 export type ParseError<Message extends string> = {
   error: true
@@ -226,4 +228,17 @@ export type ParseError<Message extends string> = {
  * Check if a type is a parse error
  */
 export type IsParseError<T> = T extends ParseError<string> ? true : false
+
+/**
+ * Error marker type for match errors
+ */
+export type MatchError<Message extends string> = {
+  readonly __error: true
+  readonly message: Message
+}
+
+/**
+ * Check if a type is a match error
+ */
+export type IsMatchError<T> = T extends { readonly __error: true } ? true : false
 

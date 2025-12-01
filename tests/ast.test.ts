@@ -37,7 +37,8 @@ import type {
     WhereExpr,
     SelectItem,
     SelectColumns,
-} from "../src/ast.js"
+    UnionClauseAny,
+} from "../src/index.js"
 import type { AssertEqual, AssertExtends, RequireTrue, HasProperty } from "./helpers.js"
 
 // ============================================================================
@@ -282,8 +283,6 @@ type _SSC1 = RequireTrue<SSC_Check>
 // ============================================================================
 
 // Test: SQLQuery structure - can contain SelectClause or UnionClauseAny
-import type { UnionClauseAny } from "../src/ast.js"
-
 type SQ_Check = SQLQuery extends { type: "SQLQuery"; query: SelectClause | UnionClauseAny } ? true : false
 type _SQ1 = RequireTrue<SQ_Check>
 

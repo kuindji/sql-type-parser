@@ -1,18 +1,27 @@
 /**
- * Type-level schema matcher
- * Takes a parsed SQL AST and a database schema, returns the result row type
+ * Type-level schema matcher for SELECT queries
+ * 
+ * Takes a parsed SQL SELECT AST and a database schema, returns the result row type.
+ * This module handles SELECT-specific matching logic.
  */
 
 import type {
+  SQLSelectQuery,
   SQLQuery,
   SelectClause,
-  SubquerySelectClause,
   ColumnRef,
+  SubqueryExpr,
+  UnionClause,
+  UnionClauseAny,
+  UnionOperatorType,
+  SelectItem,
+} from "./ast.js"
+
+import type {
   TableColumnRef,
   UnboundColumnRef,
   TableWildcard,
   ComplexExpr,
-  SubqueryExpr,
   ValidatableColumnRef,
   TableRef,
   TableSource,
@@ -20,75 +29,37 @@ import type {
   CTEDefinition,
   JoinClause,
   AggregateExpr,
-  SelectItem,
-  UnionClause,
-  UnionClauseAny,
-  UnionOperatorType,
-} from "./ast.js"
-import type { Flatten } from "./utils.js"
+  SubquerySelectClause,
+  MapSQLTypeToTS,
+} from "../common/ast.js"
+
+import type { Flatten, MatchError, IsMatchError } from "../common/utils.js"
+import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 // ============================================================================
-// Error Types
+// Re-exports for convenience
 // ============================================================================
 
-/**
- * Error type for unresolvable columns/tables
- */
-export type MatchError<Message extends string> = {
-  readonly __error: true
-  readonly message: Message
-}
-
-// ============================================================================
-// Schema Types
-// ============================================================================
-
-/**
- * Expected structure of a database schema with schema support
- * Uses a generic object constraint to allow interfaces without index signatures
- * 
- * Structure:
- * {
- *   schemas: {
- *     public: { users: {...}, posts: {...} },
- *     other: { ... }
- *   },
- *   defaultSchema?: "public" // optional, defaults to first schema key
- * }
- */
-export type DatabaseSchema = {
-  schemas: {
-    [schemaName: string]: {
-      [tableName: string]: object
-    }
-  }
-  defaultSchema?: string
-}
-
-/**
- * Get the default schema name from a DatabaseSchema
- * Uses defaultSchema if specified, otherwise uses the first schema key
- */
-type GetDefaultSchema<Schema extends DatabaseSchema> =
-  Schema["defaultSchema"] extends string
-  ? Schema["defaultSchema"]
-  : keyof Schema["schemas"] extends infer Keys
-  ? Keys extends string
-  ? Keys
-  : never
-  : never
+export type { MatchError } from "../common/utils.js"
+export type { DatabaseSchema } from "../common/schema.js"
 
 // ============================================================================
 // Main Matcher
 // ============================================================================
 
 /**
- * Match a parsed SQL query against a schema to get the result type
+ * Match a parsed SQL SELECT query against a schema to get the result type
  */
-export type MatchQuery<
+export type MatchSelectQuery<
   Query,
   Schema extends DatabaseSchema,
-> = Query extends SQLQuery<infer QueryContent>
+> = Query extends SQLSelectQuery<infer QueryContent>
+  ? QueryContent extends UnionClauseAny
+  ? MatchUnionClause<QueryContent, Schema>
+  : QueryContent extends SelectClause
+  ? MatchSelectClause<QueryContent, Schema>
+  : MatchError<"Invalid query content type">
+  : Query extends SQLQuery<infer QueryContent>
   ? QueryContent extends UnionClauseAny
   ? MatchUnionClause<QueryContent, Schema>
   : QueryContent extends SelectClause
@@ -714,20 +685,6 @@ type FindColumnExists<
   : MatchError<`Column '${Column}' not found in any table`>
 
 /**
- * Map SQL type names to TypeScript types
- */
-type MapSQLTypeToTS<T extends string> =
-  T extends "text" | "varchar" | "char" | "character varying" | "character" ? string :
-  T extends "int" | "integer" | "int4" | "int8" | "bigint" | "smallint" | "serial" | "bigserial" ? number :
-  T extends "float" | "float4" | "float8" | "real" | "double precision" | "numeric" | "decimal" ? number :
-  T extends "bool" | "boolean" ? boolean :
-  T extends "json" | "jsonb" ? object :
-  T extends "date" | "timestamp" | "timestamptz" | "time" | "timetz" ? string :
-  T extends "uuid" ? string :
-  T extends "bytea" ? Uint8Array :
-  unknown
-
-/**
  * Resolve a table-qualified column (table.column, alias.column, or schema.table.column)
  * ColSchema is the schema from the query (undefined if not specified)
  * Note: We check for undefined first due to TypeScript 5.9+ behavior
@@ -845,19 +802,25 @@ type UnionToIntersection<U> = (
   : never
 
 // ============================================================================
-// Convenience Type
+// Convenience Types
 // ============================================================================
 
 /**
  * Parse SQL and match against schema in one step
+ * 
+ * This is the lightweight type extraction path - focused on determining
+ * the result type of a query. It reports errors for columns it can't resolve,
+ * but does not perform deep validation (JOIN conditions, WHERE clauses, etc.)
+ * 
+ * For comprehensive validation, use ValidateSQL from ./validator.js
  */
 export type QueryResult<
   SQL extends string,
   Schema extends DatabaseSchema,
-> = MatchQuery<import("./parser.js").ParseSQL<SQL>, Schema>
+> = MatchSelectQuery<import("./parser.js").ParseSelectSQL<SQL>, Schema>
 
 // ============================================================================
-// Query Validator
+// Query Result Error Checking
 // ============================================================================
 
 /**
@@ -868,61 +831,61 @@ type ExtractError<T> = T extends { readonly __error: true; readonly message: inf
   : never
 
 /**
- * Check if a type is a MatchError
- */
-type IsMatchError<T> = T extends { readonly __error: true } ? true : false
-
-/**
  * Check if a type could potentially be or contain a MatchError
- * This prevents unnecessary recursion into valid column types like JSON objects or arrays
  */
 type CouldContainError<T> = T extends { readonly __error: true } ? true : false
 
 /**
- * Find the first error in an object, checking direct properties only
- * MatchErrors only appear at the first level of the result object,
- * so we don't need to recursively descend into valid column types
+ * Find the first error in a QueryResult object
+ * Checks direct properties only - MatchErrors appear at the first level
  */
 type FindFirstError<T> =
-  // First check if T itself is an error
   IsMatchError<T> extends true
-  ? ExtractError<T>
-  // Then check if it's an object with potential errors
-  : T extends object
-  ? CollectErrors<T> extends infer Errors
-  ? [Errors] extends [never]
-  ? never
-  : Errors
-  : never
-  : never
+    ? ExtractError<T>
+    : T extends object
+      ? CollectErrors<T> extends infer Errors
+        ? [Errors] extends [never]
+          ? never
+          : Errors
+        : never
+      : never
 
 /**
  * Collect errors from direct properties of an object
- * Only checks if properties are MatchErrors, doesn't recursively descend
- * into valid column types (which would cause issues with complex objects like JSON fields)
  */
 type CollectErrors<T> = {
   [K in keyof T]: IsMatchError<T[K]> extends true
-  ? ExtractError<T[K]>
-  // Only recurse into objects that could contain errors (have __error property)
-  : CouldContainError<T[K]> extends true
-  ? FindFirstError<T[K]>
-  : never
+    ? ExtractError<T[K]>
+    : CouldContainError<T[K]> extends true
+      ? FindFirstError<T[K]>
+      : never
 }[keyof T]
 
 /**
- * Validate a query result - returns true if valid, or the error message if invalid
+ * Check if a QueryResult has errors
+ * Returns true if no errors, or the error message if there are errors
+ * 
+ * Note: This only checks errors from column resolution.
+ * For comprehensive validation, use ValidateSQL from ./validator.js
  */
 export type ValidateQuery<Result> = FindFirstError<Result> extends never
   ? true
   : FindFirstError<Result>
 
+// ============================================================================
+// Legacy Validation (delegates to validator)
+// ============================================================================
+
 /**
- * Validate a SQL query against a schema in one step
+ * Validate a SQL query against a schema
  * Returns true if valid, or error message if invalid
+ * 
+ * This uses the dedicated validator for comprehensive validation.
+ * 
+ * @see ValidateSelectSQL in ./validator.js for the implementation
  */
 export type ValidateSQL<
   SQL extends string,
   Schema extends DatabaseSchema,
-> = ValidateQuery<QueryResult<SQL, Schema>>
+> = import("./validator.js").ValidateSelectSQL<SQL, Schema>
 

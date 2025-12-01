@@ -5,7 +5,7 @@
  * If this file compiles without errors, all tests pass.
  */
 
-import type { QueryResult, ValidateSQL, MatchError, DatabaseSchema } from "../src/matcher.js"
+import type { QueryResult, ValidateSQL, MatchError, DatabaseSchema } from "../src/index.js"
 import type { ValidQuery } from "../src/db.js"
 import type { AssertEqual, AssertExtends, RequireTrue, AssertIsMatchError, AssertNotMatchError, IsNever } from "./helpers.js"
 

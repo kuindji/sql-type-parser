@@ -1,5 +1,7 @@
 /**
  * Type-level SQL tokenization utilities
+ * 
+ * These utilities are shared across all query type parsers.
  */
 
 import type { Trim, ToUpperCase, Increment, Decrement } from "./utils.js"
@@ -13,7 +15,13 @@ import type { Trim, ToUpperCase, Increment, Decrement } from "./utils.js"
  */
 type SQLKeyword =
   | "SELECT"
+  | "INSERT"
+  | "UPDATE"
+  | "DELETE"
   | "FROM"
+  | "INTO"
+  | "VALUES"
+  | "SET"
   | "WHERE"
   | "AND"
   | "OR"
@@ -54,6 +62,13 @@ type SQLKeyword =
   | "INTERSECT"
   | "EXCEPT"
   | "ALL"
+  | "RETURNING"
+  | "DEFAULT"
+  | "CONFLICT"
+  | "DO"
+  | "NOTHING"
+  | "CASCADE"
+  | "RESTRICT"
 
 /**
  * Keywords that terminate the FROM clause
@@ -74,16 +89,17 @@ export type FromTerminators =
   | "UNION"
   | "INTERSECT"
   | "EXCEPT"
+  | "RETURNING"
 
 /**
  * Keywords that terminate the WHERE clause
  */
-export type WhereTerminators = "ORDER" | "GROUP" | "HAVING" | "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT"
+export type WhereTerminators = "ORDER" | "GROUP" | "HAVING" | "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT" | "RETURNING"
 
 /**
  * Keywords that terminate ORDER BY
  */
-export type OrderByTerminators = "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT"
+export type OrderByTerminators = "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT" | "RETURNING"
 
 /**
  * Union operators

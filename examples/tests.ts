@@ -6,9 +6,11 @@
  * all tests pass.
  */
 
-import type { ParseSQL } from "../src/parser.js"
-import type { QueryResult, ValidateSQL, MatchError } from "../src/matcher.js"
 import type {
+  ParseSQL,
+  QueryResult,
+  ValidateSQL,
+  MatchError,
   SQLQuery,
   SelectClause,
   ColumnRef,
@@ -19,7 +21,7 @@ import type {
   JoinClause,
   OrderByItem,
   AggregateExpr,
-} from "../src/ast.js"
+} from "../src/index.js"
 import type { BlogSchema, ECommerceSchema, CamelCaseSchema } from "./schema.js"
 
 // ============================================================================

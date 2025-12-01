@@ -20,7 +20,7 @@
  * ```
  */
 
-import type { Trim, Increment } from "./utils.js"
+import type { Trim, Increment } from "./common/utils.js"
 
 // ============================================================================
 // Parameter Placeholder Types
@@ -395,4 +395,3 @@ type FormatValue<T> = T extends string
       : T extends null
         ? "NULL"
         : "?"
-

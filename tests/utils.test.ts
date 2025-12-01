@@ -11,11 +11,10 @@ import type {
     Flatten,
     ParseError,
     IsParseError,
-    Join,
-    ToUpperCase,
     Increment,
     Decrement,
-} from "../src/utils.js"
+} from "../src/index.js"
+import type { Join, ToUpperCase } from "../src/common/utils.js"
 import type { AssertEqual, RequireTrue, AssertIsParseError, AssertNotParseError } from "./helpers.js"
 
 // ============================================================================

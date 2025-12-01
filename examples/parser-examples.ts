@@ -5,8 +5,7 @@
  * Each example shows the SQL query and the expected AST type.
  */
 
-import type { ParseSQL } from "../src/parser.js"
-import type { SQLQuery, SelectClause } from "../src/ast.js"
+import type { ParseSQL, SQLQuery, SelectClause } from "../src/index.js"
 
 // ============================================================================
 // 1. Basic SELECT Queries

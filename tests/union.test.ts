@@ -5,8 +5,8 @@
  * If this file compiles without errors, all tests pass.
  */
 
-import type { ParseSQL } from "../src/parser.js"
 import type {
+    ParseSQL,
     SQLQuery,
     SelectClause,
     UnionClause,
@@ -15,8 +15,9 @@ import type {
     UnboundColumnRef,
     TableColumnRef,
     TableRef,
-} from "../src/ast.js"
-import type { QueryResult, DatabaseSchema } from "../src/matcher.js"
+    QueryResult,
+    DatabaseSchema,
+} from "../src/index.js"
 import type { AssertEqual, AssertExtends, RequireTrue, AssertIsParseError, AssertNotMatchError } from "./helpers.js"
 
 // ============================================================================

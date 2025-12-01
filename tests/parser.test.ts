@@ -5,8 +5,8 @@
  * If this file compiles without errors, all tests pass.
  */
 
-import type { ParseSQL } from "../src/parser.js"
 import type {
+    ParseSQL,
     SQLQuery,
     SelectClause,
     ColumnRef,
@@ -22,8 +22,8 @@ import type {
     AggregateExpr,
     CTEDefinition,
     UnparsedExpr,
-} from "../src/ast.js"
-import type { ParseError } from "../src/utils.js"
+    ParseError,
+} from "../src/index.js"
 import type { AssertEqual, AssertExtends, RequireTrue, AssertIsParseError } from "./helpers.js"
 
 // ============================================================================

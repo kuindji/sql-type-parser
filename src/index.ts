@@ -1,10 +1,22 @@
 /**
  * @kuindji/sql-type-parser
  * 
- * Type-level SQL SELECT Parser
+ * Type-level SQL Parser
  *
- * This module provides a type-level parser that transforms SQL SELECT query
+ * This module provides a type-level parser that transforms SQL query
  * string literals into their corresponding AST types at compile time.
+ * 
+ * Architecture:
+ * ------------
+ * The parser is organized into modules by query type:
+ * - common/    - Shared utilities (tokenizer, AST nodes, utils)
+ * - select/    - SELECT query parser and matcher
+ * - insert/    - INSERT query parser and matcher (planned)
+ * - update/    - UPDATE query parser and matcher (planned)
+ * - delete/    - DELETE query parser and matcher (planned)
+ * 
+ * Each query type has its own execution tree in the type system
+ * to avoid TypeScript performance issues.
  *
  * @example
  * ```typescript
@@ -40,63 +52,139 @@
  * @packageDocumentation
  */
 
-// Re-export the main parser
-export type { ParseSQL } from "./parser.js"
+// ============================================================================
+// Main Parser (Router)
+// ============================================================================
 
-// Re-export AST types for consumers
+// Re-export the main router entry point
+export type { 
+  ParseSQL,
+  DetectQueryType,
+  ParseSelectSQL,
+  IsSelectQuery,
+  IsInsertQuery,
+  IsUpdateQuery,
+  IsDeleteQuery,
+  AnySQLQuery,
+  SQLInsertQuery,
+  SQLUpdateQuery,
+  SQLDeleteQuery,
+} from "./router.js"
+
+// ============================================================================
+// Common Types (shared across all query types)
+// ============================================================================
+
+// Re-export common utility types
 export type {
-  // Query types
-  SQLQuery,
-  SelectClause,
+  // Tokenizer
+  NormalizeSQL,
+  NextToken,
+  ExtractUntil,
+  SplitByComma,
+  FromTerminators,
+  WhereTerminators,
+  OrderByTerminators,
+  StartsWith,
+
+  // Utils
+  Trim,
+  RemoveQuotes,
+  Flatten,
+  ParseError,
+  IsParseError,
+  MatchError,
+  IsMatchError,
+  Increment,
+  Decrement,
+
+  // Schema types
+  DatabaseSchema,
+  TableDefinition,
+  SchemaDefinition,
+  RelationType,
+  ColumnReference,
+  Relation,
+  Relations,
+  GetDefaultSchema,
+  GetTableNames,
+  GetColumnNames,
+  GetColumnType,
+  HasRelations,
+  GetRelationNames,
+  GetRelation,
+  FindRelationsFrom,
+  FindRelationsTo,
+
+  // Common AST types
+  QueryType,
+  UnboundColumnRef,
+  TableColumnRef,
+  ValidatableColumnRef,
+  TableWildcard,
+  SimpleColumnRefType,
+  ComplexExpr,
+  ColumnRefType,
+  TableRef,
+  SubquerySelectClause,
+  DerivedTableRef,
+  CTEDefinition,
+  TableSource,
+  ComparisonOp,
+  LogicalOp,
+  LiteralValue,
+  BinaryExpr,
+  UnparsedExpr,
+  LogicalExprAny,
+  WhereExpr,
+  LogicalExpr,
+  JoinType,
+  JoinClause,
+  SortDirection,
+  OrderByItem,
+  AggregateFunc,
+  AggregateExpr,
+  MapSQLTypeToTS,
+} from "./common/index.js"
+
+// ============================================================================
+// SELECT Query Types
+// ============================================================================
+
+// Re-export SELECT-specific types
+export type {
+  // Query wrapper types
+  SQLSelectQuery,
+  SQLQuery,  // Legacy alias
 
   // Column types
   ColumnRef,
-  ColumnRefType,
-  SimpleColumnRefType,
-  TableColumnRef,
-  UnboundColumnRef,
-  TableWildcard,
-  ComplexExpr,
+  SubqueryExpr,
+  ExtendedColumnRefType,
+
+  // Select types
+  SelectClause,
   SelectItem,
   SelectColumns,
-
-  // Table types
-  TableRef,
-
-  // Expression types
-  WhereExpr,
-  BinaryExpr,
-  LogicalExpr,
-  LiteralValue,
-  ComparisonOp,
-  LogicalOp,
-
-  // Join types
-  JoinClause,
-  JoinType,
-
-  // Order types
-  OrderByItem,
-  SortDirection,
-
-  // Aggregate types
-  AggregateExpr,
-  AggregateFunc,
 
   // Union types
   UnionClause,
   UnionClauseAny,
   UnionOperatorType,
-} from "./ast.js"
 
-// Re-export utility types
-export type { ParseError, Flatten, RemoveQuotes } from "./utils.js"
+  // Matcher types (lightweight type extraction)
+  MatchSelectQuery,
+  QueryResult,
+  ValidateQuery,
 
-// Re-export tokenizer utilities (useful for extending)
-export type { NormalizeSQL, NextToken, ExtractUntil, SplitByComma } from "./tokenizer.js"
+  // Validator types (comprehensive validation)
+  ValidateSelectSQL,
+  ValidateSQL,  // Legacy alias for ValidateSelectSQL
+} from "./select/index.js"
 
-// Re-export matcher types
-export type { MatchQuery, MatchError, DatabaseSchema, QueryResult, ValidateQuery, ValidateSQL } from "./matcher.js"
+// ============================================================================
+// Parameter Types
+// ============================================================================
 
 // Re-export parameter types
 export type {
@@ -125,6 +213,10 @@ export type {
   QueryWithParams,
 } from "./params.js"
 
+// ============================================================================
+// Database Integration Types
+// ============================================================================
+
 // Re-export database integration types
 export type {
   // Core validation type
@@ -148,3 +240,12 @@ export type {
 // Re-export factory functions
 export { createSelectFn } from "./db.js"
 
+// ============================================================================
+// Legacy Compatibility Exports
+// ============================================================================
+
+// These exports maintain backward compatibility with the old flat structure.
+// Users can import from the root or from specific modules.
+
+// Legacy: Re-export MatchQuery as alias for MatchSelectQuery
+export type { MatchSelectQuery as MatchQuery } from "./select/index.js"

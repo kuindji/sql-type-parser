@@ -1,41 +1,45 @@
 /**
  * Type-level SQL SELECT parser
+ * 
+ * This module handles parsing of SELECT queries specifically.
+ * It uses shared utilities from common/ but maintains its own
+ * execution tree for TypeScript performance.
  */
 
 import type {
   SelectClause,
+  SelectItem,
+  ColumnRef,
+  SubqueryExpr,
+  ExtendedColumnRefType,
+  UnionClause,
+  UnionClauseAny,
+  UnionOperatorType,
+  SQLSelectQuery,
+  SQLQuery,
+} from "./ast.js"
+
+import type {
   TableRef,
   TableSource,
   DerivedTableRef,
   CTEDefinition,
-  ColumnRef,
-  ColumnRefType,
   TableColumnRef,
   UnboundColumnRef,
   TableWildcard,
   ComplexExpr,
-  SubqueryExpr,
   ValidatableColumnRef,
+  ColumnRefType,
   WhereExpr,
   BinaryExpr,
-  LogicalExpr,
-  LogicalExprAny,
-  ComparisonOp,
-  LogicalOp,
+  LiteralValue,
   JoinClause,
   JoinType,
   OrderByItem,
-  SortDirection,
   AggregateExpr,
   AggregateFunc,
-  LiteralValue,
-  SelectItem,
-  SQLQuery,
   UnparsedExpr,
-  UnionClause,
-  UnionClauseAny,
-  UnionOperatorType,
-} from "./ast.js"
+} from "../common/ast.js"
 
 import type {
   NormalizeSQL,
@@ -46,9 +50,9 @@ import type {
   WhereTerminators,
   OrderByTerminators,
   StartsWith,
-} from "./tokenizer.js"
+} from "../common/tokenizer.js"
 
-import type { Trim, ParseError, Flatten, RemoveQuotes, Increment, Decrement } from "./utils.js"
+import type { Trim, ParseError, Flatten, RemoveQuotes, Increment, Decrement } from "../common/utils.js"
 
 // ============================================================================
 // Main Entry Point
@@ -57,7 +61,7 @@ import type { Trim, ParseError, Flatten, RemoveQuotes, Increment, Decrement } fr
 /**
  * Parse a SQL SELECT query string into an AST
  */
-export type ParseSQL<T extends string> = ParseQueryOrUnion<NormalizeSQL<T>>
+export type ParseSelectSQL<T extends string> = ParseQueryOrUnion<NormalizeSQL<T>>
 
 /**
  * Parse a query that may contain UNION/INTERSECT/EXCEPT operators
@@ -65,7 +69,7 @@ export type ParseSQL<T extends string> = ParseQueryOrUnion<NormalizeSQL<T>>
 type ParseQueryOrUnion<T extends string> = ParseSelectQueryWithRest<T> extends infer Result
   ? Result extends { query: infer Q extends SelectClause; rest: infer Rest extends string }
     ? CheckForUnion<Q, Rest>
-    : Result extends SQLQuery<infer Q>
+    : Result extends SQLSelectQuery<infer Q>
       ? Result
       : Result
   : never
@@ -124,20 +128,20 @@ type CheckForUnion<
   Left extends SelectClause,
   Rest extends string,
 > = Trim<Rest> extends ""
-  ? SQLQuery<Left>
+  ? SQLSelectQuery<Left>
   : ParseUnionOperator<Rest> extends [infer Op extends UnionOperatorType, infer AfterOp extends string]
     ? ParseSelectQueryWithRest<AfterOp> extends infer RightResult
       ? RightResult extends { query: infer RightQ extends SelectClause; rest: infer AfterRight extends string }
         ? CheckForMoreUnions<Left, Op, RightQ, AfterRight>
-        : RightResult extends SQLQuery<infer RightQ>
+        : RightResult extends SQLSelectQuery<infer RightQ>
           ? RightQ extends SelectClause
-            ? SQLQuery<UnionClause<Left, Op, RightQ>>
+            ? SQLSelectQuery<UnionClause<Left, Op, RightQ>>
             : RightQ extends UnionClauseAny
-              ? SQLQuery<UnionClause<Left, Op, RightQ>>
+              ? SQLSelectQuery<UnionClause<Left, Op, RightQ>>
               : ParseError<"Invalid right side of union">
           : RightResult
       : never
-    : SQLQuery<Left>
+    : SQLSelectQuery<Left>
 
 /**
  * Handle more unions on the right side
@@ -148,20 +152,20 @@ type CheckForMoreUnions<
   Right extends SelectClause,
   Rest extends string,
 > = Trim<Rest> extends ""
-  ? SQLQuery<UnionClause<Left, Op, Right>>
+  ? SQLSelectQuery<UnionClause<Left, Op, Right>>
   : ParseUnionOperator<Rest> extends [infer NextOp extends UnionOperatorType, infer AfterNextOp extends string]
     ? ParseSelectQueryWithRest<AfterNextOp> extends infer NextRightResult
       ? NextRightResult extends { query: infer NextRightQ extends SelectClause; rest: infer AfterNextRight extends string }
-        ? CheckForMoreUnions<Left, Op, Right, Rest> extends SQLQuery<infer LeftUnion>
+        ? CheckForMoreUnions<Left, Op, Right, Rest> extends SQLSelectQuery<infer LeftUnion>
           ? LeftUnion extends UnionClauseAny
-            ? CheckForMoreUnions<Right, NextOp, NextRightQ, AfterNextRight> extends SQLQuery<infer RightUnion>
-              ? SQLQuery<UnionClause<Left, Op, RightUnion>>
+            ? CheckForMoreUnions<Right, NextOp, NextRightQ, AfterNextRight> extends SQLSelectQuery<infer RightUnion>
+              ? SQLSelectQuery<UnionClause<Left, Op, RightUnion>>
               : ParseError<"Failed to parse chained union">
             : ParseError<"Invalid union chain">
           : ParseError<"Failed to parse union chain">
         : NextRightResult
       : never
-    : SQLQuery<UnionClause<Left, Op, Right>>
+    : SQLSelectQuery<UnionClause<Left, Op, Right>>
 
 /**
  * Parse a union operator and return [operator, remaining string]
@@ -211,7 +215,7 @@ type ParseSingleCTE<T extends string> = NextToken<T> extends [
   ? NextToken<AfterName> extends ["AS", infer AfterAS extends string]
     ? NextToken<AfterAS> extends ["(", infer AfterParen extends string]
       ? ExtractCTEQuery<AfterParen> extends [infer QueryStr extends string, infer Rest extends string]
-        ? ParseSelectQuery<QueryStr> extends SQLQuery<infer Query extends SelectClause>
+        ? ParseSelectQuery<QueryStr> extends SQLSelectQuery<infer Query extends SelectClause>
           ? { cte: CTEDefinition<RemoveQuotes<Name>, Query>; rest: Rest }
           : ParseError<"Failed to parse CTE query">
         : ParseError<"Invalid CTE query syntax">
@@ -246,7 +250,7 @@ type ParseSelectBodyWithCTEs<
   CTEs extends CTEDefinition[] | undefined
 > = ParseSelectBodyWithCTEsAndRest<T, CTEs> extends infer Result
   ? Result extends { query: infer Q extends SelectClause; rest: string }
-    ? SQLQuery<Q>
+    ? SQLSelectQuery<Q>
     : Result
   : never
 
@@ -412,7 +416,7 @@ type ParseSubqueryColumn<T extends string> =
  */
 type ParseSubqueryExpr<T extends string> =
   ExtractParenthesizedContent<Trim<T>> extends [infer Inner extends string, infer Remainder extends string]
-    ? ParseSelectQuery<Inner> extends SQLQuery<infer Query extends SelectClause>
+    ? ParseSelectQuery<Inner> extends SQLSelectQuery<infer Query extends SelectClause>
       ? SubqueryExpr<Query, ExtractSubqueryCastType<Remainder>>
       : ParseSelectQuery<Inner> extends ParseError<infer E>
         ? ComplexExpr<[], undefined> // Fallback to unknown on parse error
@@ -878,7 +882,7 @@ type ParseFromClause<T extends string> = NextToken<T> extends [
  */
 type ParseDerivedTable<T extends string> = 
   ExtractUntilClosingParen<T, 1, ""> extends [infer QueryStr extends string, infer AfterParen extends string]
-    ? ParseSelectQuery<Trim<QueryStr>> extends SQLQuery<infer Query extends SelectClause>
+    ? ParseSelectQuery<Trim<QueryStr>> extends SQLSelectQuery<infer Query extends SelectClause>
       ? ParseDerivedTableAlias<Trim<AfterParen>> extends { alias: infer Alias extends string; rest: infer Rest extends string }
         ? { from: DerivedTableRef<Query, Alias>; rest: Rest }
         : ParseError<"Derived table requires an alias">
@@ -973,7 +977,7 @@ type BuildSelectClauseWithCTEs<
   CTEs extends CTEDefinition[] | undefined,
 > = BuildSelectClauseWithCTEsAndRest<Columns, From, Rest, Distinct, CTEs> extends infer Result
   ? Result extends { query: infer Q extends SelectClause; rest: string }
-    ? SQLQuery<Q>
+    ? SQLSelectQuery<Q>
     : Result
   : never
 
