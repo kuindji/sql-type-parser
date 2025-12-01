@@ -101,6 +101,12 @@ export type {
   Increment,
   Decrement,
 
+  // Dynamic query support
+  IsStringLiteral,
+  DynamicQuery,
+  IsDynamicQuery,
+  DynamicQueryResult,
+
   // Schema types
   DatabaseSchema,
   TableDefinition,

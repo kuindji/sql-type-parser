@@ -34,6 +34,11 @@ export type {
   IsParseError,
   MatchError,
   IsMatchError,
+  // Dynamic query support
+  IsStringLiteral,
+  DynamicQuery,
+  IsDynamicQuery,
+  DynamicQueryResult,
 } from "./utils.js"
 
 // Re-export schema types

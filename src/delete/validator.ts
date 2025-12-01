@@ -25,7 +25,7 @@ import type {
   ParsedCondition,
 } from "../common/ast.js"
 
-import type { MatchError, IsMatchError, ParseError, IsParseError } from "../common/utils.js"
+import type { MatchError, IsMatchError, ParseError, IsParseError, IsStringLiteral } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseDeleteSQL } from "./parser.js"
@@ -71,18 +71,21 @@ type DefaultValidateOptions = { validateWhere: true; validateReturning: true }
  * Validate a DELETE query against a schema
  * 
  * Returns true if valid, or an error message if invalid.
+ * For dynamic queries (non-literal strings), returns true (can't validate at compile time).
  */
 export type ValidateDeleteSQL<
   SQL extends string,
   Schema extends DatabaseSchema,
   Options extends ValidateDeleteOptions = DefaultValidateOptions,
-> = ParseDeleteSQL<SQL> extends infer Parsed
-  ? Parsed extends ParseError<infer E>
-    ? E
-    : Parsed extends SQLDeleteQuery<infer Query>
-      ? ValidateDeleteClause<Query, Schema, Options>
-      : "Failed to parse query"
-  : never
+> = IsStringLiteral<SQL> extends false
+  ? true  // Dynamic queries bypass validation
+  : ParseDeleteSQL<SQL> extends infer Parsed
+    ? Parsed extends ParseError<infer E>
+      ? E
+      : Parsed extends SQLDeleteQuery<infer Query>
+        ? ValidateDeleteClause<Query, Schema, Options>
+        : "Failed to parse query"
+    : never
 
 // ============================================================================
 // Delete Clause Validation

@@ -242,3 +242,37 @@ export type MatchError<Message extends string> = {
  */
 export type IsMatchError<T> = T extends { readonly __error: true } ? true : false
 
+// ============================================================================
+// Dynamic Query Detection
+// ============================================================================
+
+/**
+ * Check if a string type is a literal string or the generic `string` type.
+ * This is used to detect dynamic queries that can't be parsed at compile time.
+ * 
+ * When T is a literal like "SELECT * FROM users", this returns true.
+ * When T is `string` (the type) or contains unresolvable template parts, this returns false.
+ * 
+ * The trick is that `string extends T` is only true when T is exactly `string`,
+ * not when T is a literal like "hello".
+ */
+export type IsStringLiteral<T extends string> = string extends T ? false : true
+
+/**
+ * Marker for dynamic/non-literal queries that can't be validated at compile time.
+ * These queries are passed through without validation.
+ */
+export type DynamicQuery = {
+  readonly __dynamic: true
+}
+
+/**
+ * Check if a type represents a dynamic (non-literal) query
+ */
+export type IsDynamicQuery<T> = T extends DynamicQuery ? true : false
+
+/**
+ * The result type for dynamic queries - allows any column access
+ */
+export type DynamicQueryResult = Record<string, unknown>
+

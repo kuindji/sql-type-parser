@@ -27,7 +27,7 @@ import type {
   UnboundColumnRef,
 } from "../common/ast.js"
 
-import type { MatchError, IsMatchError, ParseError, IsParseError } from "../common/utils.js"
+import type { MatchError, IsMatchError, ParseError, IsParseError, IsStringLiteral } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseInsertSQL } from "./parser.js"
@@ -73,6 +73,7 @@ type DefaultValidateOptions = { validateValueCount: true; validateReturning: tru
  * Validate an INSERT query against a schema
  * 
  * Returns true if valid, or an error message if invalid.
+ * For dynamic queries (non-literal strings), returns true (can't validate at compile time).
  * 
  * @param SQL - The SQL query string to validate
  * @param Schema - The database schema to validate against
@@ -82,13 +83,15 @@ export type ValidateInsertSQL<
   SQL extends string,
   Schema extends DatabaseSchema,
   Options extends ValidateInsertOptions = DefaultValidateOptions,
-> = ParseInsertSQL<SQL> extends infer Parsed
-  ? Parsed extends ParseError<infer E>
-    ? E
-    : Parsed extends SQLInsertQuery<infer Query>
-      ? ValidateInsertClause<Query, Schema, Options>
-      : "Failed to parse query"
-  : never
+> = IsStringLiteral<SQL> extends false
+  ? true  // Dynamic queries bypass validation
+  : ParseInsertSQL<SQL> extends infer Parsed
+    ? Parsed extends ParseError<infer E>
+      ? E
+      : Parsed extends SQLInsertQuery<infer Query>
+        ? ValidateInsertClause<Query, Schema, Options>
+        : "Failed to parse query"
+    : never
 
 // ============================================================================
 // Insert Clause Validation

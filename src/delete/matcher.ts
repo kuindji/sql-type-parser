@@ -16,7 +16,7 @@ import type {
   UnboundColumnRef,
 } from "../common/ast.js"
 
-import type { Flatten, MatchError, IsMatchError } from "../common/utils.js"
+import type { Flatten, MatchError, IsMatchError, DynamicQuery, DynamicQueryResult, IsStringLiteral } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 // ============================================================================
@@ -36,13 +36,16 @@ export type { DatabaseSchema } from "../common/schema.js"
  * For DELETE without RETURNING: returns void
  * For DELETE with RETURNING *: returns full table row type
  * For DELETE with RETURNING columns: returns partial row type
+ * For dynamic queries: returns DynamicQueryResult
  */
 export type MatchDeleteQuery<
   Query,
   Schema extends DatabaseSchema,
-> = Query extends SQLDeleteQuery<infer DeleteQuery>
-  ? MatchDeleteClause<DeleteQuery, Schema>
-  : MatchError<"Invalid query type">
+> = Query extends DynamicQuery
+  ? DynamicQueryResult
+  : Query extends SQLDeleteQuery<infer DeleteQuery>
+    ? MatchDeleteClause<DeleteQuery, Schema>
+    : MatchError<"Invalid query type">
 
 /**
  * Match a DELETE clause against the schema
@@ -142,11 +145,14 @@ type MatchReturningColumns<
  * - void if no RETURNING clause
  * - Row type if RETURNING *
  * - Partial row type if RETURNING specific columns
+ * - DynamicQueryResult for dynamic/non-literal queries
  */
 export type DeleteResult<
   SQL extends string,
   Schema extends DatabaseSchema,
-> = MatchDeleteQuery<import("./parser.js").ParseDeleteSQL<SQL>, Schema>
+> = IsStringLiteral<SQL> extends false
+  ? DynamicQueryResult
+  : MatchDeleteQuery<import("./parser.js").ParseDeleteSQL<SQL>, Schema>
 
 /**
  * Check if a DELETE result has errors

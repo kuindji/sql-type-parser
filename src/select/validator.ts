@@ -52,7 +52,7 @@ import type {
   OrderByItem,
 } from "../common/ast.js"
 
-import type { Flatten, MatchError, IsMatchError, ParseError, IsParseError } from "../common/utils.js"
+import type { Flatten, MatchError, IsMatchError, ParseError, IsParseError, IsStringLiteral, DynamicQuery } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseSelectSQL } from "./parser.js"
@@ -110,6 +110,9 @@ type ValidationError<Message extends string> = MatchError<Message>
  * This is the comprehensive validation entry point.
  * Returns true if valid, or an error message if invalid.
  * 
+ * For dynamic queries (non-literal strings or template interpolations),
+ * validation is skipped and returns true since we can't validate at compile time.
+ * 
  * Unlike QueryResult which focuses on extracting the result type,
  * this validator is designed to perform all validation checks
  * including deep validation of JOIN/WHERE clauses.
@@ -125,19 +128,26 @@ type ValidationError<Message extends string> = MatchError<Message>
  * 
  * // Disable field validation in WHERE/JOIN/etc (only validate SELECT columns)
  * type Valid = ValidateSelectSQL<"SELECT id FROM users", Schema, { validateAllFields: false }>
+ * 
+ * // Dynamic queries pass through without validation
+ * declare const dynamicPart: string
+ * type Valid = ValidateSelectSQL<`SELECT * FROM users ${typeof dynamicPart}`, Schema>
+ * // Returns true (no validation possible for dynamic queries)
  * ```
  */
 export type ValidateSelectSQL<
   SQL extends string,
   Schema extends DatabaseSchema,
   Options extends ValidateSelectOptions = DefaultValidateOptions,
-> = ParseSelectSQL<SQL> extends infer Parsed
-  ? Parsed extends ParseError<infer E>
-  ? E
-  : Parsed extends SQLSelectQuery<infer QueryContent>
-  ? ValidateQueryContent<QueryContent, Schema, Options>
-  : "Failed to parse query"
-  : never
+> = IsStringLiteral<SQL> extends false
+  ? true  // Dynamic queries bypass validation - can't validate at compile time
+  : ParseSelectSQL<SQL> extends infer Parsed
+    ? Parsed extends ParseError<infer E>
+      ? E
+      : Parsed extends SQLSelectQuery<infer QueryContent>
+        ? ValidateQueryContent<QueryContent, Schema, Options>
+        : "Failed to parse query"
+    : never
 
 /**
  * Validate the query content (SelectClause or UnionClause)

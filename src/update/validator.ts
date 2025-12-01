@@ -31,7 +31,7 @@ import type {
   ParsedCondition,
 } from "../common/ast.js"
 
-import type { MatchError, IsMatchError, ParseError, IsParseError } from "../common/utils.js"
+import type { MatchError, IsMatchError, ParseError, IsParseError, IsStringLiteral } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseUpdateSQL } from "./parser.js"
@@ -83,18 +83,21 @@ type DefaultValidateOptions = { validateSet: true; validateWhere: true; validate
  * Validate an UPDATE query against a schema
  * 
  * Returns true if valid, or an error message if invalid.
+ * For dynamic queries (non-literal strings), returns true (can't validate at compile time).
  */
 export type ValidateUpdateSQL<
   SQL extends string,
   Schema extends DatabaseSchema,
   Options extends ValidateUpdateOptions = DefaultValidateOptions,
-> = ParseUpdateSQL<SQL> extends infer Parsed
-  ? Parsed extends ParseError<infer E>
-    ? E
-    : Parsed extends SQLUpdateQuery<infer Query>
-      ? ValidateUpdateClause<Query, Schema, Options>
-      : "Failed to parse query"
-  : never
+> = IsStringLiteral<SQL> extends false
+  ? true  // Dynamic queries bypass validation
+  : ParseUpdateSQL<SQL> extends infer Parsed
+    ? Parsed extends ParseError<infer E>
+      ? E
+      : Parsed extends SQLUpdateQuery<infer Query>
+        ? ValidateUpdateClause<Query, Schema, Options>
+        : "Failed to parse query"
+    : never
 
 // ============================================================================
 // Update Clause Validation

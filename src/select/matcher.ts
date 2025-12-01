@@ -32,7 +32,7 @@ import type {
   MapSQLTypeToTS,
 } from "../common/ast.js"
 
-import type { Flatten, MatchError, IsMatchError } from "../common/utils.js"
+import type { Flatten, MatchError, IsMatchError, DynamicQuery, DynamicQueryResult, IsStringLiteral } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 // ============================================================================
@@ -48,17 +48,22 @@ export type { DatabaseSchema } from "../common/schema.js"
 
 /**
  * Match a parsed SQL SELECT query against a schema to get the result type
+ * 
+ * For dynamic queries (DynamicQuery marker), returns DynamicQueryResult
+ * which allows any property access without type errors.
  */
 export type MatchSelectQuery<
   Query,
   Schema extends DatabaseSchema,
-> = Query extends SQLSelectQuery<infer QueryContent>
-  ? QueryContent extends UnionClauseAny
-    ? MatchUnionClause<QueryContent, Schema>
-    : QueryContent extends SelectClause
-      ? MatchSelectClause<QueryContent, Schema>
-      : MatchError<"Invalid query content type">
-  : MatchError<"Invalid query type">
+> = Query extends DynamicQuery
+  ? DynamicQueryResult
+  : Query extends SQLSelectQuery<infer QueryContent>
+    ? QueryContent extends UnionClauseAny
+      ? MatchUnionClause<QueryContent, Schema>
+      : QueryContent extends SelectClause
+        ? MatchSelectClause<QueryContent, Schema>
+        : MatchError<"Invalid query content type">
+    : MatchError<"Invalid query type">
 
 /**
  * Match a union clause and return the combined result type
@@ -805,12 +810,17 @@ type UnionToIntersection<U> = (
  * the result type of a query. It reports errors for columns it can't resolve,
  * but does not perform deep validation (JOIN conditions, WHERE clauses, etc.)
  * 
+ * For dynamic queries (non-literal strings or those containing template interpolations),
+ * returns DynamicQueryResult which allows any property access.
+ * 
  * For comprehensive validation, use ValidateSQL from ./validator.js
  */
 export type QueryResult<
   SQL extends string,
   Schema extends DatabaseSchema,
-> = MatchSelectQuery<import("./parser.js").ParseSelectSQL<SQL>, Schema>
+> = IsStringLiteral<SQL> extends false
+  ? DynamicQueryResult
+  : MatchSelectQuery<import("./parser.js").ParseSelectSQL<SQL>, Schema>
 
 // ============================================================================
 // Query Result Error Checking

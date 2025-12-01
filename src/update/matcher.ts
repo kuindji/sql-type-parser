@@ -20,7 +20,7 @@ import type {
   UnboundColumnRef,
 } from "../common/ast.js"
 
-import type { Flatten, MatchError, IsMatchError } from "../common/utils.js"
+import type { Flatten, MatchError, IsMatchError, DynamicQuery, DynamicQueryResult, IsStringLiteral } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 // ============================================================================
@@ -40,13 +40,16 @@ export type { DatabaseSchema } from "../common/schema.js"
  * For UPDATE without RETURNING: returns void
  * For UPDATE with RETURNING *: returns full table row type
  * For UPDATE with RETURNING columns: returns partial row type
+ * For dynamic queries: returns DynamicQueryResult
  */
 export type MatchUpdateQuery<
   Query,
   Schema extends DatabaseSchema,
-> = Query extends SQLUpdateQuery<infer UpdateQuery>
-  ? MatchUpdateClause<UpdateQuery, Schema>
-  : MatchError<"Invalid query type">
+> = Query extends DynamicQuery
+  ? DynamicQueryResult
+  : Query extends SQLUpdateQuery<infer UpdateQuery>
+    ? MatchUpdateClause<UpdateQuery, Schema>
+    : MatchError<"Invalid query type">
 
 /**
  * Match an UPDATE clause against the schema
@@ -185,11 +188,14 @@ type BuildQualifiedRow<TableDef, Prefix extends "old" | "new"> = {
  * - void if no RETURNING clause
  * - Row type if RETURNING *
  * - Partial row type if RETURNING specific columns
+ * - DynamicQueryResult for dynamic/non-literal queries
  */
 export type UpdateResult<
   SQL extends string,
   Schema extends DatabaseSchema,
-> = MatchUpdateQuery<import("./parser.js").ParseUpdateSQL<SQL>, Schema>
+> = IsStringLiteral<SQL> extends false
+  ? DynamicQueryResult
+  : MatchUpdateQuery<import("./parser.js").ParseUpdateSQL<SQL>, Schema>
 
 /**
  * Check if an UPDATE result has errors

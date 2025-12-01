@@ -20,7 +20,7 @@ import type {
   UnboundColumnRef,
 } from "../common/ast.js"
 
-import type { Flatten, MatchError, IsMatchError } from "../common/utils.js"
+import type { Flatten, MatchError, IsMatchError, DynamicQuery, DynamicQueryResult, IsStringLiteral } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 // ============================================================================
@@ -40,13 +40,16 @@ export type { DatabaseSchema } from "../common/schema.js"
  * For INSERT without RETURNING: returns void/undefined
  * For INSERT with RETURNING *: returns full table row type
  * For INSERT with RETURNING columns: returns partial row type
+ * For dynamic queries: returns DynamicQueryResult
  */
 export type MatchInsertQuery<
   Query,
   Schema extends DatabaseSchema,
-> = Query extends SQLInsertQuery<infer InsertQuery>
-  ? MatchInsertClause<InsertQuery, Schema>
-  : MatchError<"Invalid query type">
+> = Query extends DynamicQuery
+  ? DynamicQueryResult
+  : Query extends SQLInsertQuery<infer InsertQuery>
+    ? MatchInsertClause<InsertQuery, Schema>
+    : MatchError<"Invalid query type">
 
 /**
  * Match an INSERT clause against the schema
@@ -147,11 +150,14 @@ type MatchReturningColumns<
  * - void if no RETURNING clause
  * - Row type if RETURNING *
  * - Partial row type if RETURNING specific columns
+ * - DynamicQueryResult for dynamic/non-literal queries
  */
 export type InsertResult<
   SQL extends string,
   Schema extends DatabaseSchema,
-> = MatchInsertQuery<import("./parser.js").ParseInsertSQL<SQL>, Schema>
+> = IsStringLiteral<SQL> extends false
+  ? DynamicQueryResult
+  : MatchInsertQuery<import("./parser.js").ParseInsertSQL<SQL>, Schema>
 
 /**
  * Get the expected input type for an INSERT

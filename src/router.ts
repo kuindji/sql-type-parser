@@ -20,7 +20,7 @@
  */
 
 import type { NormalizeSQL, NextToken } from "./common/tokenizer.js"
-import type { ParseError, Increment, Decrement } from "./common/utils.js"
+import type { ParseError, Increment, Decrement, IsStringLiteral, DynamicQuery } from "./common/utils.js"
 import type { QueryType } from "./common/ast.js"
 
 // Import parsers from each query type module
@@ -105,6 +105,9 @@ export type AnySQLQuery = SQLSelectQuery | SQLInsertQuery | SQLUpdateQuery | SQL
  * This is the main entry point for parsing. It detects the query type
  * and routes to the appropriate parser.
  * 
+ * For dynamic queries (where the string type is not a literal), returns
+ * DynamicQuery marker to indicate the query cannot be parsed at compile time.
+ * 
  * @example
  * ```typescript
  * type SelectAST = ParseSQL<"SELECT id, name FROM users">
@@ -118,20 +121,29 @@ export type AnySQLQuery = SQLSelectQuery | SQLInsertQuery | SQLUpdateQuery | SQL
  * 
  * type DeleteAST = ParseSQL<"DELETE FROM users WHERE id = 1">
  * // Returns SQLDeleteQuery<DeleteClause<...>>
+ * 
+ * // Dynamic queries pass through without validation
+ * declare const dynamic: string
+ * type DynamicAST = ParseSQL<`SELECT * FROM users ${typeof dynamic}`>
+ * // Returns DynamicQuery (passes through without errors)
  * ```
  */
 export type ParseSQL<T extends string> = 
-  DetectQueryType<T> extends infer QType
-    ? QType extends "SELECT"
-      ? ParseSelectSQL<T>
-      : QType extends "INSERT"
-        ? ParseInsertSQL<T>
-        : QType extends "UPDATE"
-          ? ParseUpdateSQL<T>
-          : QType extends "DELETE"
-            ? ParseDeleteSQL<T>
-            : ParseError<"Unknown query type">
-    : never
+  // If T is not a string literal (e.g., it's `string` or contains unresolved template parts),
+  // return DynamicQuery to indicate we can't parse it at compile time
+  IsStringLiteral<T> extends false
+    ? DynamicQuery
+    : DetectQueryType<T> extends infer QType
+      ? QType extends "SELECT"
+        ? ParseSelectSQL<T>
+        : QType extends "INSERT"
+          ? ParseInsertSQL<T>
+          : QType extends "UPDATE"
+            ? ParseUpdateSQL<T>
+            : QType extends "DELETE"
+              ? ParseDeleteSQL<T>
+              : ParseError<"Unknown query type">
+      : never
 
 // ============================================================================
 // Type Guards
@@ -172,4 +184,7 @@ export type { ParseUpdateSQL, SQLUpdateQuery } from "./update/index.js"
 
 // Re-export the DELETE-specific parser and types for direct use
 export type { ParseDeleteSQL, SQLDeleteQuery } from "./delete/index.js"
+
+// Re-export dynamic query support
+export type { DynamicQuery } from "./common/utils.js"
 
