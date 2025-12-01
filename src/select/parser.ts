@@ -754,7 +754,7 @@ type ExtractBeforeCast<T extends string> =
 type IsSimpleIdentifier<T extends string> = 
   T extends "" ? false :
   T extends `${string} ${string}` ? false :
-  T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" ? false :
+  T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" | "<" | ">" | "!" ? false :
   true
 
 /**

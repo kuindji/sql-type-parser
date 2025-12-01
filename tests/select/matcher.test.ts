@@ -415,7 +415,7 @@ type V_ValidComplex = ValidateSQL<
   SELECT u.name, p.title
   FROM users AS u
   INNER JOIN posts AS p ON u.id = p.author_id
-  WHERE u.is_active = TRUE
+  WHERE u.is_active = TRUE and u.id < 10
   ORDER BY p.views DESC
   LIMIT 10
 `,
@@ -576,7 +576,7 @@ type _V7_3 = RequireTrue<AssertEqual<V_JsonWhereValid, true>>
 // Test: Nested JSON accessor in WHERE validates base column
 type V_JsonWhereNestedValid = ValidateSQL<`
     SELECT id FROM items 
-    WHERE ("config"::json)->>'settings'->>'enabled' = 'true'
+    WHERE ("config"::json)->>'settings'->>'value' < 2
     order by ("config"::json)->>'settings'->>'enabled' asc
     `, JsonFieldSchema>
 type _V7_4 = RequireTrue<AssertEqual<V_JsonWhereNestedValid, true>>
