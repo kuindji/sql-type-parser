@@ -6,8 +6,8 @@
  * produce result types.
  */
 
-import type { QueryResult, ValidateSQL, MatchQuery, MatchError, DatabaseSchema, ParseSQL } from "../../src/index.js"
-import type { BlogSchema, ECommerceSchema, JsonSchema } from "../schema.js"
+import type { QueryResult, ValidateSQL } from "../../src/index.js"
+import type { BlogSchema, ECommerceSchema } from "../schema.js"
 
 // ============================================================================
 // 1. Basic Column Selection

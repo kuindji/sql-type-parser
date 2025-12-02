@@ -8,15 +8,12 @@
 import type {
     ValidateSQL,
     DatabaseSchema,
-    ExtractParams,
-    MaxParamNumber,
     SelectResultArray,
     IsValidSelect,
-    HasParameters,
     ValidQuery,
 } from "../../src/index.js"
 
-import { createSelectFn } from "../../src/db.js"
+import { createSelectFn } from "../../src/index.js"
 
 /**
  * Force TypeScript to expand a type for better IDE display
@@ -136,18 +133,6 @@ type IsValid2 = IsValidSelect<"SELECT bad FROM users", MySchema> // false
 // Get validation result (true or error message)
 type Validation1 = ValidateSQL<"SELECT id FROM users", MySchema> // true
 type Validation2 = ValidateSQL<"SELECT bad FROM users", MySchema> // error message
-
-// Check if query has parameters
-type HasParams1 = HasParameters<"SELECT * FROM users WHERE id = $1"> // true
-type HasParams2 = HasParameters<"SELECT * FROM users"> // false
-
-// Extract parameter placeholders
-type Params = ExtractParams<"SELECT * FROM users WHERE id = $1 AND name = $2">
-// ["$1", "$2"]
-
-// Get max parameter number
-type MaxParam = MaxParamNumber<"SELECT * FROM t WHERE a = $1 AND b = $3">
-// 3 (handles gaps)
 
 
 // ============================================================================

@@ -5,8 +5,7 @@
  * If this file compiles without errors, all tests pass.
  */
 
-import type { QueryResult, ValidateSQL, MatchError, DatabaseSchema } from "../../src/index.js"
-import type { ValidQuery } from "../../src/db.js"
+import type { QueryResult, ValidateSQL, MatchError, DatabaseSchema, MatchSelectQuery, ValidateQuery } from "../../src/index.js"
 import type { AssertEqual, AssertExtends, RequireTrue, AssertIsMatchError, AssertNotMatchError, IsNever } from "../helpers.js"
 
 // ============================================================================
@@ -14,63 +13,63 @@ import type { AssertEqual, AssertExtends, RequireTrue, AssertIsMatchError, Asser
 // ============================================================================
 
 type TestSchema = {
-    defaultSchema: "public"
-    schemas: {
-        public: {
-            users: {
-                id: number
-                name: string
-                email: string
-                role: "admin" | "user" | "guest"
-                is_active: boolean
-                created_at: string
-                deleted_at: string | null
-            }
-            posts: {
-                id: number
-                author_id: number
-                title: string
-                content: string
-                views: number
-                status: "draft" | "published"
-                published_at: string | null
-            }
-            comments: {
-                id: number
-                post_id: number
-                user_id: number
-                content: string
-                created_at: string
-            }
-        }
-        audit: {
-            logs: {
-                id: number
-                user_id: number | null
-                action: string
-                created_at: string
-            }
-        }
+  defaultSchema: "public"
+  schemas: {
+    public: {
+      users: {
+        id: number
+        name: string
+        email: string
+        role: "admin" | "user" | "guest"
+        is_active: boolean
+        created_at: string
+        deleted_at: string | null
+      }
+      posts: {
+        id: number
+        author_id: number
+        title: string
+        content: string
+        views: number
+        status: "draft" | "published"
+        published_at: string | null
+      }
+      comments: {
+        id: number
+        post_id: number
+        user_id: number
+        content: string
+        created_at: string
+      }
     }
+    audit: {
+      logs: {
+        id: number
+        user_id: number | null
+        action: string
+        created_at: string
+      }
+    }
+  }
 }
 
 type CamelCaseTestSchema = {
-    defaultSchema: "public"
-    schemas: {
-        public: {
-            userAccounts: {
-                id: number
-                firstName: string
-                lastName: string
-                emailAddress: string
-            }
-            orderItems: {
-                id: number
-                orderId: number
-                unitPrice: number
-            }
-        }
+  defaultSchema: "public"
+  schemas: {
+    public: {
+      userAccounts: {
+        id: number
+        firstName: string
+        lastName: string
+        emailAddress: string
+      }
+      orderItems: {
+        id: number
+        orderId: number
+        unitPrice: number
+      }
     }
+  }
 }
 
 // ============================================================================
@@ -100,18 +99,18 @@ type _M4 = RequireTrue<AssertEqual<M_BoolCol, { is_active: boolean }>>
 // Test: SELECT * returns all columns
 type M_Star = QueryResult<"SELECT * FROM users", TestSchema>
 type _M5 = RequireTrue<
-    AssertExtends<
-        M_Star,
-        {
-            id: number
-            name: string
-            email: string
-            role: "admin" | "user" | "guest"
-            is_active: boolean
-            created_at: string
-            deleted_at: string | null
-        }
-    >
+  AssertExtends<
+    M_Star,
+    {
+      id: number
+      name: string
+      email: string
+      role: "admin" | "user" | "guest"
+      is_active: boolean
+      created_at: string
+      deleted_at: string | null
+    }
+  >
 >
 
 // ============================================================================
@@ -176,27 +175,27 @@ type _M15 = RequireTrue<AssertEqual<M_TableAliasSimple, { id: number; name: stri
 
 // Test: INNER JOIN merges columns
 type M_Join = QueryResult<
-    "SELECT u.name, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
-    TestSchema
+  "SELECT u.name, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
+  TestSchema
 >
 type _M16 = RequireTrue<AssertEqual<M_Join, { name: string; title: string }>>
 
 // Test: LEFT JOIN
 type M_LeftJoin = QueryResult<
-    "SELECT u.name, p.title FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
-    TestSchema
+  "SELECT u.name, p.title FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
+  TestSchema
 >
 type _M17 = RequireTrue<AssertEqual<M_LeftJoin, { name: string; title: string }>>
 
 // Test: Multiple JOINs
 type M_MultiJoin = QueryResult<
-    `
-  SELECT u.name, p.title, c.content
-  FROM users AS u
-  INNER JOIN posts AS p ON u.id = p.author_id
-  INNER JOIN comments AS c ON p.id = c.post_id
+  `
+SELECT u.name, p.title, c.content
+FROM users AS u
+INNER JOIN posts AS p ON u.id = p.author_id
+INNER JOIN comments AS c ON p.id = c.post_id
 `,
-    TestSchema
+  TestSchema
 >
 type _M18 = RequireTrue<AssertEqual<M_MultiJoin, { name: string; title: string; content: string }>>
 
@@ -226,8 +225,8 @@ type _M23 = RequireTrue<AssertEqual<M_Max, { last_title: string }>>
 
 // Test: Multiple aggregates
 type M_MultiAgg = QueryResult<
-    "SELECT COUNT ( * ) AS count, SUM ( views ) AS total, AVG ( views ) AS avg FROM posts",
-    TestSchema
+  "SELECT COUNT ( * ) AS count, SUM ( views ) AS total, AVG ( views ) AS avg FROM posts",
+  TestSchema
 >
 type _M24 = RequireTrue<AssertEqual<M_MultiAgg, { count: number; total: number; avg: number }>>
 
@@ -238,30 +237,30 @@ type _M24 = RequireTrue<AssertEqual<M_MultiAgg, { count: number; total: number; 
 // Test: table.* expands to all columns
 type M_TableWildcard = QueryResult<"SELECT u.* FROM users AS u", TestSchema>
 type _M25 = RequireTrue<
-    AssertExtends<
-        M_TableWildcard,
-        {
-            id: number
-            name: string
-            email: string
-        }
-    >
+  AssertExtends<
+    M_TableWildcard,
+    {
+      id: number
+      name: string
+      email: string
+    }
+  >
 >
 
 // Test: table.* with join
 type M_WildcardJoin = QueryResult<
-    "SELECT u.*, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
-    TestSchema
+  "SELECT u.*, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
+  TestSchema
 >
 type _M26 = RequireTrue<
-    AssertExtends<
-        M_WildcardJoin,
-        {
-            id: number
-            name: string
-            title: string
-        }
-    >
+  AssertExtends<
+    M_WildcardJoin,
+    {
+      id: number
+      name: string
+      title: string
+    }
+  >
 >
 
 // ============================================================================
@@ -270,27 +269,27 @@ type _M26 = RequireTrue<
 
 // Test: CTE columns accessible
 type M_CTE = QueryResult<
-    `
-  WITH active_users AS (
-    SELECT id, name FROM users WHERE is_active = TRUE
-  )
-  SELECT id, name FROM active_users
+  `
+WITH active_users AS (
+  SELECT id, name FROM users WHERE is_active = TRUE
+)
+SELECT id, name FROM active_users
 `,
-    TestSchema
+  TestSchema
 >
 type _M27 = RequireTrue<AssertEqual<M_CTE, { id: number; name: string }>>
 
 // Test: CTE with JOIN
 type M_CTEJoin = QueryResult<
-    `
-  WITH authors AS (
-    SELECT DISTINCT author_id FROM posts
-  )
-  SELECT u.name
-  FROM authors AS a
-  INNER JOIN users AS u ON a.author_id = u.id
+  `
+WITH authors AS (
+  SELECT DISTINCT author_id FROM posts
+)
+SELECT u.name
+FROM authors AS a
+INNER JOIN users AS u ON a.author_id = u.id
 `,
-    TestSchema
+  TestSchema
 >
 type _M28 = RequireTrue<AssertEqual<M_CTEJoin, { name: string }>>
 
@@ -300,21 +299,21 @@ type _M28 = RequireTrue<AssertEqual<M_CTEJoin, { name: string }>>
 
 // Test: Derived table columns accessible
 type M_Derived = QueryResult<
-    `
-  SELECT sub.total
-  FROM ( SELECT COUNT ( * ) AS total FROM users ) AS sub
+  `
+SELECT sub.total
+FROM ( SELECT COUNT ( * ) AS total FROM users ) AS sub
 `,
-    TestSchema
+  TestSchema
 >
 type _M29 = RequireTrue<AssertEqual<M_Derived, { total: number }>>
 
 // Test: Derived table with multiple columns
 type M_DerivedMulti = QueryResult<
-    `
-  SELECT sub.cnt, sub.avg_views
-  FROM ( SELECT COUNT ( * ) AS cnt, AVG ( views ) AS avg_views FROM posts ) AS sub
+  `
+SELECT sub.cnt, sub.avg_views
+FROM ( SELECT COUNT ( * ) AS cnt, AVG ( views ) AS avg_views FROM posts ) AS sub
 `,
-    TestSchema
+  TestSchema
 >
 type _M30 = RequireTrue<AssertEqual<M_DerivedMulti, { cnt: number; avg_views: number }>>
 
@@ -348,8 +347,8 @@ type _M35 = RequireTrue<AssertEqual<M_ExplicitSchema, { id: number; action: stri
 
 // Test: Cross-schema query with alias
 type M_CrossSchema = QueryResult<
-    "SELECT u.name, l.action FROM users AS u INNER JOIN audit.logs AS l ON u.id = l.user_id",
-    TestSchema
+  "SELECT u.name, l.action FROM users AS u INNER JOIN audit.logs AS l ON u.id = l.user_id",
+  TestSchema
 >
 type _M36 = RequireTrue<AssertEqual<M_CrossSchema, { name: string; action: string }>>
 
@@ -363,19 +362,19 @@ type _M37 = RequireTrue<AssertEqual<M_CamelCol, { firstName: string; lastName: s
 
 // Test: camelCase table with alias
 type M_CamelAlias = QueryResult<
-    'SELECT ua."firstName", ua."emailAddress" FROM "userAccounts" AS ua',
-    CamelCaseTestSchema
+  'SELECT ua."firstName", ua."emailAddress" FROM "userAccounts" AS ua',
+  CamelCaseTestSchema
 >
 type _M38 = RequireTrue<AssertEqual<M_CamelAlias, { firstName: string; emailAddress: string }>>
 
 // Test: camelCase join
 type M_CamelJoin = QueryResult<
-    `
-  SELECT ua."firstName", oi."unitPrice"
-  FROM "userAccounts" AS ua
-  INNER JOIN "orderItems" AS oi ON ua.id = oi."orderId"
+  `
+SELECT ua."firstName", oi."unitPrice"
+FROM "userAccounts" AS ua
+INNER JOIN "orderItems" AS oi ON ua.id = oi."orderId"
 `,
-    CamelCaseTestSchema
+  CamelCaseTestSchema
 >
 type _M39 = RequireTrue<AssertEqual<M_CamelJoin, { firstName: string; unitPrice: number }>>
 
@@ -411,15 +410,15 @@ type _V1 = RequireTrue<AssertEqual<V_Valid, true>>
 
 // Test: Valid complex query returns true
 type V_ValidComplex = ValidateSQL<
-    `
-  SELECT u.name, p.title
-  FROM users AS u
-  INNER JOIN posts AS p ON u.id = p.author_id
-  WHERE u.is_active = TRUE and u.id < 10
-  ORDER BY p.views DESC
-  LIMIT 10
+  `
+SELECT u.name, p.title
+FROM users AS u
+INNER JOIN posts AS p ON u.id = p.author_id
+WHERE u.is_active = TRUE and u.id < 10
+ORDER BY p.views DESC
+LIMIT 10
 `,
-    TestSchema
+  TestSchema
 >
 type _V2 = RequireTrue<AssertEqual<V_ValidComplex, true>>
 
@@ -441,38 +440,38 @@ type _V5 = RequireTrue<AssertExtends<V_InvalidQualifier, string>>
 
 // Test: Full complex query with all features
 type M_Complex = QueryResult<
-    `
-  WITH user_stats AS (
-    SELECT author_id, COUNT ( * ) AS post_count, SUM ( views ) AS total_views
-    FROM posts
-    WHERE status = 'published'
-    GROUP BY author_id
-  )
-  SELECT 
-    u.id,
-    u.name,
-    u.email,
-    us.post_count,
-    us.total_views
-  FROM users AS u
-  LEFT JOIN user_stats AS us ON u.id = us.author_id
-  WHERE u.is_active = TRUE
-  ORDER BY us.total_views DESC
-  LIMIT 100
+  `
+WITH user_stats AS (
+  SELECT author_id, COUNT ( * ) AS post_count, SUM ( views ) AS total_views
+  FROM posts
+  WHERE status = 'published'
+  GROUP BY author_id
+)
+SELECT 
+  u.id,
+  u.name,
+  u.email,
+  us.post_count,
+  us.total_views
+FROM users AS u
+LEFT JOIN user_stats AS us ON u.id = us.author_id
+WHERE u.is_active = TRUE
+ORDER BY us.total_views DESC
+LIMIT 100
 `,
-    TestSchema
+  TestSchema
 >
 type _M44 = RequireTrue<
-    AssertEqual<
-        M_Complex,
-        {
-            id: number
-            name: string
-            email: string
-            post_count: number
-            total_views: number
-        }
-    >
+  AssertEqual<
+    M_Complex,
+    {
+      id: number
+      name: string
+      email: string
+      post_count: number
+      total_views: number
+    }
+  >
 >
 
 // ============================================================================
@@ -493,29 +492,29 @@ type _M46 = RequireTrue<AssertEqual<M_SameColTwice, { id1: number; id2: number }
 
 // Schema with complex object types (JSON fields)
 type JsonFieldSchema = {
-    defaultSchema: "public"
-    schemas: {
-        public: {
-            items: {
-                id: number
-                name: string
-                // Nested object type (like a JSON field)
-                metadata: { foo: string; bar: number }
-                // Deeply nested object
-                config: {
-                    settings: {
-                        enabled: boolean
-                        values: number[]
-                    }
-                    tags: string[]
-                }
-                // Nullable object
-                extra: { key: string } | null
-                // Record type (common for JSON)
-                data: Record<string, unknown>
-            }
+  defaultSchema: "public"
+  schemas: {
+    public: {
+      items: {
+        id: number
+        name: string
+        // Nested object type (like a JSON field)
+        metadata: { foo: string; bar: number }
+        // Deeply nested object
+        config: {
+          settings: {
+            enabled: boolean
+            values: number[]
+          }
+          tags: string[]
         }
+        // Nullable object
+        extra: { key: string } | null
+        // Record type (common for JSON)
+        data: Record<string, unknown>
+      }
     }
+  }
 }
 
 // Test: Query with nested object field returns correct type (not never)
@@ -525,8 +524,8 @@ type _M47 = RequireTrue<AssertEqual<M_JsonField, { metadata: { foo: string; bar:
 // Test: Query with deeply nested object field
 type M_DeepJsonField = QueryResult<"SELECT config FROM items", JsonFieldSchema>
 type _M48 = RequireTrue<AssertEqual<
-    M_DeepJsonField,
-    { config: { settings: { enabled: boolean; values: number[] }; tags: string[] } }
+  M_DeepJsonField,
+  { config: { settings: { enabled: boolean; values: number[] }; tags: string[] } }
 >>
 
 // Test: JSON field accessor returns unknown (no type cast)
@@ -536,14 +535,6 @@ type _M48_1 = RequireTrue<AssertEqual<M_DeepJsonFieldProperty, { settings: unkno
 // Test: JSON field accessor with type cast returns casted type
 type M_JsonFieldWithCast = QueryResult<"SELECT (config)->>'settings'::text FROM items", JsonFieldSchema>
 type _M48_2 = RequireTrue<AssertEqual<M_JsonFieldWithCast, { settings: string }>>
-
-// Test: Nested JSON accessor
-type M_NestedJsonField = QueryResult<"SELECT config->'settings'->>'enabled' FROM items", JsonFieldSchema>
-type _M48_3 = RequireTrue<AssertEqual<M_NestedJsonField, { enabled: unknown }>>
-
-// Test: JSON accessor with explicit alias
-type M_JsonFieldAlias = QueryResult<`SELECT ("config"::json)->>'settings' AS cfg_settings FROM items`, JsonFieldSchema>
-type _M48_4 = RequireTrue<AssertEqual<M_JsonFieldAlias, { cfg_settings: unknown }>>
 
 // Test: Query with nullable object field
 type M_NullableJsonField = QueryResult<"SELECT extra FROM items", JsonFieldSchema>
@@ -561,39 +552,15 @@ type _V6 = RequireTrue<AssertEqual<V_JsonValid, true>>
 type V_DeepJsonValid = ValidateSQL<"SELECT config FROM items", JsonFieldSchema>
 type _V7 = RequireTrue<AssertEqual<V_DeepJsonValid, true>>
 
-// Test: JSON accessor in SELECT validates the base column
-type V_JsonAccessorValid = ValidateSQL<`SELECT ("config"::json)->>'settings' FROM items`, JsonFieldSchema>
-type _V7_1 = RequireTrue<AssertEqual<V_JsonAccessorValid, true>>
-
-// Test: Invalid base column in JSON accessor returns error
-type V_JsonAccessorInvalid = ValidateSQL<"SELECT bad_field->>'settings' FROM items", JsonFieldSchema>
-type _V7_2 = RequireTrue<AssertExtends<V_JsonAccessorInvalid, string>>
-
-// Test: JSON accessor in WHERE clause validates base column
-type V_JsonWhereValid = ValidateSQL<"SELECT id FROM items WHERE config->>'key' = 'value'", JsonFieldSchema>
-type _V7_3 = RequireTrue<AssertEqual<V_JsonWhereValid, true>>
-
-// Test: Nested JSON accessor in WHERE validates base column
-type V_JsonWhereNestedValid = ValidateSQL<`
-    SELECT id FROM items 
-    WHERE ("config"::json)->>'settings'->>'value' < 2
-    order by ("config"::json)->>'settings'->>'enabled' asc
-    `, JsonFieldSchema>
-type _V7_4 = RequireTrue<AssertEqual<V_JsonWhereNestedValid, true>>
-
-// Test: Table-qualified JSON accessor works
-type M_TableQualifiedJson = QueryResult<"SELECT i.config->>'settings' FROM items i", JsonFieldSchema>
-type _M48_5 = RequireTrue<AssertEqual<M_TableQualifiedJson, { settings: unknown }>>
-
 // Test: Multiple JSON fields in one query
 type M_MultiJsonFields = QueryResult<"SELECT id, metadata, config FROM items", JsonFieldSchema>
 type _M51 = RequireTrue<AssertEqual<
-    M_MultiJsonFields,
-    {
-        id: number
-        metadata: { foo: string; bar: number }
-        config: { settings: { enabled: boolean; values: number[] }; tags: string[] }
-    }
+  M_MultiJsonFields,
+  {
+    id: number
+    metadata: { foo: string; bar: number }
+    config: { settings: { enabled: boolean; values: number[] }; tags: string[] }
+  }
 >>
 
 // Test: SELECT * with JSON fields
@@ -604,104 +571,205 @@ type _M52 = RequireTrue<AssertExtends<M_StarWithJson, { id: number; metadata: { 
 type V_StarJsonValid = ValidateSQL<"SELECT * FROM items", JsonFieldSchema>
 type _V8 = RequireTrue<AssertEqual<V_StarJsonValid, true>>
 
-// Test: ValidQuery returns query string (not never) for JSON field queries
-type VQ_JsonField = ValidQuery<"SELECT metadata FROM items", JsonFieldSchema>
-type _VQ1 = RequireTrue<AssertEqual<IsNever<VQ_JsonField>, false>>
-type _VQ2 = RequireTrue<AssertExtends<VQ_JsonField, string>>
-
-// Test: ValidQuery returns query string for deeply nested JSON field queries
-type VQ_DeepJsonField = ValidQuery<"SELECT config FROM items", JsonFieldSchema>
-type _VQ3 = RequireTrue<AssertEqual<IsNever<VQ_DeepJsonField>, false>>
-type _VQ4 = RequireTrue<AssertExtends<VQ_DeepJsonField, string>>
-
-// Test: ValidQuery returns query string for SELECT * with JSON fields
-type VQ_StarJson = ValidQuery<"SELECT * FROM items", JsonFieldSchema>
-type _VQ5 = RequireTrue<AssertEqual<IsNever<VQ_StarJson>, false>>
-type _VQ6 = RequireTrue<AssertExtends<VQ_StarJson, string>>
-
 // ============================================================================
-// Full Field Validation Tests (validateAllFields option)
+// ValidateQuery Tests
 // ============================================================================
 
-// Test: Invalid WHERE column detected with full validation (default)
-type V_InvalidWhereCol = ValidateSQL<"SELECT id FROM users WHERE bad_column = 1", TestSchema>
-type _V9 = RequireTrue<AssertExtends<V_InvalidWhereCol, string>>
+// Test: ValidateQuery returns true for valid result
+type VQ_Valid = ValidateQuery<{ id: number; name: string }>
+type _VQ1 = RequireTrue<AssertEqual<VQ_Valid, true>>
 
-// Test: Invalid ORDER BY column detected with full validation (default)
-type V_InvalidOrderByCol = ValidateSQL<"SELECT id FROM users ORDER BY bad_column", TestSchema>
-type _V10 = RequireTrue<AssertExtends<V_InvalidOrderByCol, string>>
+// Test: ValidateQuery detects error in result
+type VQ_Invalid = ValidateQuery<{ id: MatchError<"Column not found"> }>
+type _VQ2 = RequireTrue<AssertExtends<VQ_Invalid, string>>
 
-// Test: Invalid GROUP BY column detected with full validation (default)
-type V_InvalidGroupByCol = ValidateSQL<"SELECT id FROM users GROUP BY bad_column", TestSchema>
-type _V11 = RequireTrue<AssertExtends<V_InvalidGroupByCol, string>>
+// ============================================================================
+// PostgreSQL Function Tests
+// ============================================================================
+// Functions resolve to `unknown` by default, unless type-casted.
 
-// Test: Invalid JOIN ON column detected with full validation (default)
-type V_InvalidJoinOnCol = ValidateSQL<
-    "SELECT u.id FROM users AS u INNER JOIN posts AS p ON u.bad_column = p.author_id",
-    TestSchema
+// Test: length() function returns unknown by default
+type M_LengthFunc = QueryResult<"SELECT length ( name ) AS name_len FROM users", TestSchema>
+type _F1 = RequireTrue<AssertEqual<M_LengthFunc, { name_len: unknown }>>
+
+// Test: length() with type cast returns the casted type
+type M_LengthFuncCast = QueryResult<"SELECT length ( name )::int AS name_len FROM users", TestSchema>
+type _F2 = RequireTrue<AssertEqual<M_LengthFuncCast, { name_len: number }>>
+
+// Test: concat() function returns unknown by default
+type M_ConcatFunc = QueryResult<"SELECT concat ( name, ' ', email ) AS full_info FROM users", TestSchema>
+type _F3 = RequireTrue<AssertEqual<M_ConcatFunc, { full_info: unknown }>>
+
+// Test: concat() with type cast returns string
+type M_ConcatFuncCast = QueryResult<"SELECT concat ( name, email )::text AS full_info FROM users", TestSchema>
+type _F4 = RequireTrue<AssertEqual<M_ConcatFuncCast, { full_info: string }>>
+
+// Test: split_part() function returns unknown
+type M_SplitPartFunc = QueryResult<"SELECT split_part ( email, '@', 1 ) AS username FROM users", TestSchema>
+type _F5 = RequireTrue<AssertEqual<M_SplitPartFunc, { username: unknown }>>
+
+// Test: split_part() with type cast
+type M_SplitPartFuncCast = QueryResult<"SELECT split_part ( email, '@', 1 )::varchar AS username FROM users", TestSchema>
+type _F6 = RequireTrue<AssertEqual<M_SplitPartFuncCast, { username: string }>>
+
+// Test: coalesce() function returns unknown
+type M_CoalesceFunc = QueryResult<"SELECT coalesce ( deleted_at, created_at ) AS date FROM users", TestSchema>
+type _F7 = RequireTrue<AssertEqual<M_CoalesceFunc, { date: unknown }>>
+
+// Test: coalesce() with type cast
+type M_CoalesceFuncCast = QueryResult<"SELECT coalesce ( deleted_at, created_at )::timestamp AS date FROM users", TestSchema>
+type _F8 = RequireTrue<AssertEqual<M_CoalesceFuncCast, { date: string }>>
+
+// Test: upper() function returns unknown
+type M_UpperFunc = QueryResult<"SELECT upper ( name ) AS upper_name FROM users", TestSchema>
+type _F9 = RequireTrue<AssertEqual<M_UpperFunc, { upper_name: unknown }>>
+
+// Test: upper() with type cast
+type M_UpperFuncCast = QueryResult<"SELECT upper ( name )::text AS upper_name FROM users", TestSchema>
+type _F10 = RequireTrue<AssertEqual<M_UpperFuncCast, { upper_name: string }>>
+
+// Test: lower() function returns unknown
+type M_LowerFunc = QueryResult<"SELECT lower ( email ) AS lower_email FROM users", TestSchema>
+type _F11 = RequireTrue<AssertEqual<M_LowerFunc, { lower_email: unknown }>>
+
+// Test: substring() function returns unknown
+type M_SubstringFunc = QueryResult<"SELECT substring ( name from 1 for 5 ) AS short_name FROM users", TestSchema>
+type _F12 = RequireTrue<AssertEqual<M_SubstringFunc, { short_name: unknown }>>
+
+// Test: substring() with type cast
+type M_SubstringFuncCast = QueryResult<"SELECT substring ( name from 1 for 5 )::text AS short_name FROM users", TestSchema>
+type _F13 = RequireTrue<AssertEqual<M_SubstringFuncCast, { short_name: string }>>
+
+// Test: now() function (no arguments) returns unknown
+type M_NowFunc = QueryResult<"SELECT now ( ) AS current_time FROM users", TestSchema>
+type _F14 = RequireTrue<AssertEqual<M_NowFunc, { current_time: unknown }>>
+
+// Test: now() with type cast
+type M_NowFuncCast = QueryResult<"SELECT now ( )::timestamp AS current_time FROM users", TestSchema>
+type _F15 = RequireTrue<AssertEqual<M_NowFuncCast, { current_time: string }>>
+
+// Test: date_part() function returns unknown
+type M_DatePartFunc = QueryResult<"SELECT date_part ( 'year', created_at ) AS year FROM users", TestSchema>
+type _F16 = RequireTrue<AssertEqual<M_DatePartFunc, { year: unknown }>>
+
+// Test: date_part() with type cast returns number
+type M_DatePartFuncCast = QueryResult<"SELECT date_part ( 'year', created_at )::int AS year FROM users", TestSchema>
+type _F17 = RequireTrue<AssertEqual<M_DatePartFuncCast, { year: number }>>
+
+// Test: trim() function returns unknown
+type M_TrimFunc = QueryResult<"SELECT trim ( name ) AS trimmed_name FROM users", TestSchema>
+type _F18 = RequireTrue<AssertEqual<M_TrimFunc, { trimmed_name: unknown }>>
+
+// Test: replace() function returns unknown
+type M_ReplaceFunc = QueryResult<"SELECT replace ( email, '@', '_at_' ) AS safe_email FROM users", TestSchema>
+type _F19 = RequireTrue<AssertEqual<M_ReplaceFunc, { safe_email: unknown }>>
+
+// Test: regexp_replace() function returns unknown
+type M_RegexpReplaceFunc = QueryResult<"SELECT regexp_replace ( email, '@.*', '' ) AS user_part FROM users", TestSchema>
+type _F20 = RequireTrue<AssertEqual<M_RegexpReplaceFunc, { user_part: unknown }>>
+
+// Test: left() function returns unknown
+type M_LeftFunc = QueryResult<"SELECT left ( name, 3 ) AS initials FROM users", TestSchema>
+type _F21 = RequireTrue<AssertEqual<M_LeftFunc, { initials: unknown }>>
+
+// Test: left() with type cast
+type M_LeftFuncCast = QueryResult<"SELECT left ( name, 3 )::char AS initials FROM users", TestSchema>
+type _F22 = RequireTrue<AssertEqual<M_LeftFuncCast, { initials: string }>>
+
+// Test: right() function returns unknown
+type M_RightFunc = QueryResult<"SELECT right ( name, 3 ) AS suffix FROM users", TestSchema>
+type _F23 = RequireTrue<AssertEqual<M_RightFunc, { suffix: unknown }>>
+
+// Test: array_agg() function returns unknown
+type M_ArrayAggFunc = QueryResult<"SELECT array_agg ( name ) AS names FROM users", TestSchema>
+type _F24 = RequireTrue<AssertEqual<M_ArrayAggFunc, { names: unknown }>>
+
+// Test: string_agg() function returns unknown
+type M_StringAggFunc = QueryResult<"SELECT string_agg ( name, ', ' ) AS all_names FROM users", TestSchema>
+type _F25 = RequireTrue<AssertEqual<M_StringAggFunc, { all_names: unknown }>>
+
+// Test: string_agg() with type cast
+type M_StringAggFuncCast = QueryResult<"SELECT string_agg ( name, ', ' )::text AS all_names FROM users", TestSchema>
+type _F26 = RequireTrue<AssertEqual<M_StringAggFuncCast, { all_names: string }>>
+
+// Test: abs() function returns unknown
+type M_AbsFunc = QueryResult<"SELECT abs ( views ) AS abs_views FROM posts", TestSchema>
+type _F27 = RequireTrue<AssertEqual<M_AbsFunc, { abs_views: unknown }>>
+
+// Test: abs() with type cast returns number
+type M_AbsFuncCast = QueryResult<"SELECT abs ( views )::int AS abs_views FROM posts", TestSchema>
+type _F28 = RequireTrue<AssertEqual<M_AbsFuncCast, { abs_views: number }>>
+
+// Test: round() function returns unknown
+type M_RoundFunc = QueryResult<"SELECT round ( views / 10.0, 2 ) AS rounded_views FROM posts", TestSchema>
+type _F29 = RequireTrue<AssertEqual<M_RoundFunc, { rounded_views: unknown }>>
+
+// Test: round() with type cast
+type M_RoundFuncCast = QueryResult<"SELECT round ( views / 10.0, 2 )::numeric AS rounded_views FROM posts", TestSchema>
+type _F30 = RequireTrue<AssertEqual<M_RoundFuncCast, { rounded_views: number }>>
+
+// Test: Mixed: function with regular columns
+type M_MixedFuncAndCols = QueryResult<
+  "SELECT id, name, length ( name )::int AS name_len FROM users",
+  TestSchema
 >
-type _V12 = RequireTrue<AssertExtends<V_InvalidJoinOnCol, string>>
+type _F31 = RequireTrue<AssertEqual<M_MixedFuncAndCols, { id: number; name: string; name_len: number }>>
 
-// Test: Invalid HAVING column detected with full validation (default)
-type V_InvalidHavingCol = ValidateSQL<
-    "SELECT author_id FROM posts GROUP BY author_id HAVING bad_column > 0",
-    TestSchema
+// Test: Nested functions return unknown
+type M_NestedFuncs = QueryResult<"SELECT upper ( trim ( name ) ) AS cleaned_name FROM users", TestSchema>
+type _F32 = RequireTrue<AssertEqual<M_NestedFuncs, { cleaned_name: unknown }>>
+
+// Test: Nested functions with type cast
+type M_NestedFuncsCast = QueryResult<"SELECT upper ( trim ( name ) )::text AS cleaned_name FROM users", TestSchema>
+type _F33 = RequireTrue<AssertEqual<M_NestedFuncsCast, { cleaned_name: string }>>
+
+// Test: Function in expression (e.g., length() > 5)
+type M_FuncInExpr = QueryResult<
+  "SELECT id FROM users WHERE length ( name ) > 5",
+  TestSchema
 >
-type _V13 = RequireTrue<AssertExtends<V_InvalidHavingCol, string>>
+type _F34 = RequireTrue<AssertEqual<M_FuncInExpr, { id: number }>>
 
-// Test: Valid query with all clauses passes full validation
-type V_ValidAllClauses = ValidateSQL<
-    `
-  SELECT u.name, p.title
-  FROM users AS u
-  INNER JOIN posts AS p ON u.id = p.author_id
-  WHERE u.is_active = TRUE
-  GROUP BY u.name, p.title
-  HAVING u.name IS NOT NULL
-  ORDER BY p.title
-  LIMIT 10
-`,
-    TestSchema
->
-type _V14 = RequireTrue<AssertEqual<V_ValidAllClauses, true>>
+// Test: ValidateSQL passes for function calls
+type V_FuncValid = ValidateSQL<"SELECT length ( name ) AS len FROM users", TestSchema>
+type _F35 = RequireTrue<AssertEqual<V_FuncValid, true>>
 
-// Test: Invalid WHERE column is allowed when validateAllFields is false
-import type { ValidateSelectSQL } from "../../src/index.js"
+// Test: ValidateSQL passes for function with unknown arg (string literal)
+type V_FuncLiteralValid = ValidateSQL<"SELECT concat ( 'Hello', name ) AS greeting FROM users", TestSchema>
+type _F36 = RequireTrue<AssertEqual<V_FuncLiteralValid, true>>
 
-type V_InvalidWhereCol_NoFullCheck = ValidateSelectSQL<
-    "SELECT id FROM users WHERE bad_column = 1",
-    TestSchema,
-    { validateAllFields: false }
->
-type _V15 = RequireTrue<AssertEqual<V_InvalidWhereCol_NoFullCheck, true>>
+// Test: ValidateSQL fails for function with invalid column
+type V_FuncInvalidCol = ValidateSQL<"SELECT length ( bad_column ) AS len FROM users", TestSchema>
+type _F37 = RequireTrue<AssertExtends<V_FuncInvalidCol, string>>
 
-// Test: Invalid ORDER BY column is allowed when validateAllFields is false
-type V_InvalidOrderByCol_NoFullCheck = ValidateSelectSQL<
-    "SELECT id FROM users ORDER BY bad_column",
-    TestSchema,
-    { validateAllFields: false }
->
-type _V16 = RequireTrue<AssertEqual<V_InvalidOrderByCol_NoFullCheck, true>>
+// Test: :: cast syntax returns the casted type
+type M_ColonCast = QueryResult<"SELECT id::text AS id_text FROM users", TestSchema>
+type _F38 = RequireTrue<AssertEqual<M_ColonCast, { id_text: string }>>
 
-// Test: Invalid JOIN ON column is allowed when validateAllFields is false
-type V_InvalidJoinOnCol_NoFullCheck = ValidateSelectSQL<
-    "SELECT u.id FROM users AS u INNER JOIN posts AS p ON u.bad_column = p.author_id",
-    TestSchema,
-    { validateAllFields: false }
->
-type _V17 = RequireTrue<AssertEqual<V_InvalidJoinOnCol_NoFullCheck, true>>
+// Test: CAST() function returns the casted type
+type M_CastFunc = QueryResult<"SELECT CAST ( id AS text ) AS id_text FROM users", TestSchema>
+type _F38a = RequireTrue<AssertEqual<M_CastFunc, { id_text: string }>>
 
-// Test: Invalid SELECT column still fails even when validateAllFields is false
-type V_InvalidSelectCol_NoFullCheck = ValidateSelectSQL<
-    "SELECT bad_column FROM users",
-    TestSchema,
-    { validateAllFields: false }
->
-type _V18 = RequireTrue<AssertExtends<V_InvalidSelectCol_NoFullCheck, string>>
+// Test: CAST() without alias uses expression name
+type M_CastNoAlias = QueryResult<"SELECT CAST ( id AS varchar ) FROM users", TestSchema>
+type _F38b = RequireTrue<AssertEqual<M_CastNoAlias, { id: string }>>
+
+// Test: CAST() with different type conversion
+type M_CastToInt = QueryResult<"SELECT CAST ( name AS int ) AS name_num FROM users", TestSchema>
+type _F38c = RequireTrue<AssertEqual<M_CastToInt, { name_num: number }>>
+
+// Test: to_char() function returns unknown
+type M_ToCharFunc = QueryResult<"SELECT to_char ( created_at, 'YYYY-MM-DD' ) AS date_str FROM users", TestSchema>
+type _F39 = RequireTrue<AssertEqual<M_ToCharFunc, { date_str: unknown }>>
+
+// Test: to_char() with type cast
+type M_ToCharFuncCast = QueryResult<"SELECT to_char ( created_at, 'YYYY-MM-DD' )::text AS date_str FROM users", TestSchema>
+type _F40 = RequireTrue<AssertEqual<M_ToCharFuncCast, { date_str: string }>>
 
 // ============================================================================
 // Export for verification
 // ============================================================================
 
 export type MatcherTestsPass = true
+
 

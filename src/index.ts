@@ -10,43 +10,18 @@
  * ------------
  * The parser is organized into modules by query type:
  * - common/    - Shared utilities (tokenizer, AST nodes, utils)
- * - select/    - SELECT query parser and matcher
- * - insert/    - INSERT query parser and matcher
- * - update/    - UPDATE query parser and matcher
- * - delete/    - DELETE query parser and matcher
+ * - select/    - SELECT query parser
  * 
  * Each query type has its own execution tree in the type system
  * to avoid TypeScript performance issues.
  *
  * @example
  * ```typescript
- * import type { ParseSQL, QueryResult, ValidateSQL } from '@kuindji/sql-type-parser'
+ * import type { ParseSQL, SQLSelectQuery } from '@kuindji/sql-type-parser'
  *
- * // Define your schema with schema support
- * type Schema = {
- *   defaultSchema: "public",
- *   schemas: {
- *     public: {
- *       users: { id: number; name: string; email: string }
- *       orders: { id: number; user_id: number; total: number }
- *     },
- *     audit: {
- *       logs: { id: number; user_id: number; action: string }
- *     }
- *   }
- * }
- *
- * // Get typed query results (uses default schema)
- * type Result = QueryResult<"SELECT id, name FROM users", Schema>
- * // Result: { id: number; name: string }
- *
- * // Query with explicit schema prefix
- * type AuditResult = QueryResult<"SELECT id, action FROM audit.logs", Schema>
- * // Result: { id: number; action: string }
- *
- * // Validate queries at compile time
- * type IsValid = ValidateSQL<"SELECT id FROM users", Schema>
- * // Result: true
+ * // Parse SQL to AST
+ * type AST = ParseSQL<"SELECT id, name FROM users">
+ * // Returns SQLSelectQuery<SelectClause<...>>
  * ```
  * 
  * @packageDocumentation
@@ -57,7 +32,7 @@
 // ============================================================================
 
 // Re-export the main router entry point
-export type { 
+export type {
   ParseSQL,
   DetectQueryType,
   ParseSelectSQL,
@@ -69,9 +44,6 @@ export type {
   IsUpdateQuery,
   IsDeleteQuery,
   AnySQLQuery,
-  SQLInsertQuery,
-  SQLUpdateQuery,
-  SQLDeleteQuery,
 } from "./router.js"
 
 // ============================================================================
@@ -89,6 +61,9 @@ export type {
   WhereTerminators,
   OrderByTerminators,
   StartsWith,
+  CountOpen,
+  CountClose,
+  ParensBalanced,
 
   // Utils
   Trim,
@@ -182,15 +157,15 @@ export type {
   UnionClauseAny,
   UnionOperatorType,
 
-  // Matcher types (lightweight type extraction)
+  // Matcher types
   MatchSelectQuery,
   QueryResult,
   ValidateQuery,
+  ValidateSQL,
 
-  // Validator types (comprehensive validation)
+  // Validator types
   ValidateSelectSQL,
   ValidateSelectOptions,
-  ValidateSQL,
 } from "./select/index.js"
 
 // ============================================================================
@@ -199,34 +174,39 @@ export type {
 
 // Re-export INSERT-specific types
 export type {
-  // Insert clause types
+  // Query wrapper types
+  SQLInsertQuery,
+
+  // Main clause
   InsertClause,
+
+  // Column types
   InsertColumnList,
   InsertColumnRef,
 
   // Value types
+  InsertValue,
+  InsertValueRow,
   InsertValuesClause,
   InsertSelectClause,
-  InsertValueRow,
-  InsertValue,
   InsertSource,
 
   // RETURNING clause
   ReturningClause,
 
-  // ON CONFLICT clause
+  // ON CONFLICT types
   OnConflictClause,
   ConflictTarget,
   ConflictAction,
   ConflictUpdateSet,
 
-  // Matcher types (lightweight type extraction)
+  // Matcher types
   MatchInsertQuery,
   InsertResult,
   InsertInput,
   ValidateInsertResult,
 
-  // Validator types (comprehensive validation)
+  // Validator types
   ValidateInsertSQL,
   ValidateInsertOptions,
   IsValidInsert,
@@ -239,26 +219,33 @@ export type {
 
 // Re-export UPDATE-specific types
 export type {
-  // Update clause types
+  // Query wrapper types
+  SQLUpdateQuery,
+
+  // Main clause
   UpdateClause,
+
+  // SET clause types
   SetClause,
   SetAssignment,
   SetValue,
+
+  // FROM clause
   UpdateFromClause,
 
   // RETURNING clause (PostgreSQL 17+ OLD/NEW support)
-  ReturningClause as UpdateReturningClause,
-  ReturningQualifier,
+  UpdateReturningClause,
+  ReturningItem,
   QualifiedColumnRef,
   QualifiedWildcard,
-  ReturningItem,
+  ReturningQualifier,
 
-  // Matcher types (lightweight type extraction)
+  // Matcher types
   MatchUpdateQuery,
   UpdateResult,
   ValidateUpdateResult,
 
-  // Validator types (comprehensive validation)
+  // Validator types
   ValidateUpdateSQL,
   ValidateUpdateOptions,
   IsValidUpdate,
@@ -271,19 +258,24 @@ export type {
 
 // Re-export DELETE-specific types
 export type {
-  // Delete clause types
+  // Query wrapper types
+  SQLDeleteQuery,
+
+  // Main clause
   DeleteClause,
+
+  // USING clause
   UsingClause,
 
-  // RETURNING clause (re-exported, same structure as INSERT)
-  ReturningClause as DeleteReturningClause,
+  // RETURNING clause
+  DeleteReturningClause,
 
-  // Matcher types (lightweight type extraction)
+  // Matcher types
   MatchDeleteQuery,
   DeleteResult,
   ValidateDeleteResult,
 
-  // Validator types (comprehensive validation)
+  // Validator types
   ValidateDeleteSQL,
   ValidateDeleteOptions,
   IsValidDelete,
@@ -291,69 +283,13 @@ export type {
 } from "./delete/index.js"
 
 // ============================================================================
-// Parameter Types
+// Runtime API helpers
 // ============================================================================
 
-// Re-export parameter types
+export { createSelectFn } from "./db.js"
 export type {
-  // Parameter placeholders
-  PositionalParam,
-  NamedParam,
-  ParamPlaceholder,
-  ParamRef,
-
-  // Parameter extraction
-  ExtractParams,
-  ParamCount,
-  MaxParamNumber,
-
-  // Parameter type inference
-  ParamTypeMap,
-  InferParamTypes,
-  ParamTuple,
-  TypedParamTuple,
-
-  // Validation
-  ValidateParamCount,
-  ValidateParamTypes,
-
-  // Utility
-  QueryWithParams,
-} from "./params.js"
-
-// ============================================================================
-// Database Integration Types
-// ============================================================================
-
-// Re-export database integration types
-export type {
-  // Core validation type
   ValidQuery,
-
-  // Query result types
   SelectResult,
   SelectResultArray,
-
-  // Handler types
-  QueryHandler,
-
-  // Validation utilities
-  IsValidSelect,
-
-  // Parameter utilities
-  HasParameters,
-  ExpectedParamCount,
+  IsValidSelect
 } from "./db.js"
-
-// Re-export factory functions
-export { createSelectFn } from "./db.js"
-
-// ============================================================================
-// Legacy Compatibility Exports
-// ============================================================================
-
-// These exports maintain backward compatibility with the old flat structure.
-// Users can import from the root or from specific modules.
-
-// Legacy: Re-export MatchQuery as alias for MatchSelectQuery
-export type { MatchSelectQuery as MatchQuery } from "./select/index.js"

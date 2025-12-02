@@ -1,6 +1,6 @@
 /**
  * AST type definitions specific to SQL UPDATE queries
- * 
+ *
  * This module contains AST nodes that are specific to UPDATE:
  * - UpdateClause - the main UPDATE statement
  * - SetClause - SET assignments
@@ -25,7 +25,7 @@ import type {
  * A single SET assignment value
  * Can be a literal, parameter placeholder, DEFAULT, NULL, or expression
  */
-export type SetValue = 
+export type SetValue =
   | { readonly type: "Literal"; readonly value: string | number | boolean | null }
   | { readonly type: "Default" }
   | { readonly type: "Null" }
@@ -38,7 +38,7 @@ export type SetValue =
  */
 export type SetAssignment<
   Column extends string = string,
-  Value extends SetValue = SetValue
+  Value extends SetValue = SetValue,
 > = {
   readonly type: "SetAssignment"
   readonly column: Column
@@ -64,7 +64,7 @@ export type SetClause<Assignments extends SetAssignment[] = SetAssignment[]> = {
  */
 export type UpdateFromClause<
   Tables extends TableSource[] = TableSource[],
-  Joins extends JoinClause[] | undefined = JoinClause[] | undefined
+  Joins extends JoinClause[] | undefined = JoinClause[] | undefined,
 > = {
   readonly type: "UpdateFromClause"
   readonly tables: Tables
@@ -89,7 +89,7 @@ export type ReturningQualifier = "OLD" | "NEW" | undefined
  */
 export type QualifiedColumnRef<
   Column extends string = string,
-  Qualifier extends ReturningQualifier = ReturningQualifier
+  Qualifier extends ReturningQualifier = ReturningQualifier,
 > = {
   readonly type: "QualifiedColumnRef"
   readonly column: Column
@@ -100,9 +100,7 @@ export type QualifiedColumnRef<
  * Wildcard reference with optional OLD/NEW qualifier
  * PostgreSQL 17+ syntax: RETURNING OLD.*, NEW.*
  */
-export type QualifiedWildcard<
-  Qualifier extends ReturningQualifier = ReturningQualifier
-> = {
+export type QualifiedWildcard<Qualifier extends ReturningQualifier = ReturningQualifier> = {
   readonly type: "QualifiedWildcard"
   readonly qualifier: Qualifier
 }
@@ -112,18 +110,13 @@ export type QualifiedWildcard<
  * - Unqualified column or wildcard (backwards compatible)
  * - OLD/NEW qualified column or wildcard (PostgreSQL 17+)
  */
-export type ReturningItem = 
-  | UnboundColumnRef
-  | QualifiedColumnRef
-  | QualifiedWildcard
+export type ReturningItem = UnboundColumnRef | QualifiedColumnRef | QualifiedWildcard
 
 /**
  * RETURNING clause for UPDATE
  * Can return *, specific columns, OLD/NEW qualified references
  */
-export type ReturningClause<
-  Columns extends "*" | ReturningItem[] = "*" | ReturningItem[]
-> = {
+export type UpdateReturningClause<Columns extends "*" | ReturningItem[] = "*" | ReturningItem[]> = {
   readonly type: "ReturningClause"
   readonly columns: Columns
 }
@@ -140,8 +133,8 @@ export type UpdateClause<
   Set extends SetClause = SetClause,
   From extends UpdateFromClause | undefined = UpdateFromClause | undefined,
   Where extends WhereExpr | undefined = WhereExpr | undefined,
-  Returning extends ReturningClause | undefined = ReturningClause | undefined,
-  CTEs extends CTEDefinition[] | undefined = CTEDefinition[] | undefined
+  Returning extends UpdateReturningClause | undefined = UpdateReturningClause | undefined,
+  CTEs extends CTEDefinition[] | undefined = CTEDefinition[] | undefined,
 > = Flatten<{
   readonly type: "UpdateClause"
   readonly table: Table

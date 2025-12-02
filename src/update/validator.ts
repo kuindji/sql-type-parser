@@ -1,6 +1,6 @@
 /**
  * UPDATE Query Validator
- * 
+ *
  * This module provides comprehensive validation for UPDATE queries.
  * It validates:
  * - Table existence in schema
@@ -16,7 +16,7 @@ import type {
   SetClause,
   SetAssignment,
   UpdateFromClause,
-  ReturningClause,
+  UpdateReturningClause,
   ReturningItem,
   QualifiedColumnRef,
   QualifiedWildcard,
@@ -31,7 +31,13 @@ import type {
   ParsedCondition,
 } from "../common/ast.js"
 
-import type { MatchError, IsMatchError, ParseError, IsParseError, HasTemplateHoles } from "../common/utils.js"
+import type {
+  MatchError,
+  IsMatchError,
+  ParseError,
+  IsParseError,
+  HasTemplateHoles,
+} from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseUpdateSQL } from "./parser.js"
@@ -56,13 +62,13 @@ export type ValidateUpdateOptions = {
    * @default true
    */
   validateSet?: boolean
-  
+
   /**
    * Whether to validate WHERE clause column references
    * @default true
    */
   validateWhere?: boolean
-  
+
   /**
    * Whether to validate RETURNING clause columns
    * @default true
@@ -81,7 +87,7 @@ type DefaultValidateOptions = { validateSet: true; validateWhere: true; validate
 
 /**
  * Validate an UPDATE query against a schema
- * 
+ *
  * Returns true if valid, or an error message if invalid.
  * For dynamic queries (non-literal strings), returns true (can't validate at compile time).
  */
@@ -90,7 +96,7 @@ export type ValidateUpdateSQL<
   Schema extends DatabaseSchema,
   Options extends ValidateUpdateOptions = DefaultValidateOptions,
 > = HasTemplateHoles<SQL> extends true
-  ? true  // Dynamic queries bypass validation
+  ? true // Dynamic queries bypass validation
   : ParseUpdateSQL<SQL> extends infer Parsed
     ? Parsed extends ParseError<infer E>
       ? E
@@ -110,13 +116,7 @@ type ValidateUpdateClause<
   Update extends UpdateClause,
   Schema extends DatabaseSchema,
   Options extends ValidateUpdateOptions = DefaultValidateOptions,
-> = Update extends UpdateClause<
-  infer Table,
-  infer Set,
-  infer From,
-  infer Where,
-  infer Returning
->
+> = Update extends UpdateClause<infer Table, infer Set, infer From, infer Where, infer Returning>
   ? ValidateTable<Table, Schema> extends infer TableResult
     ? TableResult extends true
       ? ValidateFromClause<From, Schema> extends infer FromResult
@@ -147,12 +147,10 @@ type ValidateUpdateClause<
 /**
  * Validate that the target table exists in the schema
  */
-type ValidateTable<
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
-  ? ResolveTableInSchema<TableName, TableSchema, Schema>
-  : `Invalid table reference`
+type ValidateTable<Table extends TableRef, Schema extends DatabaseSchema> =
+  Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
+    ? ResolveTableInSchema<TableName, TableSchema, Schema>
+    : `Invalid table reference`
 
 /**
  * Resolve a table in the database schema
@@ -250,10 +248,7 @@ type ValidateColumnExists<
 /**
  * Validate FROM clause tables exist
  */
-type ValidateFromClause<
-  From,
-  Schema extends DatabaseSchema,
-> = From extends undefined
+type ValidateFromClause<From, Schema extends DatabaseSchema> = From extends undefined
   ? true
   : From extends UpdateFromClause<infer Tables>
     ? ValidateTableList<Tables, Schema>
@@ -299,24 +294,22 @@ type BuildValidationContext<
 /**
  * Resolve table to context entry
  */
-type ResolveTableContext<
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = Table extends TableRef<infer TableName, infer Alias, infer TableSchema>
-  ? TableSchema extends undefined
-    ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
-      ? DefaultSchema extends keyof Schema["schemas"]
-        ? TableName extends keyof Schema["schemas"][DefaultSchema]
-          ? { [K in Alias]: Schema["schemas"][DefaultSchema][TableName] }
-          : MatchError<`Table '${TableName}' not found`>
-        : MatchError<`Default schema not found`>
-      : MatchError<`Cannot determine default schema`>
-    : TableSchema extends keyof Schema["schemas"]
-      ? TableName extends keyof Schema["schemas"][TableSchema]
-        ? { [K in Alias]: Schema["schemas"][TableSchema][TableName] }
-        : MatchError<`Table '${TableName}' not found in schema '${TableSchema}'`>
-      : MatchError<`Schema '${TableSchema}' not found`>
-  : MatchError<`Invalid table reference`>
+type ResolveTableContext<Table extends TableRef, Schema extends DatabaseSchema> =
+  Table extends TableRef<infer TableName, infer Alias, infer TableSchema>
+    ? TableSchema extends undefined
+      ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
+        ? DefaultSchema extends keyof Schema["schemas"]
+          ? TableName extends keyof Schema["schemas"][DefaultSchema]
+            ? { [K in Alias]: Schema["schemas"][DefaultSchema][TableName] }
+            : MatchError<`Table '${TableName}' not found`>
+          : MatchError<`Default schema not found`>
+        : MatchError<`Cannot determine default schema`>
+      : TableSchema extends keyof Schema["schemas"]
+        ? TableName extends keyof Schema["schemas"][TableSchema]
+          ? { [K in Alias]: Schema["schemas"][TableSchema][TableName] }
+          : MatchError<`Table '${TableName}' not found in schema '${TableSchema}'`>
+        : MatchError<`Schema '${TableSchema}' not found`>
+    : MatchError<`Invalid table reference`>
 
 /**
  * Merge FROM tables into context
@@ -377,15 +370,12 @@ type ValidateColumnRefList<
 /**
  * Validate a single column reference
  */
-type ValidateSingleRef<
-  Ref,
-  Context,
-  Schema extends DatabaseSchema,
-> = Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
-  ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
-  : Ref extends UnboundColumnRef<infer Column>
-    ? ValidateUnboundColumn<Column, Context>
-    : true
+type ValidateSingleRef<Ref, Context, Schema extends DatabaseSchema> =
+  Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+    ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
+    : Ref extends UnboundColumnRef<infer Column>
+      ? ValidateUnboundColumn<Column, Context>
+      : true
 
 /**
  * Validate a table-qualified column
@@ -417,19 +407,16 @@ type ValidateTableColumn<
 /**
  * Validate an unbound column exists in some table
  */
-type ValidateUnboundColumn<
-  Column extends string,
+type ValidateUnboundColumn<Column extends string, Context> = ColumnExistsInContext<
+  Column,
   Context,
-> = ColumnExistsInContext<Column, Context, keyof Context>
+  keyof Context
+>
 
 /**
  * Check if column exists in any table in context
  */
-type ColumnExistsInContext<
-  Column extends string,
-  Context,
-  Keys,
-> = [Keys] extends [never]
+type ColumnExistsInContext<Column extends string, Context, Keys> = [Keys] extends [never]
   ? `Column '${Column}' not found in any table`
   : Keys extends keyof Context
     ? Context[Keys] extends infer Table
@@ -456,7 +443,7 @@ type ValidateReturningClause<
   ? true
   : Returning extends undefined
     ? true
-    : Returning extends ReturningClause<infer Cols>
+    : Returning extends UpdateReturningClause<infer Cols>
       ? Cols extends "*"
         ? true
         : Cols extends ReturningItem[]
@@ -484,21 +471,17 @@ type ValidateReturningItems<
 /**
  * Validate a single RETURNING item
  */
-type ValidateSingleReturningItem<
-  Item,
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = 
+type ValidateSingleReturningItem<Item, Table extends TableRef, Schema extends DatabaseSchema> =
   // OLD.* or NEW.* - always valid if table exists
   Item extends QualifiedWildcard
     ? true
-  // OLD.column or NEW.column
-  : Item extends QualifiedColumnRef<infer ColName, infer _Qualifier>
-    ? ValidateColumnExists<ColName, Table, Schema>
-  // Unqualified column
-  : Item extends UnboundColumnRef<infer ColName>
-    ? ValidateColumnExists<ColName, Table, Schema>
-  : true
+    : // OLD.column or NEW.column
+      Item extends QualifiedColumnRef<infer ColName, infer _Qualifier>
+      ? ValidateColumnExists<ColName, Table, Schema>
+      : // Unqualified column
+        Item extends UnboundColumnRef<infer ColName>
+        ? ValidateColumnExists<ColName, Table, Schema>
+        : true
 
 // ============================================================================
 // Convenience Types
@@ -507,34 +490,36 @@ type ValidateSingleReturningItem<
 /**
  * Check if an UPDATE query is valid
  */
-export type IsValidUpdate<
-  SQL extends string,
-  Schema extends DatabaseSchema,
-> = ValidateUpdateSQL<SQL, Schema> extends true ? true : false
+export type IsValidUpdate<SQL extends string, Schema extends DatabaseSchema> =
+  ValidateUpdateSQL<SQL, Schema> extends true ? true : false
 
 /**
  * Get the table columns that would be affected by an UPDATE
  */
-export type GetUpdateTableColumns<
-  SQL extends string,
-  Schema extends DatabaseSchema,
-> = ParseUpdateSQL<SQL> extends SQLUpdateQuery<infer Query>
-  ? Query extends UpdateClause<infer Table, infer _Set, infer _From, infer _Where, infer _Return>
-    ? Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
-      ? TableSchema extends undefined
-        ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
-          ? DefaultSchema extends keyof Schema["schemas"]
-            ? TableName extends keyof Schema["schemas"][DefaultSchema]
-              ? Schema["schemas"][DefaultSchema][TableName]
+export type GetUpdateTableColumns<SQL extends string, Schema extends DatabaseSchema> =
+  ParseUpdateSQL<SQL> extends SQLUpdateQuery<infer Query>
+    ? Query extends UpdateClause<
+        infer Table,
+        infer _Set,
+        infer _From,
+        infer _Where,
+        infer _Return
+      >
+      ? Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
+        ? TableSchema extends undefined
+          ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
+            ? DefaultSchema extends keyof Schema["schemas"]
+              ? TableName extends keyof Schema["schemas"][DefaultSchema]
+                ? Schema["schemas"][DefaultSchema][TableName]
+                : never
               : never
             : never
-          : never
-        : TableSchema extends keyof Schema["schemas"]
-          ? TableName extends keyof Schema["schemas"][TableSchema]
-            ? Schema["schemas"][TableSchema][TableName]
+          : TableSchema extends keyof Schema["schemas"]
+            ? TableName extends keyof Schema["schemas"][TableSchema]
+              ? Schema["schemas"][TableSchema][TableName]
+              : never
             : never
-          : never
+        : never
       : never
     : never
-  : never
 

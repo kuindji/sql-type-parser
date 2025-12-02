@@ -1,6 +1,6 @@
 /**
  * Type-level SQL UPDATE parser
- * 
+ *
  * This module handles parsing of UPDATE queries specifically.
  * It uses shared utilities from common/ but maintains its own
  * execution tree for TypeScript performance.
@@ -12,7 +12,7 @@ import type {
   SetAssignment,
   SetValue,
   UpdateFromClause,
-  ReturningClause,
+  UpdateReturningClause,
   ReturningItem,
   QualifiedColumnRef,
   QualifiedWildcard,
@@ -33,12 +33,7 @@ import type {
   SubquerySelectClause,
 } from "../common/ast.js"
 
-import type {
-  NormalizeSQL,
-  NextToken,
-  ExtractUntil,
-  SplitByComma,
-} from "../common/tokenizer.js"
+import type { NormalizeSQL, NextToken, ExtractUntil, SplitByComma } from "../common/tokenizer.js"
 
 import type { Trim, ParseError, RemoveQuotes, Increment, Decrement } from "../common/utils.js"
 
@@ -70,7 +65,10 @@ type ParseUpdateQuery<T extends string> = NextToken<T> extends [
  * Parse WITH clause followed by UPDATE
  */
 type ParseWithAndUpdate<T extends string> = ParseCTEList<T> extends infer CTEResult
-  ? CTEResult extends { ctes: infer CTEs extends CTEDefinition[]; rest: infer AfterCTEs extends string }
+  ? CTEResult extends {
+      ctes: infer CTEs extends CTEDefinition[]
+      rest: infer AfterCTEs extends string
+    }
     ? NextToken<AfterCTEs> extends ["UPDATE", infer UpdateRest extends string]
       ? ParseUpdateBodyWithCTEs<UpdateRest, CTEs>
       : ParseError<"Expected UPDATE after WITH clause">
@@ -84,18 +82,16 @@ type ParseWithAndUpdate<T extends string> = ParseCTEList<T> extends infer CTERes
 /**
  * Parse a list of CTEs: name AS (SELECT ...), name2 AS (SELECT ...)
  */
-type ParseCTEList<
-  T extends string,
-  Acc extends CTEDefinition[] = []
-> = ParseSingleCTE<T> extends infer CTEResult
-  ? CTEResult extends { cte: infer CTE extends CTEDefinition; rest: infer Rest extends string }
-    ? NextToken<Rest> extends [",", infer AfterComma extends string]
-      ? ParseCTEList<AfterComma, [...Acc, CTE]>
-      : { ctes: [...Acc, CTE]; rest: Rest }
-    : CTEResult extends ParseError<string>
-      ? CTEResult
-      : ParseError<"Invalid CTE syntax">
-  : never
+type ParseCTEList<T extends string, Acc extends CTEDefinition[] = []> =
+  ParseSingleCTE<T> extends infer CTEResult
+    ? CTEResult extends { cte: infer CTE extends CTEDefinition; rest: infer Rest extends string }
+      ? NextToken<Rest> extends [",", infer AfterComma extends string]
+        ? ParseCTEList<AfterComma, [...Acc, CTE]>
+        : { ctes: [...Acc, CTE]; rest: Rest }
+      : CTEResult extends ParseError<string>
+        ? CTEResult
+        : ParseError<"Invalid CTE syntax">
+    : never
 
 /**
  * Parse a single CTE: name AS ( SELECT ... )
@@ -106,7 +102,10 @@ type ParseSingleCTE<T extends string> = NextToken<T> extends [
 ]
   ? NextToken<AfterName> extends ["AS", infer AfterAs extends string]
     ? NextToken<AfterAs> extends ["(", infer InParen extends string]
-      ? ExtractParenContent<InParen> extends [infer Content extends string, infer AfterParen extends string]
+      ? ExtractParenContent<InParen> extends [
+          infer Content extends string,
+          infer AfterParen extends string,
+        ]
         ? {
             cte: CTEDefinition<Name, SubquerySelectClause>
             rest: AfterParen
@@ -122,7 +121,7 @@ type ParseSingleCTE<T extends string> = NextToken<T> extends [
 type ExtractParenContent<
   T extends string,
   Depth extends number = 1,
-  Acc extends string = ""
+  Acc extends string = "",
 > = Depth extends 0
   ? [Acc, T]
   : T extends `(${infer Rest}`
@@ -140,20 +139,12 @@ type ExtractParenContent<
 // ============================================================================
 
 /**
- * Parse UPDATE table_name SET ... (legacy - no CTEs)
- */
-type ParseUpdateBody<T extends string> = ParseUpdateBodyWithCTEs<T, undefined>
-
-/**
  * Parse UPDATE table_name SET ... with optional CTEs
  */
 type ParseUpdateBodyWithCTEs<
   T extends string,
-  CTEs extends CTEDefinition[] | undefined
-> = ExtractUntil<T, "SET"> extends [
-  infer TablePart extends string,
-  infer Rest extends string,
-]
+  CTEs extends CTEDefinition[] | undefined,
+> = ExtractUntil<T, "SET"> extends [infer TablePart extends string, infer Rest extends string]
   ? ParseTableRef<Trim<TablePart>> extends infer Table extends TableRef
     ? NextToken<Rest> extends ["SET", infer AfterSet extends string]
       ? ParseSetClauseWithCTEs<AfterSet, Table, CTEs>
@@ -162,29 +153,22 @@ type ParseUpdateBodyWithCTEs<
   : ParseError<"Expected SET after table name">
 
 /**
- * Parse SET clause and remaining parts (legacy - no CTEs)
- */
-type ParseSetClause<T extends string, Table extends TableRef> = 
-  ParseSetClauseWithCTEs<T, Table, undefined>
-
-/**
  * Parse SET clause and remaining parts with optional CTEs
  */
 type ParseSetClauseWithCTEs<
   T extends string,
   Table extends TableRef,
-  CTEs extends CTEDefinition[] | undefined
-> = 
-  ExtractUntil<T, UpdateTerminators> extends [
-    infer SetPart extends string,
-    infer Rest extends string,
-  ]
-    ? ParseSetAssignments<Trim<SetPart>> extends infer Assignments extends SetAssignment[]
-      ? BuildUpdateClauseWithCTEs<Table, SetClause<Assignments>, Rest, CTEs>
-      : ParseError<"Failed to parse SET assignments">
-    : ParseSetAssignments<Trim<T>> extends infer Assignments extends SetAssignment[]
-      ? BuildUpdateClauseWithCTEs<Table, SetClause<Assignments>, "", CTEs>
-      : ParseError<"Failed to parse SET assignments">
+  CTEs extends CTEDefinition[] | undefined,
+> = ExtractUntil<T, UpdateTerminators> extends [
+  infer SetPart extends string,
+  infer Rest extends string,
+]
+  ? ParseSetAssignments<Trim<SetPart>> extends infer Assignments extends SetAssignment[]
+    ? BuildUpdateClauseWithCTEs<Table, SetClause<Assignments>, Rest, CTEs>
+    : ParseError<"Failed to parse SET assignments">
+  : ParseSetAssignments<Trim<T>> extends infer Assignments extends SetAssignment[]
+    ? BuildUpdateClauseWithCTEs<Table, SetClause<Assignments>, "", CTEs>
+    : ParseError<"Failed to parse SET assignments">
 
 /**
  * Keywords that terminate the SET clause
@@ -194,10 +178,9 @@ type UpdateTerminators = "FROM" | "WHERE" | "RETURNING"
 /**
  * Parse SET assignments: col1 = val1, col2 = val2, ...
  */
-type ParseSetAssignments<T extends string> = 
-  SplitByComma<T> extends infer Parts extends string[]
-    ? ParseAssignmentList<Parts>
-    : []
+type ParseSetAssignments<T extends string> = SplitByComma<T> extends infer Parts extends string[]
+  ? ParseAssignmentList<Parts>
+  : []
 
 /**
  * Parse list of assignments
@@ -214,36 +197,38 @@ type ParseAssignmentList<T extends string[]> = T extends [
 /**
  * Parse a single assignment: column = value
  */
-type ParseSingleAssignment<T extends string> = 
-  T extends `${infer Col} = ${infer Val}`
-    ? SetAssignment<RemoveQuotes<Trim<Col>>, ParseSetValue<Trim<Val>>>
-    : never
+type ParseSingleAssignment<T extends string> = T extends `${infer Col} = ${infer Val}`
+  ? SetAssignment<RemoveQuotes<Trim<Col>>, ParseSetValue<Trim<Val>>>
+  : never
 
 /**
  * Parse a SET value
  */
-type ParseSetValue<T extends string> = 
-  T extends "DEFAULT"
-    ? { readonly type: "Default" }
-    : T extends "NULL"
-      ? { readonly type: "Null" }
-      : T extends "TRUE"
-        ? { readonly type: "Literal"; readonly value: true }
-        : T extends "FALSE"
-          ? { readonly type: "Literal"; readonly value: false }
-          : T extends `'${infer Val}'`
-            ? { readonly type: "Literal"; readonly value: Val }
-            : T extends `$${infer Num}`
-              ? { readonly type: "Param"; readonly name: Num }
-              : T extends `:${infer Name}`
-                ? { readonly type: "Param"; readonly name: Name }
-                : IsNumericString<T> extends true
-                  ? { readonly type: "Literal"; readonly value: T }
-                  : T extends `${infer Table}.${infer Col}`
-                    ? { readonly type: "ColumnRef"; readonly column: RemoveQuotes<Col>; readonly table: RemoveQuotes<Table> }
-                    : IsSimpleIdentifier<T> extends true
-                      ? { readonly type: "ColumnRef"; readonly column: RemoveQuotes<T> }
-                      : { readonly type: "Expression"; readonly expr: T }
+type ParseSetValue<T extends string> = T extends "DEFAULT"
+  ? { readonly type: "Default" }
+  : T extends "NULL"
+    ? { readonly type: "Null" }
+    : T extends "TRUE"
+      ? { readonly type: "Literal"; readonly value: true }
+      : T extends "FALSE"
+        ? { readonly type: "Literal"; readonly value: false }
+        : T extends `'${infer Val}'`
+          ? { readonly type: "Literal"; readonly value: Val }
+          : T extends `$${infer Num}`
+            ? { readonly type: "Param"; readonly name: Num }
+            : T extends `:${infer Name}`
+              ? { readonly type: "Param"; readonly name: Name }
+              : IsNumericString<T> extends true
+                ? { readonly type: "Literal"; readonly value: T }
+                : T extends `${infer Table}.${infer Col}`
+                  ? {
+                      readonly type: "ColumnRef"
+                      readonly column: RemoveQuotes<Col>
+                      readonly table: RemoveQuotes<Table>
+                    }
+                  : IsSimpleIdentifier<T> extends true
+                    ? { readonly type: "ColumnRef"; readonly column: RemoveQuotes<T> }
+                    : { readonly type: "Expression"; readonly expr: T }
 
 /**
  * Check if a string looks like a number
@@ -255,38 +240,38 @@ type IsNumericString<T extends string> = T extends `${number}` ? true : false
 // ============================================================================
 
 /**
- * Build the complete UPDATE clause by parsing remaining optional parts (legacy - no CTEs)
- */
-type BuildUpdateClause<
-  Table extends TableRef,
-  Set extends SetClause,
-  Rest extends string
-> = BuildUpdateClauseWithCTEs<Table, Set, Rest, undefined>
-
-/**
  * Build the complete UPDATE clause by parsing remaining optional parts with CTEs
  */
 type BuildUpdateClauseWithCTEs<
   Table extends TableRef,
   Set extends SetClause,
   Rest extends string,
-  CTEs extends CTEDefinition[] | undefined
+  CTEs extends CTEDefinition[] | undefined,
 > = ParseFromWithJoins<Rest> extends infer FromResult
-  ? FromResult extends { from: infer From; joins: infer Joins; rest: infer AfterFrom extends string }
+  ? FromResult extends {
+      from: infer From
+      joins: infer Joins
+      rest: infer AfterFrom extends string
+    }
     ? ParseWhere<AfterFrom> extends infer WhereResult
       ? WhereResult extends { where: infer Where; rest: infer AfterWhere extends string }
         ? ParseReturning<AfterWhere> extends infer ReturnResult
-          ? ReturnResult extends { returning: infer Returning; rest: infer _AfterReturn extends string }
-            ? SQLUpdateQuery<UpdateClause<
-                Table,
-                Set,
-                From extends TableSource[]
-                  ? UpdateFromClause<From, Joins extends JoinClause[] ? Joins : undefined>
-                  : undefined,
-                Where extends WhereExpr ? Where : undefined,
-                Returning extends ReturningClause ? Returning : undefined,
-                CTEs
-              >>
+          ? ReturnResult extends {
+              returning: infer Returning
+              rest: infer _AfterReturn extends string
+            }
+            ? SQLUpdateQuery<
+                UpdateClause<
+                  Table,
+                  Set,
+                  From extends TableSource[]
+                    ? UpdateFromClause<From, Joins extends JoinClause[] ? Joins : undefined>
+                    : undefined,
+                  Where extends WhereExpr ? Where : undefined,
+                  Returning extends UpdateReturningClause ? Returning : undefined,
+                  CTEs
+                >
+              >
             : never
           : never
         : never
@@ -297,15 +282,6 @@ type BuildUpdateClauseWithCTEs<
 // ============================================================================
 // FROM Clause Parser (with JOIN support)
 // ============================================================================
-
-/**
- * Parse FROM clause (PostgreSQL multi-table update) - legacy version
- */
-type ParseFrom<T extends string> = ParseFromWithJoins<T> extends infer Result
-  ? Result extends { from: infer From; joins: infer _Joins; rest: infer Rest extends string }
-    ? { from: From extends TableSource[] ? UpdateFromClause<From> : undefined; rest: Rest }
-    : Result
-  : never
 
 /**
  * Parse FROM clause with JOIN support
@@ -319,22 +295,22 @@ type ParseFromWithJoins<T extends string> = Trim<T> extends ""
 /**
  * Parse tables and JOINs in FROM clause
  */
-type ParseFromTablesWithJoins<T extends string> = 
-  // First, extract the first table
-  ExtractFirstTable<T> extends [infer FirstTable extends string, infer AfterFirst extends string]
-    ? ParseJoinsOrContinue<AfterFirst, [ParseTableRef<Trim<FirstTable>>]>
-    : { from: [ParseTableRef<Trim<T>>]; joins: undefined; rest: "" }
+type ParseFromTablesWithJoins<T extends string> = ExtractFirstTable<T> extends [
+  infer FirstTable extends string,
+  infer AfterFirst extends string,
+]
+  ? ParseJoinsOrContinue<AfterFirst, [ParseTableRef<Trim<FirstTable>>]>
+  : { from: [ParseTableRef<Trim<T>>]; joins: undefined; rest: "" }
 
 /**
  * Extract the first table (until comma, JOIN, WHERE, or RETURNING)
  */
-type ExtractFirstTable<T extends string> = 
-  ExtractUntil<T, "," | JoinKeywords | "WHERE" | "RETURNING"> extends [
-    infer TablePart extends string,
-    infer Rest extends string,
-  ]
-    ? [TablePart, Rest]
-    : [T, ""]
+type ExtractFirstTable<T extends string> = ExtractUntil<
+  T,
+  "," | JoinKeywords | "WHERE" | "RETURNING"
+> extends [infer TablePart extends string, infer Rest extends string]
+  ? [TablePart, Rest]
+  : [T, ""]
 
 /**
  * JOIN keywords to detect
@@ -344,17 +320,22 @@ type JoinKeywords = "JOIN" | "INNER" | "LEFT" | "RIGHT" | "FULL" | "CROSS"
 /**
  * Parse JOINs or continue with comma-separated tables
  */
-type ParseJoinsOrContinue<
-  T extends string,
-  Tables extends TableSource[]
-> = NextToken<Trim<T>> extends [infer Token extends string, infer Rest extends string]
+type ParseJoinsOrContinue<T extends string, Tables extends TableSource[]> = NextToken<
+  Trim<T>
+> extends [infer Token extends string, infer Rest extends string]
   ? Token extends ","
-    ? ExtractFirstTable<Rest> extends [infer NextTable extends string, infer AfterNext extends string]
+    ? ExtractFirstTable<Rest> extends [
+        infer NextTable extends string,
+        infer AfterNext extends string,
+      ]
       ? ParseJoinsOrContinue<AfterNext, [...Tables, ParseTableRef<Trim<NextTable>>]>
       : { from: Tables; joins: undefined; rest: T }
     : Token extends JoinKeywords
       ? ParseJoinClauses<T, []> extends infer JoinResult
-        ? JoinResult extends { joins: infer Joins extends JoinClause[]; rest: infer AfterJoins extends string }
+        ? JoinResult extends {
+            joins: infer Joins extends JoinClause[]
+            rest: infer AfterJoins extends string
+          }
           ? { from: Tables; joins: Joins; rest: AfterJoins }
           : { from: Tables; joins: undefined; rest: T }
         : { from: Tables; joins: undefined; rest: T }
@@ -364,22 +345,19 @@ type ParseJoinsOrContinue<
 /**
  * Parse multiple JOIN clauses
  */
-type ParseJoinClauses<
-  T extends string,
-  Acc extends JoinClause[]
-> = ParseSingleJoin<Trim<T>> extends infer JoinResult
-  ? JoinResult extends { join: infer J extends JoinClause; rest: infer Rest extends string }
-    ? NextToken<Trim<Rest>> extends [infer Token extends string, infer _]
-      ? Token extends JoinKeywords
-        ? ParseJoinClauses<Rest, [...Acc, J]>
+type ParseJoinClauses<T extends string, Acc extends JoinClause[]> =
+  ParseSingleJoin<Trim<T>> extends infer JoinResult
+    ? JoinResult extends { join: infer J extends JoinClause; rest: infer Rest extends string }
+      ? NextToken<Trim<Rest>> extends [infer Token extends string, infer _]
+        ? Token extends JoinKeywords
+          ? ParseJoinClauses<Rest, [...Acc, J]>
+          : { joins: [...Acc, J]; rest: Rest }
         : { joins: [...Acc, J]; rest: Rest }
-      : { joins: [...Acc, J]; rest: Rest }
+      : { joins: Acc; rest: T }
     : { joins: Acc; rest: T }
-  : { joins: Acc; rest: T }
 
 /**
  * Parse a single JOIN clause
- * Note: JoinClause<Type, Table, On> - Type comes first!
  */
 type ParseSingleJoin<T extends string> = ParseJoinType<T> extends [
   infer JType extends JoinType,
@@ -413,42 +391,42 @@ type ParseSingleJoin<T extends string> = ParseJoinType<T> extends [
             }
         : // CROSS JOIN doesn't have ON
           JType extends "CROSS"
-            ? {
-                join: JoinClause<JType, ParseTableRef<Trim<TablePart>>, undefined>
-                rest: Rest
-              }
-            : never
+          ? {
+              join: JoinClause<JType, ParseTableRef<Trim<TablePart>>, undefined>
+              rest: Rest
+            }
+          : never
       : never
     : // Handle just "JOIN" without type prefix
       T extends `JOIN ${infer AfterJoin}`
-        ? ExtractUntil<AfterJoin, "ON" | JoinKeywords | "WHERE" | "RETURNING"> extends [
-            infer TablePart extends string,
-            infer Rest extends string,
-          ]
-          ? NextToken<Rest> extends ["ON", infer AfterOn extends string]
-            ? ExtractUntil<AfterOn, JoinKeywords | "WHERE" | "RETURNING"> extends [
-                infer Condition extends string,
-                infer FinalRest extends string,
-              ]
-              ? {
-                  join: JoinClause<
-                    "INNER",
-                    ParseTableRef<Trim<TablePart>>,
-                    ParsedCondition<ScanTokensForColumnRefs<Trim<Condition>, []>>
-                  >
-                  rest: FinalRest
-                }
-              : {
-                  join: JoinClause<
-                    "INNER",
-                    ParseTableRef<Trim<TablePart>>,
-                    ParsedCondition<ScanTokensForColumnRefs<Trim<AfterOn>, []>>
-                  >
-                  rest: ""
-                }
-            : never
+      ? ExtractUntil<AfterJoin, "ON" | JoinKeywords | "WHERE" | "RETURNING"> extends [
+          infer TablePart extends string,
+          infer Rest extends string,
+        ]
+        ? NextToken<Rest> extends ["ON", infer AfterOn extends string]
+          ? ExtractUntil<AfterOn, JoinKeywords | "WHERE" | "RETURNING"> extends [
+              infer Condition extends string,
+              infer FinalRest extends string,
+            ]
+            ? {
+                join: JoinClause<
+                  "INNER",
+                  ParseTableRef<Trim<TablePart>>,
+                  ParsedCondition<ScanTokensForColumnRefs<Trim<Condition>, []>>
+                >
+                rest: FinalRest
+              }
+            : {
+                join: JoinClause<
+                  "INNER",
+                  ParseTableRef<Trim<TablePart>>,
+                  ParsedCondition<ScanTokensForColumnRefs<Trim<AfterOn>, []>>
+                >
+                rest: ""
+              }
           : never
         : never
+      : never
   : never
 
 /**
@@ -475,19 +453,9 @@ type ParseJoinType<T extends string> = NextToken<T> extends [
           : Token extends "CROSS"
             ? ["CROSS", Rest]
             : Token extends "JOIN"
-              ? ["INNER", T]  // Plain "JOIN" means INNER JOIN, don't consume token
+              ? ["INNER", T] // Plain "JOIN" means INNER JOIN, don't consume token
               : never
   : never
-
-/**
- * Parse a list of table references
- */
-type ParseTableList<T extends string[]> = T extends [
-  infer First extends string,
-  ...infer Rest extends string[],
-]
-  ? [ParseTableRef<Trim<First>>, ...ParseTableList<Rest>]
-  : []
 
 // ============================================================================
 // WHERE Clause Parser
@@ -510,10 +478,9 @@ type ParseWhere<T extends string> = Trim<T> extends ""
 /**
  * Scan tokens for column references
  */
-type ScanTokensForColumnRefs<
-  T extends string,
-  Acc extends ValidatableColumnRef[]
-> = Trim<T> extends ""
+type ScanTokensForColumnRefs<T extends string, Acc extends ValidatableColumnRef[]> = Trim<
+  T
+> extends ""
   ? Acc
   : NextToken<Trim<T>> extends [infer Token extends string, infer Rest extends string]
     ? ExtractColumnFromToken<Token> extends infer ColRef
@@ -527,35 +494,35 @@ type ScanTokensForColumnRefs<
 
 /**
  * Extract the base column from a JSON operator expression (recursively)
- * Handles nested JSON operators: config->'a'->>'b' -> config
- * e.g., config->>'settings' -> config, table.col->'key' -> table.col
  */
-type ExtractBaseColumnFromJsonExpr<T extends string> =
-  T extends `${infer Base}->>${string}`
-    ? ExtractBaseColumnFromJsonExpr<Base>
+type ExtractBaseColumnFromJsonExpr<T extends string> = T extends `${infer Base}->>${string}`
+  ? ExtractBaseColumnFromJsonExpr<Base>
   : T extends `${infer Base}->${string}`
     ? ExtractBaseColumnFromJsonExpr<Base>
-  : T extends `${infer Base}#>>${string}`
-    ? ExtractBaseColumnFromJsonExpr<Base>
-  : T extends `${infer Base}#>${string}`
-    ? ExtractBaseColumnFromJsonExpr<Base>
-  : T
+    : T extends `${infer Base}#>>${string}`
+      ? ExtractBaseColumnFromJsonExpr<Base>
+      : T extends `${infer Base}#>${string}`
+        ? ExtractBaseColumnFromJsonExpr<Base>
+        : T
 
 /**
  * Check if the token contains a JSON operator
  */
-type HasJsonOperator<T extends string> =
-  T extends `${string}->>${string}` ? true :
-  T extends `${string}->${string}` ? true :
-  T extends `${string}#>>${string}` ? true :
-  T extends `${string}#>${string}` ? true :
-  false
+type HasJsonOperator<T extends string> = T extends `${string}->>${string}`
+  ? true
+  : T extends `${string}->${string}`
+    ? true
+    : T extends `${string}#>>${string}`
+      ? true
+      : T extends `${string}#>${string}`
+        ? true
+        : false
 
 /**
  * Try to extract a column reference from a token
  */
 type ExtractColumnFromToken<T extends string> =
-  // Pattern: table.column with JSON operator (e.g., t.col->>'key')
+  // Pattern: table.column with JSON operator
   T extends `${infer Table}.${infer Rest}`
     ? HasJsonOperator<Rest> extends true
       ? IsSimpleIdentifier<Table> extends true
@@ -572,8 +539,8 @@ type ExtractColumnFromToken<T extends string> =
         : never
     : T extends `"${infer Table}"."${infer Col}"`
       ? TableColumnRef<Table, Col, undefined>
-      // Pattern: column with JSON operator (e.g., config->>'key')
-      : HasJsonOperator<T> extends true
+      : // Pattern: column with JSON operator
+        HasJsonOperator<T> extends true
         ? ExtractBaseColumnFromJsonExpr<T> extends infer BaseCol extends string
           ? IsSimpleIdentifier<BaseCol> extends true
             ? IsKeywordOrOperator<BaseCol> extends true
@@ -592,23 +559,52 @@ type ExtractColumnFromToken<T extends string> =
 /**
  * Check if a string is a simple identifier
  */
-type IsSimpleIdentifier<T extends string> = 
-  T extends "" ? false :
-  T extends `${string} ${string}` ? false :
-  T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" | "'" ? false :
-  true
+type IsSimpleIdentifier<T extends string> = T extends ""
+  ? false
+  : T extends `${string} ${string}`
+    ? false
+    : T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" | "'"
+      ? false
+      : true
 
 /**
  * Check if a token is a SQL keyword or operator
  */
-type IsKeywordOrOperator<T extends string> =
-  T extends `'${string}'` ? true :
-  T extends "SELECT" | "FROM" | "WHERE" | "AND" | "OR" | "NOT" | "IN" | "IS" | "NULL"
-    | "TRUE" | "FALSE" | "LIKE" | "ILIKE" | "BETWEEN" | "EXISTS" | "UPDATE" | "SET"
-    | "RETURNING" | "DEFAULT" | "=" | "!=" | "<>" | "<" | ">" | "<=" | ">=" ? true :
-  T extends `$${number}` | `$${string}` | `:${string}` ? true :
-  T extends `${number}` ? true :
-  false
+type IsKeywordOrOperator<T extends string> = T extends `'${string}'`
+  ? true
+  : T extends
+        | "SELECT"
+        | "FROM"
+        | "WHERE"
+        | "AND"
+        | "OR"
+        | "NOT"
+        | "IN"
+        | "IS"
+        | "NULL"
+        | "TRUE"
+        | "FALSE"
+        | "LIKE"
+        | "ILIKE"
+        | "BETWEEN"
+        | "EXISTS"
+        | "UPDATE"
+        | "SET"
+        | "RETURNING"
+        | "DEFAULT"
+        | "="
+        | "!="
+        | "<>"
+        | "<"
+        | ">"
+        | "<="
+        | ">="
+    ? true
+    : T extends `$${number}` | `$${string}` | `:${string}`
+      ? true
+      : T extends `${number}`
+        ? true
+        : false
 
 // ============================================================================
 // RETURNING Clause Parser (PostgreSQL 17+ OLD/NEW support)
@@ -622,10 +618,13 @@ type ParseReturning<T extends string> = Trim<T> extends ""
   ? { returning: undefined; rest: "" }
   : NextToken<T> extends ["RETURNING", infer Rest extends string]
     ? Trim<Rest> extends "*"
-      ? { returning: ReturningClause<"*">; rest: "" }
+      ? { returning: UpdateReturningClause<"*">; rest: "" }
       : ParseReturningItems<Rest> extends infer Result
-        ? Result extends { items: infer Items extends ReturningItem[]; rest: infer AfterItems extends string }
-          ? { returning: ReturningClause<Items>; rest: AfterItems }
+        ? Result extends {
+            items: infer Items extends ReturningItem[]
+            rest: infer AfterItems extends string
+          }
+          ? { returning: UpdateReturningClause<Items>; rest: AfterItems }
           : Result
         : never
     : { returning: undefined; rest: T }
@@ -633,10 +632,10 @@ type ParseReturning<T extends string> = Trim<T> extends ""
 /**
  * Parse RETURNING items list (columns, OLD/NEW references)
  */
-type ParseReturningItems<T extends string> = 
-  SplitByComma<Trim<T>> extends infer Parts extends string[]
-    ? { items: ParseReturningItemList<Parts>; rest: "" }
-    : { items: []; rest: "" }
+type ParseReturningItems<T extends string> = SplitByComma<Trim<T>> extends infer Parts extends
+  string[]
+  ? { items: ParseReturningItemList<Parts>; rest: "" }
+  : { items: []; rest: "" }
 
 /**
  * Parse list of RETURNING items
@@ -652,20 +651,20 @@ type ParseReturningItemList<T extends string[]> = T extends [
  * Parse a single RETURNING item
  * Handles: column, OLD.column, NEW.column, OLD.*, NEW.*
  */
-type ParseSingleReturningItem<T extends string> = 
+type ParseSingleReturningItem<T extends string> =
   // OLD.* or NEW.*
   T extends "OLD.*"
     ? QualifiedWildcard<"OLD">
     : T extends "NEW.*"
       ? QualifiedWildcard<"NEW">
-      // OLD.column
-      : T extends `OLD.${infer Col}`
+      : // OLD.column
+        T extends `OLD.${infer Col}`
         ? QualifiedColumnRef<RemoveQuotes<Col>, "OLD">
-        // NEW.column
-        : T extends `NEW.${infer Col}`
+        : // NEW.column
+          T extends `NEW.${infer Col}`
           ? QualifiedColumnRef<RemoveQuotes<Col>, "NEW">
-          // Unqualified column (backwards compatible)
-          : UnboundColumnRef<RemoveQuotes<T>>
+          : // Unqualified column (backwards compatible)
+            UnboundColumnRef<RemoveQuotes<T>>
 
 // ============================================================================
 // Table Reference Parser
@@ -674,42 +673,52 @@ type ParseSingleReturningItem<T extends string> =
 /**
  * Parse a table reference with optional schema and alias
  */
-type ParseTableRef<T extends string> = 
-  Trim<T> extends `${infer SchemaTable} AS ${infer Alias}`
-    ? ParseSchemaTable<SchemaTable> extends [infer Schema extends string | undefined, infer Table extends string]
-      ? TableRef<Table, RemoveQuotes<Alias>, Schema>
-      : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<Alias>, undefined>
-    : Trim<T> extends `${infer SchemaTable} ${infer Alias}`
-      ? Alias extends UpdateTerminators | "SET"
-        ? ParseSchemaTable<SchemaTable> extends [infer Schema extends string | undefined, infer Table extends string]
-          ? TableRef<Table, Table, Schema>
-          : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<SchemaTable>, undefined>
-        : ParseSchemaTable<SchemaTable> extends [infer Schema extends string | undefined, infer Table extends string]
-          ? TableRef<Table, RemoveQuotes<Alias>, Schema>
-          : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<Alias>, undefined>
-      : ParseSchemaTable<T> extends [infer Schema extends string | undefined, infer Table extends string]
+type ParseTableRef<T extends string> = Trim<T> extends `${infer SchemaTable} AS ${infer Alias}`
+  ? ParseSchemaTable<SchemaTable> extends [
+      infer Schema extends string | undefined,
+      infer Table extends string,
+    ]
+    ? TableRef<Table, RemoveQuotes<Alias>, Schema>
+    : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<Alias>, undefined>
+  : Trim<T> extends `${infer SchemaTable} ${infer Alias}`
+    ? Alias extends UpdateTerminators | "SET"
+      ? ParseSchemaTable<SchemaTable> extends [
+          infer Schema extends string | undefined,
+          infer Table extends string,
+        ]
         ? TableRef<Table, Table, Schema>
-        : TableRef<RemoveQuotes<T>, RemoveQuotes<T>, undefined>
+        : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<SchemaTable>, undefined>
+      : ParseSchemaTable<SchemaTable> extends [
+            infer Schema extends string | undefined,
+            infer Table extends string,
+          ]
+        ? TableRef<Table, RemoveQuotes<Alias>, Schema>
+        : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<Alias>, undefined>
+    : ParseSchemaTable<T> extends [
+          infer Schema extends string | undefined,
+          infer Table extends string,
+        ]
+      ? TableRef<Table, Table, Schema>
+      : TableRef<RemoveQuotes<T>, RemoveQuotes<T>, undefined>
 
 /**
  * Parse schema.table syntax
  */
-type ParseSchemaTable<T extends string> = 
-  Trim<T> extends `"${infer Schema}"."${infer Table}"`
-    ? [Schema, Table]
-    : Trim<T> extends `${infer Schema}."${infer Table}"`
-      ? IsSimpleIdentifier<Schema> extends true
-        ? [Schema, Table]
+type ParseSchemaTable<T extends string> = Trim<T> extends `"${infer Schema}"."${infer Table}"`
+  ? [Schema, Table]
+  : Trim<T> extends `${infer Schema}."${infer Table}"`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? [Schema, Table]
+      : [undefined, RemoveQuotes<T>]
+    : Trim<T> extends `"${infer Schema}".${infer Table}`
+      ? IsSimpleIdentifier<Table> extends true
+        ? [Schema, RemoveQuotes<Table>]
         : [undefined, RemoveQuotes<T>]
-      : Trim<T> extends `"${infer Schema}".${infer Table}`
-        ? IsSimpleIdentifier<Table> extends true
-          ? [Schema, RemoveQuotes<Table>]
-          : [undefined, RemoveQuotes<T>]
-        : Trim<T> extends `${infer Schema}.${infer Table}`
-          ? IsSimpleIdentifier<Schema> extends true
-            ? IsSimpleIdentifier<Table> extends true
-              ? [Schema, Table]
-              : [undefined, RemoveQuotes<T>]
+      : Trim<T> extends `${infer Schema}.${infer Table}`
+        ? IsSimpleIdentifier<Schema> extends true
+          ? IsSimpleIdentifier<Table> extends true
+            ? [Schema, Table]
             : [undefined, RemoveQuotes<T>]
           : [undefined, RemoveQuotes<T>]
+        : [undefined, RemoveQuotes<T>]
 

@@ -1,17 +1,12 @@
 /**
  * Type-level SQL DELETE parser
- * 
+ *
  * This module handles parsing of DELETE queries specifically.
  * It uses shared utilities from common/ but maintains its own
  * execution tree for TypeScript performance.
  */
 
-import type {
-  DeleteClause,
-  UsingClause,
-  ReturningClause,
-  SQLDeleteQuery,
-} from "./ast.js"
+import type { DeleteClause, UsingClause, DeleteReturningClause, SQLDeleteQuery } from "./ast.js"
 
 import type {
   TableRef,
@@ -23,13 +18,7 @@ import type {
   WhereExpr,
 } from "../common/ast.js"
 
-import type {
-  NormalizeSQL,
-  NextToken,
-  ExtractUntil,
-  SplitByComma,
-  WhereTerminators,
-} from "../common/tokenizer.js"
+import type { NormalizeSQL, NextToken, ExtractUntil, SplitByComma } from "../common/tokenizer.js"
 
 import type { Trim, ParseError, RemoveQuotes } from "../common/utils.js"
 
@@ -96,27 +85,30 @@ type DeleteTerminators = "USING" | "WHERE" | "RETURNING"
 /**
  * Build the complete DELETE clause by parsing remaining optional parts
  */
-type BuildDeleteClause<
-  Table extends TableRef,
-  Rest extends string
-> = ParseUsing<Rest> extends infer UsingResult
-  ? UsingResult extends { using: infer Using; rest: infer AfterUsing extends string }
-    ? ParseWhere<AfterUsing> extends infer WhereResult
-      ? WhereResult extends { where: infer Where; rest: infer AfterWhere extends string }
-        ? ParseReturning<AfterWhere> extends infer ReturnResult
-          ? ReturnResult extends { returning: infer Returning; rest: infer _AfterReturn extends string }
-            ? SQLDeleteQuery<DeleteClause<
-                Table,
-                Using extends UsingClause ? Using : undefined,
-                Where extends WhereExpr ? Where : undefined,
-                Returning extends ReturningClause ? Returning : undefined
-              >>
+type BuildDeleteClause<Table extends TableRef, Rest extends string> =
+  ParseUsing<Rest> extends infer UsingResult
+    ? UsingResult extends { using: infer Using; rest: infer AfterUsing extends string }
+      ? ParseWhere<AfterUsing> extends infer WhereResult
+        ? WhereResult extends { where: infer Where; rest: infer AfterWhere extends string }
+          ? ParseReturning<AfterWhere> extends infer ReturnResult
+            ? ReturnResult extends {
+                returning: infer Returning
+                rest: infer _AfterReturn extends string
+              }
+              ? SQLDeleteQuery<
+                  DeleteClause<
+                    Table,
+                    Using extends UsingClause ? Using : undefined,
+                    Where extends WhereExpr ? Where : undefined,
+                    Returning extends DeleteReturningClause ? Returning : undefined
+                  >
+                >
+              : never
             : never
           : never
         : never
       : never
     : never
-  : never
 
 // ============================================================================
 // USING Clause Parser
@@ -129,7 +121,10 @@ type ParseUsing<T extends string> = Trim<T> extends ""
   ? { using: undefined; rest: "" }
   : NextToken<T> extends ["USING", infer Rest extends string]
     ? ParseUsingTables<Rest> extends infer Result
-      ? Result extends { tables: infer Tables extends TableSource[]; rest: infer AfterTables extends string }
+      ? Result extends {
+          tables: infer Tables extends TableSource[]
+          rest: infer AfterTables extends string
+        }
         ? { using: UsingClause<Tables>; rest: AfterTables }
         : { using: undefined; rest: T }
       : { using: undefined; rest: T }
@@ -178,10 +173,9 @@ type ParseWhere<T extends string> = Trim<T> extends ""
 /**
  * Scan tokens for column references (simplified - extracts identifiers)
  */
-type ScanTokensForColumnRefs<
-  T extends string,
-  Acc extends ValidatableColumnRef[]
-> = Trim<T> extends ""
+type ScanTokensForColumnRefs<T extends string, Acc extends ValidatableColumnRef[]> = Trim<
+  T
+> extends ""
   ? Acc
   : NextToken<Trim<T>> extends [infer Token extends string, infer Rest extends string]
     ? ExtractColumnFromToken<Token> extends infer ColRef
@@ -195,35 +189,35 @@ type ScanTokensForColumnRefs<
 
 /**
  * Extract the base column from a JSON operator expression (recursively)
- * Handles nested JSON operators: config->'a'->>'b' -> config
- * e.g., config->>'settings' -> config, table.col->'key' -> table.col
  */
-type ExtractBaseColumnFromJsonExpr<T extends string> =
-  T extends `${infer Base}->>${string}`
-    ? ExtractBaseColumnFromJsonExpr<Base>
+type ExtractBaseColumnFromJsonExpr<T extends string> = T extends `${infer Base}->>${string}`
+  ? ExtractBaseColumnFromJsonExpr<Base>
   : T extends `${infer Base}->${string}`
     ? ExtractBaseColumnFromJsonExpr<Base>
-  : T extends `${infer Base}#>>${string}`
-    ? ExtractBaseColumnFromJsonExpr<Base>
-  : T extends `${infer Base}#>${string}`
-    ? ExtractBaseColumnFromJsonExpr<Base>
-  : T
+    : T extends `${infer Base}#>>${string}`
+      ? ExtractBaseColumnFromJsonExpr<Base>
+      : T extends `${infer Base}#>${string}`
+        ? ExtractBaseColumnFromJsonExpr<Base>
+        : T
 
 /**
  * Check if the token contains a JSON operator
  */
-type HasJsonOperator<T extends string> =
-  T extends `${string}->>${string}` ? true :
-  T extends `${string}->${string}` ? true :
-  T extends `${string}#>>${string}` ? true :
-  T extends `${string}#>${string}` ? true :
-  false
+type HasJsonOperator<T extends string> = T extends `${string}->>${string}`
+  ? true
+  : T extends `${string}->${string}`
+    ? true
+    : T extends `${string}#>>${string}`
+      ? true
+      : T extends `${string}#>${string}`
+        ? true
+        : false
 
 /**
  * Try to extract a column reference from a token
  */
 type ExtractColumnFromToken<T extends string> =
-  // Pattern: table.column with JSON operator (e.g., t.col->>'key')
+  // Pattern: table.column with JSON operator
   T extends `${infer Table}.${infer Rest}`
     ? HasJsonOperator<Rest> extends true
       ? IsSimpleIdentifier<Table> extends true
@@ -240,8 +234,8 @@ type ExtractColumnFromToken<T extends string> =
         : never
     : T extends `"${infer Table}"."${infer Col}"`
       ? TableColumnRef<Table, Col, undefined>
-      // Pattern: column with JSON operator (e.g., config->>'key')
-      : HasJsonOperator<T> extends true
+      : // Pattern: column with JSON operator
+        HasJsonOperator<T> extends true
         ? ExtractBaseColumnFromJsonExpr<T> extends infer BaseCol extends string
           ? IsSimpleIdentifier<BaseCol> extends true
             ? IsKeywordOrOperator<BaseCol> extends true
@@ -249,8 +243,8 @@ type ExtractColumnFromToken<T extends string> =
               : UnboundColumnRef<RemoveQuotes<BaseCol>>
             : never
           : never
-        // Simple identifier
-        : IsSimpleIdentifier<T> extends true
+        : // Simple identifier
+          IsSimpleIdentifier<T> extends true
           ? IsKeywordOrOperator<T> extends true
             ? never
             : UnboundColumnRef<RemoveQuotes<T>>
@@ -261,23 +255,51 @@ type ExtractColumnFromToken<T extends string> =
 /**
  * Check if a string is a simple identifier
  */
-type IsSimpleIdentifier<T extends string> = 
-  T extends "" ? false :
-  T extends `${string} ${string}` ? false :
-  T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" | "'" ? false :
-  true
+type IsSimpleIdentifier<T extends string> = T extends ""
+  ? false
+  : T extends `${string} ${string}`
+    ? false
+    : T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" | "'"
+      ? false
+      : true
 
 /**
  * Check if a token is a SQL keyword or operator
  */
-type IsKeywordOrOperator<T extends string> =
-  T extends `'${string}'` ? true :
-  T extends "SELECT" | "FROM" | "WHERE" | "AND" | "OR" | "NOT" | "IN" | "IS" | "NULL"
-    | "TRUE" | "FALSE" | "LIKE" | "ILIKE" | "BETWEEN" | "EXISTS" | "DELETE" | "USING"
-    | "RETURNING" | "=" | "!=" | "<>" | "<" | ">" | "<=" | ">=" ? true :
-  T extends `$${number}` | `$${string}` | `:${string}` ? true :
-  T extends `${number}` ? true :
-  false
+type IsKeywordOrOperator<T extends string> = T extends `'${string}'`
+  ? true
+  : T extends
+        | "SELECT"
+        | "FROM"
+        | "WHERE"
+        | "AND"
+        | "OR"
+        | "NOT"
+        | "IN"
+        | "IS"
+        | "NULL"
+        | "TRUE"
+        | "FALSE"
+        | "LIKE"
+        | "ILIKE"
+        | "BETWEEN"
+        | "EXISTS"
+        | "DELETE"
+        | "USING"
+        | "RETURNING"
+        | "="
+        | "!="
+        | "<>"
+        | "<"
+        | ">"
+        | "<="
+        | ">="
+    ? true
+    : T extends `$${number}` | `$${string}` | `:${string}`
+      ? true
+      : T extends `${number}`
+        ? true
+        : false
 
 // ============================================================================
 // RETURNING Clause Parser
@@ -290,10 +312,13 @@ type ParseReturning<T extends string> = Trim<T> extends ""
   ? { returning: undefined; rest: "" }
   : NextToken<T> extends ["RETURNING", infer Rest extends string]
     ? Trim<Rest> extends "*"
-      ? { returning: ReturningClause<"*">; rest: "" }
+      ? { returning: DeleteReturningClause<"*">; rest: "" }
       : ParseReturningColumns<Rest> extends infer Result
-        ? Result extends { columns: infer Cols extends UnboundColumnRef[]; rest: infer AfterCols extends string }
-          ? { returning: ReturningClause<Cols>; rest: AfterCols }
+        ? Result extends {
+            columns: infer Cols extends UnboundColumnRef[]
+            rest: infer AfterCols extends string
+          }
+          ? { returning: DeleteReturningClause<Cols>; rest: AfterCols }
           : Result
         : never
     : { returning: undefined; rest: T }
@@ -301,10 +326,10 @@ type ParseReturning<T extends string> = Trim<T> extends ""
 /**
  * Parse RETURNING column list
  */
-type ParseReturningColumns<T extends string> = 
-  SplitByComma<Trim<T>> extends infer Parts extends string[]
-    ? { columns: ParseColumnRefs<Parts>; rest: "" }
-    : { columns: []; rest: "" }
+type ParseReturningColumns<T extends string> = SplitByComma<Trim<T>> extends infer Parts extends
+  string[]
+  ? { columns: ParseColumnRefs<Parts>; rest: "" }
+  : { columns: []; rest: "" }
 
 /**
  * Parse column references for RETURNING
@@ -323,43 +348,54 @@ type ParseColumnRefs<T extends string[]> = T extends [
 /**
  * Parse a table reference with optional schema and alias
  */
-type ParseTableRef<T extends string> = 
+type ParseTableRef<T extends string> =
   // Pattern: schema.table AS alias or schema.table alias
   Trim<T> extends `${infer SchemaTable} AS ${infer Alias}`
-    ? ParseSchemaTable<SchemaTable> extends [infer Schema extends string | undefined, infer Table extends string]
+    ? ParseSchemaTable<SchemaTable> extends [
+        infer Schema extends string | undefined,
+        infer Table extends string,
+      ]
       ? TableRef<Table, RemoveQuotes<Alias>, Schema>
       : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<Alias>, undefined>
     : Trim<T> extends `${infer SchemaTable} ${infer Alias}`
       ? Alias extends DeleteTerminators
-        ? ParseSchemaTable<SchemaTable> extends [infer Schema extends string | undefined, infer Table extends string]
+        ? ParseSchemaTable<SchemaTable> extends [
+            infer Schema extends string | undefined,
+            infer Table extends string,
+          ]
           ? TableRef<Table, Table, Schema>
           : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<SchemaTable>, undefined>
-        : ParseSchemaTable<SchemaTable> extends [infer Schema extends string | undefined, infer Table extends string]
+        : ParseSchemaTable<SchemaTable> extends [
+              infer Schema extends string | undefined,
+              infer Table extends string,
+            ]
           ? TableRef<Table, RemoveQuotes<Alias>, Schema>
           : TableRef<RemoveQuotes<SchemaTable>, RemoveQuotes<Alias>, undefined>
-      : ParseSchemaTable<T> extends [infer Schema extends string | undefined, infer Table extends string]
+      : ParseSchemaTable<T> extends [
+            infer Schema extends string | undefined,
+            infer Table extends string,
+          ]
         ? TableRef<Table, Table, Schema>
         : TableRef<RemoveQuotes<T>, RemoveQuotes<T>, undefined>
 
 /**
  * Parse schema.table syntax
  */
-type ParseSchemaTable<T extends string> = 
-  Trim<T> extends `"${infer Schema}"."${infer Table}"`
-    ? [Schema, Table]
-    : Trim<T> extends `${infer Schema}."${infer Table}"`
-      ? IsSimpleIdentifier<Schema> extends true
-        ? [Schema, Table]
+type ParseSchemaTable<T extends string> = Trim<T> extends `"${infer Schema}"."${infer Table}"`
+  ? [Schema, Table]
+  : Trim<T> extends `${infer Schema}."${infer Table}"`
+    ? IsSimpleIdentifier<Schema> extends true
+      ? [Schema, Table]
+      : [undefined, RemoveQuotes<T>]
+    : Trim<T> extends `"${infer Schema}".${infer Table}`
+      ? IsSimpleIdentifier<Table> extends true
+        ? [Schema, RemoveQuotes<Table>]
         : [undefined, RemoveQuotes<T>]
-      : Trim<T> extends `"${infer Schema}".${infer Table}`
-        ? IsSimpleIdentifier<Table> extends true
-          ? [Schema, RemoveQuotes<Table>]
-          : [undefined, RemoveQuotes<T>]
-        : Trim<T> extends `${infer Schema}.${infer Table}`
-          ? IsSimpleIdentifier<Schema> extends true
-            ? IsSimpleIdentifier<Table> extends true
-              ? [Schema, Table]
-              : [undefined, RemoveQuotes<T>]
+      : Trim<T> extends `${infer Schema}.${infer Table}`
+        ? IsSimpleIdentifier<Schema> extends true
+          ? IsSimpleIdentifier<Table> extends true
+            ? [Schema, Table]
             : [undefined, RemoveQuotes<T>]
           : [undefined, RemoveQuotes<T>]
+        : [undefined, RemoveQuotes<T>]
 

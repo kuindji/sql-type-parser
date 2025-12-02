@@ -1,57 +1,63 @@
 /**
- * UPDATE query parser, matcher, and validator
- * 
- * This module provides everything needed to parse, match, and validate UPDATE queries:
- * 
- * Type Extraction (lightweight):
- * - ParseUpdateSQL - parses an UPDATE query string into an AST
- * - MatchUpdateQuery - matches an UPDATE AST against a schema
- * - UpdateResult - convenience type that does both in one step
- * 
- * Validation (comprehensive):
- * - ValidateUpdateSQL - validates an UPDATE query with all checks
+ * UPDATE Query Module
+ *
+ * This module provides type-level parsing, validation, and schema matching
+ * for SQL UPDATE queries.
+ *
+ * @example
+ * ```typescript
+ * import type { ParseUpdateSQL, UpdateResult, ValidateUpdateSQL } from './update'
+ *
+ * // Parse UPDATE query
+ * type AST = ParseUpdateSQL<"UPDATE users SET name = 'John' WHERE id = 1">
+ *
+ * // Get result type (for RETURNING clause)
+ * type Result = UpdateResult<"UPDATE users SET name = 'John' RETURNING *", Schema>
+ *
+ * // Validate query
+ * type Valid = ValidateUpdateSQL<"UPDATE users SET name = 'John'", Schema>
+ * ```
  */
 
-// Re-export parser types
+// ============================================================================
+// Parser Exports
+// ============================================================================
+
 export type { ParseUpdateSQL } from "./parser.js"
 
-// Re-export AST types
-export type {
-  // Query wrapper types
-  SQLUpdateQuery,
+// ============================================================================
+// AST Type Exports
+// ============================================================================
 
-  // Update clause types
+export type {
+  // Query wrapper
+  SQLUpdateQuery,
+  // Main clause
   UpdateClause,
+  // SET clause types
   SetClause,
   SetAssignment,
   SetValue,
+  // FROM clause
   UpdateFromClause,
-
   // RETURNING clause (PostgreSQL 17+ OLD/NEW support)
-  ReturningClause,
-  ReturningQualifier,
+  UpdateReturningClause,
+  ReturningItem,
   QualifiedColumnRef,
   QualifiedWildcard,
-  ReturningItem,
+  ReturningQualifier,
 } from "./ast.js"
 
-// Re-export matcher types (lightweight type extraction)
-export type {
-  // Main matcher
-  MatchUpdateQuery,
+// ============================================================================
+// Matcher Exports
+// ============================================================================
 
-  // Error types
-  MatchError,
+export type { MatchUpdateQuery, UpdateResult, ValidateUpdateResult } from "./matcher.js"
 
-  // Convenience types
-  UpdateResult,
-  ValidateUpdateResult,
-} from "./matcher.js"
+// ============================================================================
+// Validator Exports
+// ============================================================================
 
-// Re-export schema types from common (for backwards compatibility)
-export type { DatabaseSchema } from "../common/schema.js"
-
-// Re-export validator types (comprehensive validation)
 export type {
   ValidateUpdateSQL,
   ValidateUpdateOptions,

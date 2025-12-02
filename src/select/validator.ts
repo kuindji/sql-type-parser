@@ -159,8 +159,8 @@ type ValidateQueryContent<
 > = Content extends UnionClauseAny
   ? ValidateUnionClause<Content, Schema, Options>
   : Content extends SelectClause
-  ? ValidateSelectClause<Content, Schema, Options>
-  : "Invalid query content"
+    ? ValidateSelectClause<Content, Schema, Options>
+    : "Invalid query content"
 
 // ============================================================================
 // Union Clause Validation
@@ -175,12 +175,12 @@ type ValidateUnionClause<
   Options extends ValidateSelectOptions = DefaultValidateOptions,
 > = Union extends UnionClause<infer Left, infer _Op, infer Right>
   ? ValidateSelectClause<Left, Schema, Options> extends true
-  ? Right extends UnionClauseAny
-  ? ValidateUnionClause<Right, Schema, Options>
-  : Right extends SelectClause
-  ? ValidateSelectClause<Right, Schema, Options>
-  : "Invalid right side of union"
-  : ValidateSelectClause<Left, Schema, Options>
+    ? Right extends UnionClauseAny
+      ? ValidateUnionClause<Right, Schema, Options>
+      : Right extends SelectClause
+        ? ValidateSelectClause<Right, Schema, Options>
+        : "Invalid right side of union"
+    : ValidateSelectClause<Left, Schema, Options>
   : "Invalid union clause"
 
 // ============================================================================
@@ -218,16 +218,16 @@ type ValidateSelectClause<
   infer CTEs
 >
   ? BuildValidationContext<From, Joins, CTEs, Schema> extends infer Context
-  ? Context extends MatchError<infer E>
-  ? E
-  : ValidateColumns<Columns, Context, Schema> extends infer ColResult
-  ? ColResult extends true
-  ? Options["validateAllFields"] extends false
-  ? true  // Skip full validation if disabled
-  : ValidateAllClauses<Joins, Where, GroupBy, Having, OrderBy, Context, Schema>
-  : ColResult
-  : "Column validation failed"
-  : "Context building failed"
+    ? Context extends MatchError<infer E>
+      ? E
+      : ValidateColumns<Columns, Context, Schema> extends infer ColResult
+        ? ColResult extends true
+          ? Options["validateAllFields"] extends false
+            ? true  // Skip full validation if disabled
+            : ValidateAllClauses<Joins, Where, GroupBy, Having, OrderBy, Context, Schema>
+          : ColResult
+        : "Column validation failed"
+    : "Context building failed"
   : "Invalid SELECT clause"
 
 /**
@@ -243,20 +243,20 @@ type ValidateAllClauses<
   Schema extends DatabaseSchema,
 > = ValidateJoinConditions<Joins, Context, Schema> extends infer JoinResult
   ? JoinResult extends true
-  ? ValidateWhereClause<Where, Context, Schema> extends infer WhereResult
-  ? WhereResult extends true
-  ? ValidateGroupByClause<GroupBy, Context, Schema> extends infer GroupByResult
-  ? GroupByResult extends true
-  ? ValidateHavingClause<Having, Context, Schema> extends infer HavingResult
-  ? HavingResult extends true
-  ? ValidateOrderByClause<OrderBy, Context, Schema>
-  : HavingResult
-  : "HAVING validation failed"
-  : GroupByResult
-  : "GROUP BY validation failed"
-  : WhereResult
-  : "WHERE validation failed"
-  : JoinResult
+    ? ValidateWhereClause<Where, Context, Schema> extends infer WhereResult
+      ? WhereResult extends true
+        ? ValidateGroupByClause<GroupBy, Context, Schema> extends infer GroupByResult
+          ? GroupByResult extends true
+            ? ValidateHavingClause<Having, Context, Schema> extends infer HavingResult
+              ? HavingResult extends true
+                ? ValidateOrderByClause<OrderBy, Context, Schema>
+                : HavingResult
+              : "HAVING validation failed"
+            : GroupByResult
+          : "GROUP BY validation failed"
+        : WhereResult
+      : "WHERE validation failed"
+    : JoinResult
   : "JOIN validation failed"
 
 /**
@@ -269,8 +269,8 @@ type ValidateWhereClause<
 > = Where extends undefined
   ? true
   : Where extends ParsedCondition<infer ColumnRefs>
-  ? ValidateColumnRefList<ColumnRefs, Context, Schema>
-  : true  // For other WhereExpr types, skip (backwards compatibility)
+    ? ValidateColumnRefList<ColumnRefs, Context, Schema>
+    : true  // For other WhereExpr types, skip (backwards compatibility)
 
 /**
  * Validate HAVING clause column references
@@ -282,8 +282,8 @@ type ValidateHavingClause<
 > = Having extends undefined
   ? true
   : Having extends ParsedCondition<infer ColumnRefs>
-  ? ValidateColumnRefList<ColumnRefs, Context, Schema>
-  : true  // For other WhereExpr types, skip
+    ? ValidateColumnRefList<ColumnRefs, Context, Schema>
+    : true  // For other WhereExpr types, skip
 
 /**
  * Validate GROUP BY clause column references
@@ -295,8 +295,8 @@ type ValidateGroupByClause<
 > = GroupBy extends undefined
   ? true
   : GroupBy extends ColumnRefType[]
-  ? ValidateColumnRefTypeList<GroupBy, Context, Schema>
-  : true
+    ? ValidateColumnRefTypeList<GroupBy, Context, Schema>
+    : true
 
 /**
  * Validate ORDER BY clause column references
@@ -308,8 +308,8 @@ type ValidateOrderByClause<
 > = OrderBy extends undefined
   ? true
   : OrderBy extends OrderByItem[]
-  ? ValidateOrderByItems<OrderBy, Context, Schema>
-  : true
+    ? ValidateOrderByItems<OrderBy, Context, Schema>
+    : true
 
 /**
  * Validate ORDER BY items
@@ -320,14 +320,14 @@ type ValidateOrderByItems<
   Schema extends DatabaseSchema,
 > = Items extends [infer First, ...infer Rest]
   ? First extends OrderByItem<infer Col, infer _Dir>
-  ? ValidateColumnRefType<Col, Context, Schema> extends infer Result
-  ? Result extends true
-  ? Rest extends OrderByItem[]
-  ? ValidateOrderByItems<Rest, Context, Schema>
-  : true
-  : Result
-  : "ORDER BY validation failed"
-  : true
+    ? ValidateColumnRefType<Col, Context, Schema> extends infer Result
+      ? Result extends true
+        ? Rest extends OrderByItem[]
+          ? ValidateOrderByItems<Rest, Context, Schema>
+          : true
+        : Result
+      : "ORDER BY validation failed"
+    : true
   : true
 
 /**
@@ -339,12 +339,12 @@ type ValidateColumnRefTypeList<
   Schema extends DatabaseSchema,
 > = Refs extends [infer First, ...infer Rest]
   ? ValidateColumnRefType<First, Context, Schema> extends infer Result
-  ? Result extends true
-  ? Rest extends ColumnRefType[]
-  ? ValidateColumnRefTypeList<Rest, Context, Schema>
-  : true
-  : Result
-  : "Validation failed"
+    ? Result extends true
+      ? Rest extends ColumnRefType[]
+        ? ValidateColumnRefTypeList<Rest, Context, Schema>
+        : true
+      : Result
+    : "Validation failed"
   : true
 
 /**
@@ -357,10 +357,10 @@ type ValidateColumnRefType<
 > = Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
   ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
   : Ref extends UnboundColumnRef<infer Column>
-  ? ValidateUnboundColumn<Column, Context>
-  : Ref extends ComplexExpr<infer ColumnRefs, infer _CastType>
-  ? ValidateColumnRefList<ColumnRefs, Context, Schema>
-  : true  // TableWildcard and others are valid
+    ? ValidateUnboundColumn<Column, Context>
+    : Ref extends ComplexExpr<infer ColumnRefs, infer _CastType>
+      ? ValidateColumnRefList<ColumnRefs, Context, Schema>
+      : true  // TableWildcard and others are valid
 
 /**
  * Validate JOIN conditions
@@ -372,8 +372,8 @@ type ValidateJoinConditions<
 > = Joins extends undefined
   ? true
   : Joins extends JoinClause[]
-  ? ValidateJoinList<Joins, Context, Schema>
-  : true
+    ? ValidateJoinList<Joins, Context, Schema>
+    : true
 
 /**
  * Validate a list of JOINs
@@ -384,14 +384,14 @@ type ValidateJoinList<
   Schema extends DatabaseSchema,
 > = Joins extends [infer First, ...infer Rest]
   ? First extends JoinClause<infer _Type, infer _Table, infer On>
-  ? ValidateJoinOn<On, Context, Schema> extends infer Result
-  ? Result extends true
-  ? Rest extends JoinClause[]
-  ? ValidateJoinList<Rest, Context, Schema>
-  : true
-  : Result
-  : "JOIN validation failed"
-  : true
+    ? ValidateJoinOn<On, Context, Schema> extends infer Result
+      ? Result extends true
+        ? Rest extends JoinClause[]
+          ? ValidateJoinList<Rest, Context, Schema>
+          : true
+        : Result
+      : "JOIN validation failed"
+    : true
   : true
 
 /**
@@ -404,8 +404,8 @@ type ValidateJoinOn<
 > = On extends undefined
   ? true
   : On extends ParsedCondition<infer ColumnRefs>
-  ? ValidateColumnRefList<ColumnRefs, Context, Schema>
-  : true  // For UnparsedExpr or other types, skip
+    ? ValidateColumnRefList<ColumnRefs, Context, Schema>
+    : true  // For UnparsedExpr or other types, skip
 
 /**
  * Validate a list of ValidatableColumnRef
@@ -416,12 +416,12 @@ type ValidateColumnRefList<
   Schema extends DatabaseSchema,
 > = Refs extends [infer First, ...infer Rest]
   ? ValidateSingleRef<First, Context, Schema> extends infer Result
-  ? Result extends true
-  ? Rest extends ValidatableColumnRef[]
-  ? ValidateColumnRefList<Rest, Context, Schema>
-  : true
-  : Result
-  : "Validation failed"
+    ? Result extends true
+      ? Rest extends ValidatableColumnRef[]
+        ? ValidateColumnRefList<Rest, Context, Schema>
+        : true
+      : Result
+    : "Validation failed"
   : true
 
 // ============================================================================
@@ -438,8 +438,8 @@ type BuildValidationContext<
   Schema extends DatabaseSchema,
 > = BuildCTEContext<CTEs, Schema> extends infer CTEContext
   ? CTEContext extends MatchError<string>
-  ? CTEContext
-  : BuildTableContext<From, Joins, Schema, CTEContext>
+    ? CTEContext
+    : BuildTableContext<From, Joins, Schema, CTEContext>
   : never
 
 /**
@@ -451,14 +451,14 @@ type BuildCTEContext<
   Acc = {}
 > = CTEs extends [infer First, ...infer Rest]
   ? First extends CTEDefinition<infer Name, infer Query>
-  ? ResolveCTEQuery<Query, Schema, Acc> extends infer CTEColumns
-  ? CTEColumns extends MatchError<string>
-  ? CTEColumns
-  : Rest extends CTEDefinition[]
-  ? BuildCTEContext<Rest, Schema, Acc & { [K in Name]: CTEColumns }>
-  : Acc & { [K in Name]: CTEColumns }
-  : never
-  : Acc
+    ? ResolveCTEQuery<Query, Schema, Acc> extends infer CTEColumns
+      ? CTEColumns extends MatchError<string>
+        ? CTEColumns
+        : Rest extends CTEDefinition[]
+          ? BuildCTEContext<Rest, Schema, Acc & { [K in Name]: CTEColumns }>
+          : Acc & { [K in Name]: CTEColumns }
+      : never
+    : Acc
   : Acc
 
 /**
@@ -470,10 +470,10 @@ type ResolveCTEQuery<
   CTEContext
 > = Query extends { columns: infer Columns; from: infer From extends TableSource; joins: infer Joins }
   ? BuildTableContext<From, Joins, Schema, CTEContext> extends infer InnerContext
-  ? InnerContext extends MatchError<string>
-  ? InnerContext
-  : ExtractColumnsAsObject<Columns, InnerContext, Schema>
-  : never
+    ? InnerContext extends MatchError<string>
+      ? InnerContext
+      : ExtractColumnsAsObject<Columns, InnerContext, Schema>
+    : never
   : never
 
 /**
@@ -486,8 +486,8 @@ type ExtractColumnsAsObject<
 > = Columns extends "*"
   ? ExpandAllColumns<Context>
   : Columns extends SelectItem[]
-  ? ExtractColumnListAsObject<Columns, Context, Schema>
-  : {}
+    ? ExtractColumnListAsObject<Columns, Context, Schema>
+    : {}
 
 /**
  * Extract a list of columns as an object type
@@ -498,12 +498,12 @@ type ExtractColumnListAsObject<
   Schema extends DatabaseSchema
 > = Columns extends [infer First, ...infer Rest]
   ? ExtractSingleColumnAsObject<First, Context, Schema> extends infer FirstResult
-  ? Rest extends SelectItem[]
-  ? ExtractColumnListAsObject<Rest, Context, Schema> extends infer RestResult
-  ? Flatten<FirstResult & RestResult>
-  : FirstResult
-  : FirstResult
-  : {}
+    ? Rest extends SelectItem[]
+      ? ExtractColumnListAsObject<Rest, Context, Schema> extends infer RestResult
+        ? Flatten<FirstResult & RestResult>
+        : FirstResult
+      : FirstResult
+    : {}
   : {}
 
 /**
@@ -516,10 +516,10 @@ type ExtractSingleColumnAsObject<
 > = Col extends ColumnRef<infer Ref, infer Alias>
   ? { [K in Alias]: ResolveColumnType<Ref, Context, Schema> }
   : Col extends AggregateExpr<infer _Func, infer _Arg, infer Alias>
-  ? { [K in Alias]: number }
-  : Col extends TableWildcard<infer TableOrAlias, infer WildcardSchema>
-  ? ResolveTableWildcard<TableOrAlias, WildcardSchema, Context, Schema>
-  : {}
+    ? { [K in Alias]: number }
+    : Col extends TableWildcard<infer TableOrAlias, infer WildcardSchema>
+      ? ResolveTableWildcard<TableOrAlias, WildcardSchema, Context, Schema>
+      : {}
 
 /**
  * Build table context
@@ -531,10 +531,10 @@ type BuildTableContext<
   CTEContext = {},
 > = ResolveTableSource<From, Schema, CTEContext> extends infer FromContext
   ? FromContext extends MatchError<string>
-  ? FromContext
-  : Joins extends JoinClause[]
-  ? Flatten<MergeJoinContexts<FromContext, Joins, Schema, CTEContext>>
-  : FromContext
+    ? FromContext
+    : Joins extends JoinClause[]
+      ? Flatten<MergeJoinContexts<FromContext, Joins, Schema, CTEContext>>
+      : FromContext
   : never
 
 /**
@@ -547,8 +547,8 @@ type ResolveTableSource<
 > = Source extends DerivedTableRef<infer Query, infer Alias>
   ? ResolveDerivedTable<Query, Alias, Schema, CTEContext>
   : Source extends TableRef<infer Table, infer Alias, infer TableSchema>
-  ? ResolveTableRefOrCTE<Table, Alias, TableSchema, Schema, CTEContext>
-  : MatchError<"Invalid table source">
+    ? ResolveTableRefOrCTE<Table, Alias, TableSchema, Schema, CTEContext>
+    : MatchError<"Invalid table source">
 
 /**
  * Resolve table reference or CTE
@@ -573,19 +573,19 @@ type ResolveTableInSchema<
   Schema extends DatabaseSchema,
 > = TableSchema extends undefined
   ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
-  ? DefaultSchema extends keyof Schema["schemas"]
-  ? Table extends keyof Schema["schemas"][DefaultSchema]
-  ? { [K in Alias]: Schema["schemas"][DefaultSchema][Table] }
-  : MatchError<`Table '${Table}' not found in default schema '${DefaultSchema}'`>
-  : MatchError<`Default schema not found`>
-  : MatchError<`Cannot determine default schema`>
+    ? DefaultSchema extends keyof Schema["schemas"]
+      ? Table extends keyof Schema["schemas"][DefaultSchema]
+        ? { [K in Alias]: Schema["schemas"][DefaultSchema][Table] }
+        : MatchError<`Table '${Table}' not found in default schema '${DefaultSchema}'`>
+      : MatchError<`Default schema not found`>
+    : MatchError<`Cannot determine default schema`>
   : TableSchema extends string
-  ? TableSchema extends keyof Schema["schemas"]
-  ? Table extends keyof Schema["schemas"][TableSchema]
-  ? { [K in Alias]: Schema["schemas"][TableSchema][Table] }
-  : MatchError<`Table '${Table}' not found in schema '${TableSchema}'`>
-  : MatchError<`Schema '${TableSchema}' not found`>
-  : MatchError<`Invalid schema type`>
+    ? TableSchema extends keyof Schema["schemas"]
+      ? Table extends keyof Schema["schemas"][TableSchema]
+        ? { [K in Alias]: Schema["schemas"][TableSchema][Table] }
+        : MatchError<`Table '${Table}' not found in schema '${TableSchema}'`>
+      : MatchError<`Schema '${TableSchema}' not found`>
+    : MatchError<`Invalid schema type`>
 
 /**
  * Resolve a derived table
@@ -597,12 +597,12 @@ type ResolveDerivedTable<
   CTEContext,
 > = Query extends { columns: infer Columns; from: infer From extends TableSource; joins: infer Joins }
   ? BuildTableContext<From, Joins, Schema, CTEContext> extends infer InnerContext
-  ? InnerContext extends MatchError<string>
-  ? InnerContext
-  : ExtractColumnsAsObject<Columns, InnerContext, Schema> extends infer DerivedColumns
-  ? { [K in Alias]: DerivedColumns }
-  : never
-  : never
+    ? InnerContext extends MatchError<string>
+      ? InnerContext
+      : ExtractColumnsAsObject<Columns, InnerContext, Schema> extends infer DerivedColumns
+        ? { [K in Alias]: DerivedColumns }
+        : never
+    : never
   : MatchError<"Invalid derived table query">
 
 /**
@@ -615,14 +615,14 @@ type MergeJoinContexts<
   CTEContext = {},
 > = Joins extends [infer First, ...infer Rest]
   ? First extends JoinClause<infer _Type, infer JoinTable, infer _On>
-  ? ResolveTableSource<JoinTable, Schema, CTEContext> extends infer JoinContext
-  ? JoinContext extends MatchError<string>
-  ? JoinContext
-  : Rest extends JoinClause[]
-  ? MergeJoinContexts<Context & JoinContext, Rest, Schema, CTEContext>
-  : Context & JoinContext
-  : never
-  : Context
+    ? ResolveTableSource<JoinTable, Schema, CTEContext> extends infer JoinContext
+      ? JoinContext extends MatchError<string>
+        ? JoinContext
+        : Rest extends JoinClause[]
+          ? MergeJoinContexts<Context & JoinContext, Rest, Schema, CTEContext>
+          : Context & JoinContext
+      : never
+    : Context
   : Context
 
 /**
@@ -644,15 +644,15 @@ type ResolveTableWildcard<
   Schema extends DatabaseSchema,
 > = WildcardSchema extends undefined
   ? TableOrAlias extends keyof Context
-  ? Context[TableOrAlias]
-  : MatchError<`Table or alias '${TableOrAlias}' not found`>
+    ? Context[TableOrAlias]
+    : MatchError<`Table or alias '${TableOrAlias}' not found`>
   : WildcardSchema extends string
-  ? WildcardSchema extends keyof Schema["schemas"]
-  ? TableOrAlias extends keyof Schema["schemas"][WildcardSchema]
-  ? Schema["schemas"][WildcardSchema][TableOrAlias]
-  : MatchError<`Table '${TableOrAlias}' not found in schema '${WildcardSchema}'`>
-  : MatchError<`Schema '${WildcardSchema}' not found`>
-  : MatchError<`Invalid schema type`>
+    ? WildcardSchema extends keyof Schema["schemas"]
+      ? TableOrAlias extends keyof Schema["schemas"][WildcardSchema]
+        ? Schema["schemas"][WildcardSchema][TableOrAlias]
+        : MatchError<`Table '${TableOrAlias}' not found in schema '${WildcardSchema}'`>
+      : MatchError<`Schema '${WildcardSchema}' not found`>
+    : MatchError<`Invalid schema type`>
 
 /**
  * Resolve column type (simplified for validation - just needs to check existence)
@@ -664,12 +664,12 @@ type ResolveColumnType<
 > = Ref extends SubqueryExpr<infer _Query, infer CastType>
   ? CastType extends string ? MapSQLTypeToTS<CastType> : unknown
   : Ref extends ComplexExpr<infer _ColumnRefs, infer CastType>
-  ? CastType extends string ? MapSQLTypeToTS<CastType> : unknown
-  : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
-  ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
-  : Ref extends UnboundColumnRef<infer Column>
-  ? ResolveUnboundColumn<Column, Context>
-  : unknown
+    ? CastType extends string ? MapSQLTypeToTS<CastType> : unknown
+    : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+      ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
+      : Ref extends UnboundColumnRef<infer Column>
+        ? ResolveUnboundColumn<Column, Context>
+        : unknown
 
 /**
  * Resolve table-qualified column
@@ -682,21 +682,21 @@ type ResolveTableColumn<
   Schema extends DatabaseSchema,
 > = ColSchema extends undefined
   ? TableOrAlias extends keyof Context
-  ? Context[TableOrAlias] extends infer Table
-  ? Column extends keyof Table
-  ? Table[Column]
-  : MatchError<`Column '${Column}' not found in '${TableOrAlias}'`>
-  : never
-  : MatchError<`Table or alias '${TableOrAlias}' not found`>
+    ? Context[TableOrAlias] extends infer Table
+      ? Column extends keyof Table
+        ? Table[Column]
+        : MatchError<`Column '${Column}' not found in '${TableOrAlias}'`>
+      : never
+    : MatchError<`Table or alias '${TableOrAlias}' not found`>
   : ColSchema extends string
-  ? ColSchema extends keyof Schema["schemas"]
-  ? TableOrAlias extends keyof Schema["schemas"][ColSchema]
-  ? Column extends keyof Schema["schemas"][ColSchema][TableOrAlias]
-  ? Schema["schemas"][ColSchema][TableOrAlias][Column]
-  : MatchError<`Column '${Column}' not found in '${ColSchema}.${TableOrAlias}'`>
-  : MatchError<`Table '${TableOrAlias}' not found in schema '${ColSchema}'`>
-  : MatchError<`Schema '${ColSchema}' not found`>
-  : MatchError<`Invalid schema type`>
+    ? ColSchema extends keyof Schema["schemas"]
+      ? TableOrAlias extends keyof Schema["schemas"][ColSchema]
+        ? Column extends keyof Schema["schemas"][ColSchema][TableOrAlias]
+          ? Schema["schemas"][ColSchema][TableOrAlias][Column]
+          : MatchError<`Column '${Column}' not found in '${ColSchema}.${TableOrAlias}'`>
+        : MatchError<`Table '${TableOrAlias}' not found in schema '${ColSchema}'`>
+      : MatchError<`Schema '${ColSchema}' not found`>
+    : MatchError<`Invalid schema type`>
 
 /**
  * Resolve unbound column by searching all tables
@@ -716,12 +716,12 @@ type FindColumnInContext<
 > = [Keys] extends [never]
   ? MatchError<`Column '${Column}' not found in any table`>
   : Keys extends keyof Context
-  ? Context[Keys] extends infer Table
-  ? Column extends keyof Table
-  ? Table[Column]
-  : FindColumnInContext<Column, Context, Exclude<keyof Context, Keys>>
-  : FindColumnInContext<Column, Context, Exclude<keyof Context, Keys>>
-  : MatchError<`Column '${Column}' not found in any table`>
+    ? Context[Keys] extends infer Table
+      ? Column extends keyof Table
+        ? Table[Column]
+        : FindColumnInContext<Column, Context, Exclude<keyof Context, Keys>>
+      : FindColumnInContext<Column, Context, Exclude<keyof Context, Keys>>
+    : MatchError<`Column '${Column}' not found in any table`>
 
 // ============================================================================
 // Column Validation
@@ -737,8 +737,8 @@ type ValidateColumns<
 > = Columns extends "*"
   ? true
   : Columns extends SelectItem[]
-  ? ValidateColumnList<Columns, Context, Schema>
-  : "Invalid columns type"
+    ? ValidateColumnList<Columns, Context, Schema>
+    : "Invalid columns type"
 
 /**
  * Validate a list of columns
@@ -749,12 +749,12 @@ type ValidateColumnList<
   Schema extends DatabaseSchema,
 > = Columns extends [infer First, ...infer Rest]
   ? ValidateSingleColumn<First, Context, Schema> extends infer FirstResult
-  ? FirstResult extends true
-  ? Rest extends SelectItem[]
-  ? ValidateColumnList<Rest, Context, Schema>
-  : true
-  : FirstResult
-  : "Column validation failed"
+    ? FirstResult extends true
+      ? Rest extends SelectItem[]
+        ? ValidateColumnList<Rest, Context, Schema>
+        : true
+      : FirstResult
+    : "Column validation failed"
   : true
 
 /**
@@ -767,10 +767,10 @@ type ValidateSingleColumn<
 > = Col extends ColumnRef<infer Ref, infer _Alias>
   ? ValidateColumnRef<Ref, Context, Schema>
   : Col extends TableWildcard<infer TableOrAlias, infer WildcardSchema>
-  ? ValidateTableWildcard<TableOrAlias, WildcardSchema, Context, Schema>
-  : Col extends AggregateExpr<infer _Func, infer Arg, infer _Alias>
-  ? ValidateAggregateArg<Arg, Context, Schema>
-  : true
+    ? ValidateTableWildcard<TableOrAlias, WildcardSchema, Context, Schema>
+    : Col extends AggregateExpr<infer _Func, infer Arg, infer _Alias>
+      ? ValidateAggregateArg<Arg, Context, Schema>
+      : true
 
 /**
  * Validate a column reference
@@ -782,12 +782,12 @@ type ValidateColumnRef<
 > = Ref extends SubqueryExpr<infer Query, infer _CastType>
   ? ValidateSubquery<Query, Context, Schema>
   : Ref extends ComplexExpr<infer ColumnRefs, infer _CastType>
-  ? ValidateComplexExprRefs<ColumnRefs, Context, Schema>
-  : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
-  ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
-  : Ref extends UnboundColumnRef<infer Column>
-  ? ValidateUnboundColumn<Column, Context>
-  : true
+    ? ValidateComplexExprRefs<ColumnRefs, Context, Schema>
+    : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+      ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
+      : Ref extends UnboundColumnRef<infer Column>
+        ? ValidateUnboundColumn<Column, Context>
+        : true
 
 /**
  * Validate a subquery
@@ -798,10 +798,10 @@ type ValidateSubquery<
   Schema extends DatabaseSchema,
 > = Query extends { columns: infer _Columns; from: infer From extends TableSource; joins: infer Joins }
   ? BuildTableContext<From, Joins, Schema, {}> extends infer InnerContext
-  ? InnerContext extends MatchError<infer E>
-  ? E
-  : true // Subquery structure is valid
-  : true
+    ? InnerContext extends MatchError<infer E>
+      ? E
+      : true // Subquery structure is valid
+    : true
   : true
 
 /**
@@ -814,12 +814,12 @@ type ValidateComplexExprRefs<
 > = ColumnRefs extends []
   ? true
   : ColumnRefs extends [infer First, ...infer Rest]
-  ? ValidateSingleRef<First, Context, Schema> extends infer FirstResult
-  ? FirstResult extends true
-  ? ValidateComplexExprRefs<Rest, Context, Schema>
-  : FirstResult
-  : true
-  : true
+    ? ValidateSingleRef<First, Context, Schema> extends infer FirstResult
+      ? FirstResult extends true
+        ? ValidateComplexExprRefs<Rest, Context, Schema>
+        : FirstResult
+      : true
+    : true
 
 /**
  * Validate a single ref in complex expr
@@ -831,8 +831,8 @@ type ValidateSingleRef<
 > = Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
   ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
   : Ref extends UnboundColumnRef<infer Column>
-  ? ValidateUnboundColumn<Column, Context>
-  : true
+    ? ValidateUnboundColumn<Column, Context>
+    : true
 
 /**
  * Validate a table-qualified column exists
@@ -845,21 +845,21 @@ type ValidateTableColumn<
   Schema extends DatabaseSchema,
 > = ColSchema extends undefined
   ? TableOrAlias extends keyof Context
-  ? Context[TableOrAlias] extends infer Table
-  ? Column extends keyof Table
-  ? true
-  : `Column '${Column}' not found in '${TableOrAlias}'`
-  : never
-  : `Table or alias '${TableOrAlias}' not found`
+    ? Context[TableOrAlias] extends infer Table
+      ? Column extends keyof Table
+        ? true
+        : `Column '${Column}' not found in '${TableOrAlias}'`
+      : never
+    : `Table or alias '${TableOrAlias}' not found`
   : ColSchema extends string
-  ? ColSchema extends keyof Schema["schemas"]
-  ? TableOrAlias extends keyof Schema["schemas"][ColSchema]
-  ? Column extends keyof Schema["schemas"][ColSchema][TableOrAlias]
-  ? true
-  : `Column '${Column}' not found in '${ColSchema}.${TableOrAlias}'`
-  : `Table '${TableOrAlias}' not found in schema '${ColSchema}'`
-  : `Schema '${ColSchema}' not found`
-  : `Invalid schema type`
+    ? ColSchema extends keyof Schema["schemas"]
+      ? TableOrAlias extends keyof Schema["schemas"][ColSchema]
+        ? Column extends keyof Schema["schemas"][ColSchema][TableOrAlias]
+          ? true
+          : `Column '${Column}' not found in '${ColSchema}.${TableOrAlias}'`
+        : `Table '${TableOrAlias}' not found in schema '${ColSchema}'`
+      : `Schema '${ColSchema}' not found`
+    : `Invalid schema type`
 
 /**
  * Validate an unbound column exists in some table
@@ -879,12 +879,12 @@ type ColumnExistsInContext<
 > = [Keys] extends [never]
   ? `Column '${Column}' not found in any table`
   : Keys extends keyof Context
-  ? Context[Keys] extends infer Table
-  ? Column extends keyof Table
-  ? true
-  : ColumnExistsInContext<Column, Context, Exclude<keyof Context, Keys>>
-  : ColumnExistsInContext<Column, Context, Exclude<keyof Context, Keys>>
-  : `Column '${Column}' not found in any table`
+    ? Context[Keys] extends infer Table
+      ? Column extends keyof Table
+        ? true
+        : ColumnExistsInContext<Column, Context, Exclude<keyof Context, Keys>>
+      : ColumnExistsInContext<Column, Context, Exclude<keyof Context, Keys>>
+    : `Column '${Column}' not found in any table`
 
 /**
  * Validate table wildcard
@@ -896,15 +896,15 @@ type ValidateTableWildcard<
   Schema extends DatabaseSchema,
 > = WildcardSchema extends undefined
   ? TableOrAlias extends keyof Context
-  ? true
-  : `Table or alias '${TableOrAlias}' not found`
+    ? true
+    : `Table or alias '${TableOrAlias}' not found`
   : WildcardSchema extends string
-  ? WildcardSchema extends keyof Schema["schemas"]
-  ? TableOrAlias extends keyof Schema["schemas"][WildcardSchema]
-  ? true
-  : `Table '${TableOrAlias}' not found in schema '${WildcardSchema}'`
-  : `Schema '${WildcardSchema}' not found`
-  : `Invalid schema type`
+    ? WildcardSchema extends keyof Schema["schemas"]
+      ? TableOrAlias extends keyof Schema["schemas"][WildcardSchema]
+        ? true
+        : `Table '${TableOrAlias}' not found in schema '${WildcardSchema}'`
+      : `Schema '${WildcardSchema}' not found`
+    : `Invalid schema type`
 
 /**
  * Validate aggregate function argument
@@ -916,10 +916,10 @@ type ValidateAggregateArg<
 > = Arg extends "*"
   ? true
   : Arg extends TableColumnRef<infer Table, infer Column, infer ColSchema>
-  ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
-  : Arg extends UnboundColumnRef<infer Column>
-  ? ValidateUnboundColumn<Column, Context>
-  : true
+    ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
+    : Arg extends UnboundColumnRef<infer Column>
+      ? ValidateUnboundColumn<Column, Context>
+      : true
 
 // ============================================================================
 // Utility Types
@@ -934,22 +934,4 @@ type UnionToIntersection<U> = (
   ? I
   : never
 
-// ============================================================================
-// Future Extension Points
-// ============================================================================
-
-// TODO: Add JOIN condition validation
-// type ValidateJoinConditions<Joins, Context, Schema>
-
-// TODO: Add WHERE clause validation
-// type ValidateWhereClause<Where, Context, Schema>
-
-// TODO: Add GROUP BY validation
-// type ValidateGroupBy<GroupBy, Context, Schema>
-
-// TODO: Add HAVING validation
-// type ValidateHaving<Having, Context, Schema>
-
-// TODO: Add ORDER BY validation
-// type ValidateOrderBy<OrderBy, Context, Schema>
 

@@ -388,13 +388,97 @@ type ParseSimpleColumn<T extends string> =
     // Check for scalar subquery (parenthesized SELECT)
     : IsSubqueryExpression<T> extends true
       ? ParseSubqueryColumn<T>
-      // Check for complex expression (contains JSON operators or parentheses with operators)
-      : IsComplexExpression<T> extends true
-        ? ParseComplexColumn<T>
-        // Simple column with optional alias
-        : T extends `${infer Col} AS ${infer Alias}`
-          ? ColumnRef<ParseColumnRefType<StripTypeCast<Trim<Col>>>, RemoveQuotes<Alias>>
-          : ColumnRef<ParseColumnRefType<StripTypeCast<T>>, ExtractColumnName<StripTypeCast<T>>>
+      // Check for CAST function (must be before general complex expression check)
+      : IsCastExpression<T> extends true
+        ? ParseCastColumn<T>
+        // Check for complex expression (contains JSON operators or parentheses with operators)
+        : IsComplexExpression<T> extends true
+          ? ParseComplexColumn<T>
+          // Simple column with optional alias
+          : T extends `${infer Col} AS ${infer Alias}`
+            ? ColumnRef<ParseColumnRefType<StripTypeCast<Trim<Col>>>, RemoveQuotes<Alias>>
+            : ColumnRef<ParseColumnRefType<StripTypeCast<T>>, ExtractColumnName<StripTypeCast<T>>>
+
+/**
+ * Check if the expression is a CAST function
+ * CAST ( expr AS type ) - note: AS inside CAST is different from column alias AS
+ */
+type IsCastExpression<T extends string> =
+  Trim<T> extends `CAST ( ${string}` ? true :
+  Trim<T> extends `cast ( ${string}` ? true :
+  false
+
+/**
+ * Parse a CAST expression column
+ * Handles: CAST ( expr AS type ) AS alias
+ */
+type ParseCastColumn<T extends string> =
+  // Pattern: CAST ( expr AS type ) AS alias
+  ExtractCastContent<Trim<T>> extends [infer CastExpr extends string, infer CastType extends string, infer Rest extends string]
+    ? Trim<Rest> extends `AS ${infer Alias}`
+      ? ColumnRef<ParseCastExpr<CastExpr, CastType>, RemoveQuotes<Alias>>
+      : ColumnRef<ParseCastExpr<CastExpr, CastType>, ExtractCastAlias<CastExpr>>
+    : ColumnRef<ComplexExpr<[], undefined>, "cast">
+
+/**
+ * Parse the CAST expression into a ComplexExpr with the cast type
+ */
+type ParseCastExpr<Expr extends string, CastType extends string> =
+  ComplexExpr<ExtractAllColumnRefs<Expr>, CastType>
+
+/**
+ * Extract alias from CAST expression (use the expression name or "cast")
+ */
+type ExtractCastAlias<Expr extends string> =
+  Trim<Expr> extends `${infer _}.${infer Col}`
+    ? Col
+    : Trim<Expr> extends ""
+      ? "cast"
+      : Trim<Expr>
+
+/**
+ * Extract content from a CAST expression
+ * Input: "CAST ( expr AS type ) rest" or "cast ( expr AS type ) rest"
+ * Returns: [expr, type, rest]
+ */
+type ExtractCastContent<T extends string> =
+  // Remove CAST keyword (case-insensitive after normalization)
+  Trim<T> extends `CAST ( ${infer Content}`
+    ? ExtractCastParts<Content>
+    : Trim<T> extends `cast ( ${infer Content}`
+      ? ExtractCastParts<Content>
+      : never
+
+/**
+ * Extract expression and type from inside CAST parentheses
+ * Input: "expr AS type ) rest"
+ * Returns: [expr, type, rest]
+ */
+type ExtractCastParts<T extends string> =
+  // Find the AS keyword that separates expr from type
+  T extends `${infer Expr} AS ${infer TypeAndRest}`
+    ? ExtractCastType<TypeAndRest> extends [infer CastType extends string, infer Rest extends string]
+      ? [Trim<Expr>, Trim<CastType>, Trim<Rest>]
+      : never
+    : never
+
+/**
+ * Extract the type and remainder after the closing paren
+ * Input: "text ) AS alias" or "varchar ( 255 ) ) rest"
+ * Returns: [type, rest]
+ */
+type ExtractCastType<T extends string> =
+  // Handle type with precision: varchar ( 255 ) )
+  T extends `${infer Type} ( ${infer Precision} ) ) ${infer Rest}`
+    ? [`${Trim<Type>}(${Trim<Precision>})`, Rest]
+    : T extends `${infer Type} ( ${infer Precision} ) )`
+      ? [`${Trim<Type>}(${Trim<Precision>})`, ""]
+      // Simple type: text )
+      : T extends `${infer Type} ) ${infer Rest}`
+        ? [Trim<Type>, Rest]
+        : T extends `${infer Type} )`
+          ? [Trim<Type>, ""]
+          : never
 
 /**
  * Check if the expression is a scalar subquery (starts with parenthesized SELECT)
@@ -521,6 +605,7 @@ type ExtractAllColumnRefs<T extends string> =
 
 /**
  * Scan tokens one by one looking for column reference patterns
+ * Skips function names (tokens followed by opening parenthesis)
  */
 type ScanTokensForColumnRefs<
   T extends string,
@@ -528,15 +613,34 @@ type ScanTokensForColumnRefs<
 > = Trim<T> extends ""
   ? Acc
   : NextToken<Trim<T>> extends [infer Token extends string, infer Rest extends string]
-    ? ExtractColumnFromToken<Token> extends infer ColRef
-      // Must check [ColRef] extends [never] first because never extends everything
-      ? [ColRef] extends [never]
-        ? ScanTokensForColumnRefs<Rest, Acc>
-        : ColRef extends ValidatableColumnRef
-          ? ScanTokensForColumnRefs<Rest, [...Acc, ColRef]>
-          : ScanTokensForColumnRefs<Rest, Acc>
-      : ScanTokensForColumnRefs<Rest, Acc>
+    // Skip function names: if the next token is "(", this token is a function name, not a column
+    ? IsFunctionName<Token, Rest> extends true
+      ? ScanTokensForColumnRefs<Rest, Acc>
+      : ExtractColumnFromToken<Token> extends infer ColRef
+        // Must check [ColRef] extends [never] first because never extends everything
+        ? [ColRef] extends [never]
+          ? ScanTokensForColumnRefs<Rest, Acc>
+          : ColRef extends ValidatableColumnRef
+            ? ScanTokensForColumnRefs<Rest, [...Acc, ColRef]>
+            : ScanTokensForColumnRefs<Rest, Acc>
+        : ScanTokensForColumnRefs<Rest, Acc>
     : Acc
+
+/**
+ * Check if a token is a function name (followed by opening parenthesis)
+ * A token is a function name if:
+ * 1. It's not a known SQL keyword or operator
+ * 2. The next token is "("
+ */
+type IsFunctionName<Token extends string, Rest extends string> = 
+  // Skip known SQL keywords and operators that aren't function names
+  Token extends "(" | ")" | "," | "AS" | "AND" | "OR" | "NOT" | "IN" | "IS" | "LIKE" | "ILIKE" | "BETWEEN" | "SELECT" | "FROM" | "WHERE" | "JOIN" | "ON" | "ORDER" | "BY" | "GROUP" | "HAVING" | "LIMIT" | "OFFSET"
+    ? false
+    : IsSimpleIdentifier<Token> extends true
+      ? NextToken<Trim<Rest>> extends ["(", string]
+        ? true
+        : false
+      : false
 
 /**
  * Try to extract a column reference from a single token
@@ -597,14 +701,6 @@ type ExtractBaseColumnFromJsonExpr<T extends string> =
 
 /**
  * Extract column name from a potentially parenthesized and/or type-casted expression
- * Handles patterns like:
- *   - ("config"::json) -> config
- *   - (config::json) -> config
- *   - "config"::json -> config
- *   - config::json -> config
- *   - ("config") -> config
- *   - "config" -> config
- *   - config -> config
  */
 type ExtractColumnFromParenExpr<T extends string> =
   // Strip outer parentheses first
@@ -689,7 +785,6 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
             : never
           : never
   // Pattern: column with JSON operator (e.g., config->>'key') - MUST come before ::type pattern
-  // Also handles parenthesized expressions like ("config"::json)->>'key'
   : HasJsonOperator<T> extends true
     ? ExtractBaseColumnFromJsonExpr<T> extends infer BaseCol extends string
       ? IsSimpleIdentifier<BaseCol> extends true
@@ -723,17 +818,20 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
  */
 type IsKeywordOrOperator<T extends string> =
   // String literals (single-quoted values are values, not identifiers)
-  // Note: Double quotes are for identifiers, single quotes are for string values
   T extends `'${string}'`
     ? true
-    // SQL keywords
+    // SQL keywords (including function-specific keywords like FOR, USING)
     : T extends "SELECT" | "FROM" | "WHERE" | "AND" | "OR" | "NOT" | "IN" | "IS" | "NULL"
       | "TRUE" | "FALSE" | "LIKE" | "ILIKE" | "BETWEEN" | "EXISTS" | "CASE" | "WHEN"
       | "THEN" | "ELSE" | "END" | "AS" | "ON" | "JOIN" | "LEFT" | "RIGHT" | "INNER"
       | "OUTER" | "FULL" | "CROSS" | "GROUP" | "BY" | "HAVING" | "ORDER" | "ASC" | "DESC"
       | "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT" | "ALL" | "DISTINCT"
       | "COUNT" | "SUM" | "AVG" | "MIN" | "MAX" | "COALESCE" | "NULLIF" | "CAST"
+      | "FOR" | "USING" | "WITH" | "OVER" | "PARTITION" | "ROWS" | "RANGE" | "PRECEDING" | "FOLLOWING"
       ? true
+      // Lowercase versions of keywords (after normalization some might be lowercased in certain contexts)
+      : T extends "for" | "from" | "using" | "with" | "over" | "partition" | "rows" | "range"
+        ? true
       // Parameter placeholders ($1, $2, etc. or :name)
       : T extends `$${number}` | `$${string}` | `:${string}`
         ? true
@@ -755,12 +853,15 @@ type IsSimpleIdentifier<T extends string> =
   T extends "" ? false :
   T extends `${string} ${string}` ? false :
   T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" | "<" | ">" | "!" ? false :
+  // Exclude string literal parts (tokens that start or end with single quotes)
+  T extends `'${string}` ? false :
+  T extends `${string}'` ? false :
+  // Exclude number literals
+  T extends `${number}` ? false :
   true
 
 /**
  * Extract the final type cast from an expression
- * Looks for ::type at the very end (after all parentheses)
- * e.g., ( expr ) ::text -> "text"
  */
 type ExtractFinalCastType<T extends string> =
   // Match ) ::type AS alias at the end
@@ -798,7 +899,6 @@ type ExtractComplexColumnName<T extends string> =
 
 /**
  * Extract the JSON key from a JSON operator expression for use as alias
- * e.g., config->>'settings' -> settings, data->'items'->>'name' -> name
  */
 type ExtractJsonKeyForAlias<T extends string> =
   // Strip any type cast at the end first
@@ -838,7 +938,6 @@ type ExtractLastJsonKey<T extends string> =
 
 /**
  * Strip PostgreSQL type cast syntax (::type) from a column reference
- * e.g., "id::text" -> "id", "col::varchar(255)" -> "col"
  */
 type StripTypeCast<T extends string> = T extends `${infer Col}::${string}`
   ? Trim<Col>
@@ -855,11 +954,9 @@ type IsTableWildcard<T extends string> = Trim<T> extends `${string}.*`
 
 /**
  * Parse a table.* or schema.table.* wildcard into a TableWildcard type
- * Note: We use [X] extends [never] pattern due to TypeScript 5.9+ behavior
  */
 type ParseTableWildcard<T extends string> = 
   // Check for schema.table.* pattern first
-  // Use [X] extends [never] pattern to properly handle never in TypeScript 5.9+
   [ParseSchemaTableWildcard<Trim<T>>] extends [never]
     ? ParseSimpleTableWildcard<T>
     : ParseSchemaTableWildcard<Trim<T>> extends [infer Schema extends string, infer Table extends string]
@@ -924,7 +1021,6 @@ type ParseSchemaTableWildcard<T extends string> =
 
 /**
  * Extract column name for default alias (removes quotes)
- * For three-part identifiers (schema.table.column), extracts just the column
  */
 type ExtractColumnName<T extends string> = 
   // Check for three-part: schema.table.column
@@ -938,12 +1034,9 @@ type ExtractColumnName<T extends string> =
 
 /**
  * Parse a column reference (schema.table.column, table.column, or just column)
- * Removes quotes from schema, table, and column names
- * Note: We use [X] extends [never] pattern due to TypeScript 5.9+ behavior
  */
 type ParseColumnRefType<T extends string> = 
   // Check for three-part identifier: schema.table.column
-  // Use [X] extends [never] pattern to properly handle never in TypeScript 5.9+
   [ParseThreePartIdentifier<Trim<T>>] extends [never]
     ? ParseTwoOrOnePartIdentifier<T>
     : ParseThreePartIdentifier<Trim<T>> extends [infer Schema extends string, infer Table extends string, infer Col extends string]
@@ -1062,8 +1155,6 @@ type ParseDerivedTableAlias<T extends string> =
 
 /**
  * Parse a table reference with optional schema and alias
- * Handles: schema.table, table, schema.table AS alias, table AS alias
- * Removes quotes from schema, table name, and alias
  */
 type ParseTableRef<T extends string> = Trim<T> extends `${infer SchemaOrTable} AS ${infer Alias}`
   ? ParseSchemaTable<SchemaOrTable> extends [infer Schema extends string | undefined, infer Table extends string]
@@ -1083,7 +1174,6 @@ type ParseTableRef<T extends string> = Trim<T> extends `${infer SchemaOrTable} A
 
 /**
  * Parse schema.table syntax, returns [schema, table] or [undefined, table]
- * Handles: "schema"."table", schema.table, "table", table
  */
 type ParseSchemaTable<T extends string> = 
   // Pattern: "schema"."table"
@@ -1275,7 +1365,6 @@ type ParseJoinList<T extends string, Acc extends JoinClause[]> = IsJoinStart<T> 
 
 /**
  * Parse a single JOIN clause
- * Note: We check [ExtractJoinType<T>] extends [never] first to detect plain JOIN vs INNER/LEFT/etc JOIN
  */
 type ParseSingleJoin<T extends string> =
   [ExtractJoinType<T>] extends [never]
@@ -1284,7 +1373,6 @@ type ParseSingleJoin<T extends string> =
 
 /**
  * Parse a plain JOIN (without INNER/LEFT/etc prefix) - treated as INNER JOIN
- * Extracts column references from ON conditions for validation
  */
 type ParsePlainJoin<T extends string> = 
   NextToken<T> extends ["JOIN", infer AfterJoin extends string]
@@ -1314,10 +1402,8 @@ type ParsePlainJoin<T extends string> =
       : never
     : ParseError<"Invalid JOIN syntax">
 
-
 /**
  * Parse a typed JOIN (INNER/LEFT/RIGHT/FULL/CROSS JOIN)
- * Extracts column references from ON conditions for validation
  */
 type ParseTypedJoin<T extends string, JoinTypeResult> =
   JoinTypeResult extends [infer JType extends JoinType, infer AfterType extends string]
@@ -1396,78 +1482,6 @@ type ParseWhereClause<T extends string> = Trim<T> extends ""
       ? { where: ParsedCondition<ScanTokensForColumnRefs<Trim<WherePart>, []>>; rest: Remaining }
       : { where: ParsedCondition<ScanTokensForColumnRefs<Trim<Rest>, []>>; rest: "" }
     : { where: undefined; rest: T }
-
-
-/**
- * Parse a WHERE expression (handles AND/OR)
- * Simplified version that doesn't recurse deeply
- */
-type ParseWhereExpr<T extends string> = ParseSimpleWhereExpr<Trim<T>>
-
-/**
- * Simplified WHERE expression parser - creates a simple comparison
- * without recursively parsing complex AND/OR trees
- */
-type ParseSimpleWhereExpr<T extends string> = 
-  // Just create a simple binary expression for the first comparison found
-  T extends `${infer Left} = ${infer Right}`
-    ? BinaryExpr<ParseOperand<Left>, "=", ParseOperand<Right>>
-    : BinaryExpr<LiteralValue<true>, "=", LiteralValue<true>>
-
-/**
- * Split by a logical operator (simple version without parenthesis handling)
- */
-type SplitByLogicalOp<T extends string, Op extends string> =
-  T extends `${infer L} ${Op} ${infer R}` ? [Trim<L>, Trim<R>] : never
-
-/**
- * Parse a comparison expression
- */
-type ParseComparison<T extends string> = Trim<T> extends `${infer L} = ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "=", ParseOperand<R>>
-  : Trim<T> extends `${infer L} != ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "!=", ParseOperand<R>>
-  : Trim<T> extends `${infer L} <> ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "<>", ParseOperand<R>>
-  : Trim<T> extends `${infer L} >= ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, ">=", ParseOperand<R>>
-  : Trim<T> extends `${infer L} <= ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "<=", ParseOperand<R>>
-  : Trim<T> extends `${infer L} > ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, ">", ParseOperand<R>>
-  : Trim<T> extends `${infer L} < ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "<", ParseOperand<R>>
-  : Trim<T> extends `${infer L} LIKE ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "LIKE", ParseOperand<R>>
-  : Trim<T> extends `${infer L} ILIKE ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "ILIKE", ParseOperand<R>>
-  : Trim<T> extends `${infer L} IS NOT ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "IS NOT", ParseOperand<R>>
-  : Trim<T> extends `${infer L} IS ${infer R}`
-  ? BinaryExpr<ParseOperand<L>, "IS", ParseOperand<R>>
-  : BinaryExpr<ParseOperand<T>, "=", LiteralValue<true>>
-
-/**
- * Parse an operand (column reference or literal)
- */
-type ParseOperand<T extends string> = Trim<T> extends `'${infer Val}'`
-  ? LiteralValue<Val>
-  : Trim<T> extends `"${infer Val}"`
-  ? LiteralValue<Val>
-  : Trim<T> extends "NULL"
-  ? LiteralValue<null>
-  : Trim<T> extends "TRUE"
-  ? LiteralValue<true>
-  : Trim<T> extends "FALSE"
-  ? LiteralValue<false>
-  : IsNumericString<Trim<T>> extends true
-  ? LiteralValue<Trim<T>>
-  : ParseColumnRefType<Trim<T>>
-
-/**
- * Check if a string looks like a number
- */
-type IsNumericString<T extends string> = T extends `${number}` ? true : false
 
 // ============================================================================
 // GROUP BY Parser
@@ -1573,14 +1587,9 @@ type ParseOrderByItem<T extends string> = Trim<T> extends `${infer Col} DESC`
 
 /**
  * Parse column reference for ORDER BY, handling JSON accessors
- * This extracts the base column from JSON accessor expressions like:
- *   - config->>'settings'
- *   - ("config"::json)->>'key'->>'subkey'
- *   - table.column->>'field'
  */
 type ParseOrderByColumnRef<T extends string> =
   // First try to extract from JSON expression using the token-based extractor
-  // which handles JSON accessors properly
   ExtractColumnFromToken<Trim<T>> extends infer Result extends ValidatableColumnRef
     ? Result
     : ParseColumnRefType<T>  // Fallback to regular parsing for non-JSON columns

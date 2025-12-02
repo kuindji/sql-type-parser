@@ -8,7 +8,6 @@
 
 export type { TokenizerTestsPass } from "./tokenizer.test.js"
 export type { UtilsTestsPass } from "./utils.test.js"
-export type { ParamsTestsPass } from "./params.test.js"
 
 /**
  * All common tests pass if this type is true

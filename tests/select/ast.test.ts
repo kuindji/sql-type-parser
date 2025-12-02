@@ -1,290 +1,220 @@
 /**
  * AST Type Tests
  *
- * Tests for AST type definitions.
+ * Tests for AST type definitions and their structure.
  * If this file compiles without errors, all tests pass.
  */
 
 import type {
-    SQLSelectQuery,
-    SelectClause,
-    SubquerySelectClause,
-    ColumnRef,
-    TableRef,
-    DerivedTableRef,
-    TableColumnRef,
+    // Column references
     UnboundColumnRef,
+    TableColumnRef,
     TableWildcard,
     ComplexExpr,
-    SubqueryExpr,
-    ValidatableColumnRef,
     ColumnRefType,
-    ExtendedColumnRefType,
-    TableSource,
+    ValidatableColumnRef,
+    
+    // Table references
+    TableRef,
+    DerivedTableRef,
     CTEDefinition,
-    JoinClause,
-    JoinType,
-    OrderByItem,
-    SortDirection,
-    AggregateExpr,
-    AggregateFunc,
-    BinaryExpr,
-    LogicalExpr,
-    LogicalExprAny,
-    LiteralValue,
+    TableSource,
+    
+    // Expressions
     ComparisonOp,
     LogicalOp,
+    LiteralValue,
+    BinaryExpr,
+    ParsedCondition,
     WhereExpr,
+    
+    // Joins
+    JoinType,
+    JoinClause,
+    
+    // Order by
+    SortDirection,
+    OrderByItem,
+    
+    // Aggregations
+    AggregateFunc,
+    AggregateExpr,
+    
+    // SELECT-specific
+    SelectClause,
     SelectItem,
-    SelectColumns,
-    UnionClauseAny,
+    ColumnRef,
+    SubqueryExpr,
+    SQLSelectQuery,
+    UnionClause,
+    UnionOperatorType,
 } from "../../src/index.js"
 import type { AssertEqual, AssertExtends, RequireTrue, HasProperty } from "../helpers.js"
 
 // ============================================================================
-// Column Reference Types Tests
+// Column Reference Type Tests
 // ============================================================================
 
 // Test: UnboundColumnRef structure
-type UCR_Structure = UnboundColumnRef<"id">
-type _UCR1 = RequireTrue<AssertEqual<UCR_Structure["type"], "UnboundColumnRef">>
-type _UCR2 = RequireTrue<AssertEqual<UCR_Structure["column"], "id">>
+type UCR = UnboundColumnRef<"id">
+type _UCR1 = RequireTrue<AssertEqual<UCR["type"], "UnboundColumnRef">>
+type _UCR2 = RequireTrue<AssertEqual<UCR["column"], "id">>
 
 // Test: TableColumnRef structure
-type TCR_Structure = TableColumnRef<"users", "id", "public">
-type _TCR1 = RequireTrue<AssertEqual<TCR_Structure["type"], "TableColumnRef">>
-type _TCR2 = RequireTrue<AssertEqual<TCR_Structure["table"], "users">>
-type _TCR3 = RequireTrue<AssertEqual<TCR_Structure["column"], "id">>
-type _TCR4 = RequireTrue<AssertEqual<TCR_Structure["schema"], "public">>
-
-// Test: TableColumnRef without schema
-type TCR_NoSchema = TableColumnRef<"users", "id", undefined>
-type _TCR5 = RequireTrue<AssertEqual<TCR_NoSchema["schema"], undefined>>
+type TCR = TableColumnRef<"users", "id", "public">
+type _TCR1 = RequireTrue<AssertEqual<TCR["type"], "TableColumnRef">>
+type _TCR2 = RequireTrue<AssertEqual<TCR["table"], "users">>
+type _TCR3 = RequireTrue<AssertEqual<TCR["column"], "id">>
+type _TCR4 = RequireTrue<AssertEqual<TCR["schema"], "public">>
 
 // Test: TableWildcard structure
-type TW_Structure = TableWildcard<"u", "public">
-type _TW1 = RequireTrue<AssertEqual<TW_Structure["type"], "TableWildcard">>
-type _TW2 = RequireTrue<AssertEqual<TW_Structure["table"], "u">>
-type _TW3 = RequireTrue<AssertEqual<TW_Structure["schema"], "public">>
+type TW = TableWildcard<"u", "public">
+type _TW1 = RequireTrue<AssertEqual<TW["type"], "TableWildcard">>
+type _TW2 = RequireTrue<AssertEqual<TW["table"], "u">>
+type _TW3 = RequireTrue<AssertEqual<TW["schema"], "public">>
 
 // Test: ComplexExpr structure
-type CE_Structure = ComplexExpr<[UnboundColumnRef<"data">], "text">
-type _CE1 = RequireTrue<AssertEqual<CE_Structure["type"], "ComplexExpr">>
-type _CE2 = RequireTrue<AssertEqual<CE_Structure["castType"], "text">>
-
-// Test: ColumnRef structure
-type CR_Structure = ColumnRef<UnboundColumnRef<"id">, "user_id">
-type _CR1 = RequireTrue<AssertEqual<CR_Structure["type"], "ColumnRef">>
-type _CR2 = RequireTrue<AssertEqual<CR_Structure["alias"], "user_id">>
-
-// Test: ValidatableColumnRef union
-type VCR_Unbound = UnboundColumnRef<"x"> extends ValidatableColumnRef ? true : false
-type _VCR1 = RequireTrue<VCR_Unbound>
-
-type VCR_Table = TableColumnRef<"t", "c", undefined> extends ValidatableColumnRef ? true : false
-type _VCR2 = RequireTrue<VCR_Table>
-
-// Test: ColumnRefType union
-type CRT_Includes = UnboundColumnRef extends ColumnRefType ? true : false
-type _CRT1 = RequireTrue<CRT_Includes>
-
-type CRT_Includes2 = TableColumnRef extends ColumnRefType ? true : false
-type _CRT2 = RequireTrue<CRT_Includes2>
-
-type CRT_Includes3 = TableWildcard extends ColumnRefType ? true : false
-type _CRT3 = RequireTrue<CRT_Includes3>
-
-type CRT_Includes4 = ComplexExpr extends ColumnRefType ? true : false
-type _CRT4 = RequireTrue<CRT_Includes4>
-
-// Test: ExtendedColumnRefType includes SubqueryExpr
-type ECRT_Includes = SubqueryExpr extends ExtendedColumnRefType ? true : false
-type _ECRT1 = RequireTrue<ECRT_Includes>
+type CE = ComplexExpr<[UnboundColumnRef<"data">], "text">
+type _CE1 = RequireTrue<AssertEqual<CE["type"], "ComplexExpr">>
+type _CE2 = RequireTrue<AssertExtends<CE["columnRefs"], ValidatableColumnRef[]>>
+type _CE3 = RequireTrue<AssertEqual<CE["castType"], "text">>
 
 // ============================================================================
-// Table Reference Types Tests
+// Table Reference Type Tests
 // ============================================================================
 
 // Test: TableRef structure
-type TR_Structure = TableRef<"users", "u", "public">
-type _TR1 = RequireTrue<AssertEqual<TR_Structure["type"], "TableRef">>
-type _TR2 = RequireTrue<AssertEqual<TR_Structure["table"], "users">>
-type _TR3 = RequireTrue<AssertEqual<TR_Structure["alias"], "u">>
-type _TR4 = RequireTrue<AssertEqual<TR_Structure["schema"], "public">>
-
-// Test: DerivedTableRef structure
-type DTR_Check = DerivedTableRef extends { type: "DerivedTableRef"; alias: string } ? true : false
-type _DTR1 = RequireTrue<DTR_Check>
-
-// Test: CTEDefinition structure
-type CTE_Check = CTEDefinition extends { type: "CTEDefinition"; name: string } ? true : false
-type _CTE1 = RequireTrue<CTE_Check>
+type TR = TableRef<"users", "u", "public">
+type _TR1 = RequireTrue<AssertEqual<TR["type"], "TableRef">>
+type _TR2 = RequireTrue<AssertEqual<TR["table"], "users">>
+type _TR3 = RequireTrue<AssertEqual<TR["alias"], "u">>
+type _TR4 = RequireTrue<AssertEqual<TR["schema"], "public">>
 
 // Test: TableSource union
-type TS_TableRef = TableRef extends TableSource ? true : false
-type _TS1 = RequireTrue<TS_TableRef>
-
-type TS_Derived = DerivedTableRef extends TableSource ? true : false
-type _TS2 = RequireTrue<TS_Derived>
+type _TS1 = RequireTrue<AssertExtends<TableRef, TableSource>>
+type _TS2 = RequireTrue<AssertExtends<DerivedTableRef, TableSource>>
 
 // ============================================================================
-// Expression Types Tests
+// Expression Type Tests
 // ============================================================================
 
-// Test: ComparisonOp includes expected operators
-type CO_Eq = "=" extends ComparisonOp ? true : false
-type _CO1 = RequireTrue<CO_Eq>
-
-type CO_Ne = "!=" extends ComparisonOp ? true : false
-type _CO2 = RequireTrue<CO_Ne>
-
-type CO_Lt = "<" extends ComparisonOp ? true : false
-type _CO3 = RequireTrue<CO_Lt>
-
-type CO_Like = "LIKE" extends ComparisonOp ? true : false
-type _CO4 = RequireTrue<CO_Like>
-
-type CO_In = "IN" extends ComparisonOp ? true : false
-type _CO5 = RequireTrue<CO_In>
-
-type CO_Is = "IS" extends ComparisonOp ? true : false
-type _CO6 = RequireTrue<CO_Is>
-
-// Test: LogicalOp
-type LO_And = "AND" extends LogicalOp ? true : false
-type _LO1 = RequireTrue<LO_And>
-
-type LO_Or = "OR" extends LogicalOp ? true : false
-type _LO2 = RequireTrue<LO_Or>
-
-// Test: LiteralValue
-type LV_String = LiteralValue<"hello">
-type _LV1 = RequireTrue<AssertEqual<LV_String["type"], "Literal">>
-type _LV2 = RequireTrue<AssertEqual<LV_String["value"], "hello">>
-
-type LV_Number = LiteralValue<42>
-type _LV3 = RequireTrue<AssertEqual<LV_Number["value"], 42>>
-
-type LV_Bool = LiteralValue<true>
-type _LV4 = RequireTrue<AssertEqual<LV_Bool["value"], true>>
-
-type LV_Null = LiteralValue<null>
-type _LV5 = RequireTrue<AssertEqual<LV_Null["value"], null>>
+// Test: LiteralValue structure
+type LV = LiteralValue<"hello">
+type _LV1 = RequireTrue<AssertEqual<LV["type"], "Literal">>
+type _LV2 = RequireTrue<AssertEqual<LV["value"], "hello">>
 
 // Test: BinaryExpr structure
-type BE_Structure = BinaryExpr<UnboundColumnRef<"id">, "=", LiteralValue<1>>
-type _BE1 = RequireTrue<AssertEqual<BE_Structure["type"], "BinaryExpr">>
-type _BE2 = RequireTrue<AssertEqual<BE_Structure["operator"], "=">>
+type BE = BinaryExpr<UnboundColumnRef<"id">, "=", LiteralValue<1>>
+type _BE1 = RequireTrue<AssertEqual<BE["type"], "BinaryExpr">>
+type _BE2 = RequireTrue<AssertEqual<BE["operator"], "=">>
+
+// Test: ParsedCondition structure
+type PC = ParsedCondition<[UnboundColumnRef<"id">]>
+type _PC1 = RequireTrue<AssertEqual<PC["type"], "ParsedCondition">>
+type _PC2 = RequireTrue<AssertExtends<PC["columnRefs"], ValidatableColumnRef[]>>
 
 // ============================================================================
-// Join Types Tests
+// Comparison Operator Type Tests
 // ============================================================================
 
-// Test: JoinType includes all join types
-type JT_Inner = "INNER" extends JoinType ? true : false
-type _JT1 = RequireTrue<JT_Inner>
+// Test: ComparisonOp includes all expected operators
+type _CO1 = RequireTrue<AssertExtends<"=", ComparisonOp>>
+type _CO2 = RequireTrue<AssertExtends<"!=", ComparisonOp>>
+type _CO3 = RequireTrue<AssertExtends<"<>", ComparisonOp>>
+type _CO4 = RequireTrue<AssertExtends<"<", ComparisonOp>>
+type _CO5 = RequireTrue<AssertExtends<">", ComparisonOp>>
+type _CO6 = RequireTrue<AssertExtends<"<=", ComparisonOp>>
+type _CO7 = RequireTrue<AssertExtends<">=", ComparisonOp>>
+type _CO8 = RequireTrue<AssertExtends<"LIKE", ComparisonOp>>
+type _CO9 = RequireTrue<AssertExtends<"ILIKE", ComparisonOp>>
+type _CO10 = RequireTrue<AssertExtends<"IN", ComparisonOp>>
+type _CO11 = RequireTrue<AssertExtends<"IS", ComparisonOp>>
 
-type JT_Left = "LEFT" extends JoinType ? true : false
-type _JT2 = RequireTrue<JT_Left>
+// ============================================================================
+// Join Type Tests
+// ============================================================================
 
-type JT_Right = "RIGHT" extends JoinType ? true : false
-type _JT3 = RequireTrue<JT_Right>
-
-type JT_Full = "FULL" extends JoinType ? true : false
-type _JT4 = RequireTrue<JT_Full>
-
-type JT_Cross = "CROSS" extends JoinType ? true : false
-type _JT5 = RequireTrue<JT_Cross>
-
-type JT_LeftOuter = "LEFT OUTER" extends JoinType ? true : false
-type _JT6 = RequireTrue<JT_LeftOuter>
+// Test: JoinType includes all expected types
+type _JT1 = RequireTrue<AssertExtends<"INNER", JoinType>>
+type _JT2 = RequireTrue<AssertExtends<"LEFT", JoinType>>
+type _JT3 = RequireTrue<AssertExtends<"RIGHT", JoinType>>
+type _JT4 = RequireTrue<AssertExtends<"FULL", JoinType>>
+type _JT5 = RequireTrue<AssertExtends<"CROSS", JoinType>>
+type _JT6 = RequireTrue<AssertExtends<"LEFT OUTER", JoinType>>
+type _JT7 = RequireTrue<AssertExtends<"RIGHT OUTER", JoinType>>
+type _JT8 = RequireTrue<AssertExtends<"FULL OUTER", JoinType>>
 
 // Test: JoinClause structure
-type JC_Check = JoinClause extends { type: "JoinClause"; joinType: JoinType } ? true : false
-type _JC1 = RequireTrue<JC_Check>
+type JC = JoinClause<"LEFT", TableRef<"orders", "o">, ParsedCondition>
+type _JC1 = RequireTrue<AssertEqual<JC["type"], "JoinClause">>
+type _JC2 = RequireTrue<AssertEqual<JC["joinType"], "LEFT">>
 
 // ============================================================================
-// Order By Types Tests
+// Order By Type Tests
 // ============================================================================
 
 // Test: SortDirection
-type SD_Asc = "ASC" extends SortDirection ? true : false
-type _SD1 = RequireTrue<SD_Asc>
-
-type SD_Desc = "DESC" extends SortDirection ? true : false
-type _SD2 = RequireTrue<SD_Desc>
+type _SD1 = RequireTrue<AssertExtends<"ASC", SortDirection>>
+type _SD2 = RequireTrue<AssertExtends<"DESC", SortDirection>>
 
 // Test: OrderByItem structure
-type OBI_Check = OrderByItem extends { type: "OrderByItem"; direction: SortDirection } ? true : false
-type _OBI1 = RequireTrue<OBI_Check>
+type OBI = OrderByItem<UnboundColumnRef<"name">, "DESC">
+type _OBI1 = RequireTrue<AssertEqual<OBI["type"], "OrderByItem">>
+type _OBI2 = RequireTrue<AssertEqual<OBI["direction"], "DESC">>
 
 // ============================================================================
-// Aggregate Types Tests
+// Aggregate Type Tests
 // ============================================================================
 
-// Test: AggregateFunc includes all functions
-type AF_Count = "COUNT" extends AggregateFunc ? true : false
-type _AF1 = RequireTrue<AF_Count>
-
-type AF_Sum = "SUM" extends AggregateFunc ? true : false
-type _AF2 = RequireTrue<AF_Sum>
-
-type AF_Avg = "AVG" extends AggregateFunc ? true : false
-type _AF3 = RequireTrue<AF_Avg>
-
-type AF_Min = "MIN" extends AggregateFunc ? true : false
-type _AF4 = RequireTrue<AF_Min>
-
-type AF_Max = "MAX" extends AggregateFunc ? true : false
-type _AF5 = RequireTrue<AF_Max>
+// Test: AggregateFunc
+type _AF1 = RequireTrue<AssertExtends<"COUNT", AggregateFunc>>
+type _AF2 = RequireTrue<AssertExtends<"SUM", AggregateFunc>>
+type _AF3 = RequireTrue<AssertExtends<"AVG", AggregateFunc>>
+type _AF4 = RequireTrue<AssertExtends<"MIN", AggregateFunc>>
+type _AF5 = RequireTrue<AssertExtends<"MAX", AggregateFunc>>
 
 // Test: AggregateExpr structure
-type AE_Structure = AggregateExpr<"COUNT", "*", "total">
-type _AE1 = RequireTrue<AssertEqual<AE_Structure["type"], "AggregateExpr">>
-type _AE2 = RequireTrue<AssertEqual<AE_Structure["func"], "COUNT">>
-type _AE3 = RequireTrue<AssertEqual<AE_Structure["argument"], "*">>
-type _AE4 = RequireTrue<AssertEqual<AE_Structure["alias"], "total">>
+type AE = AggregateExpr<"COUNT", "*", "total">
+type _AE1 = RequireTrue<AssertEqual<AE["type"], "AggregateExpr">>
+type _AE2 = RequireTrue<AssertEqual<AE["func"], "COUNT">>
+type _AE3 = RequireTrue<AssertEqual<AE["argument"], "*">>
+type _AE4 = RequireTrue<AssertEqual<AE["alias"], "total">>
 
 // ============================================================================
-// Select Types Tests
+// SELECT-specific Type Tests
 // ============================================================================
+
+// Test: ColumnRef structure
+type CR = ColumnRef<UnboundColumnRef<"id">, "user_id">
+type _CR1 = RequireTrue<AssertEqual<CR["type"], "ColumnRef">>
+type _CR2 = RequireTrue<AssertEqual<CR["alias"], "user_id">>
 
 // Test: SelectItem union
-type SI_ColumnRef = ColumnRef extends SelectItem ? true : false
-type _SI1 = RequireTrue<SI_ColumnRef>
+type _SI1 = RequireTrue<AssertExtends<ColumnRef, SelectItem>>
+type _SI2 = RequireTrue<AssertExtends<AggregateExpr, SelectItem>>
+type _SI3 = RequireTrue<AssertExtends<TableWildcard, SelectItem>>
 
-type SI_Aggregate = AggregateExpr extends SelectItem ? true : false
-type _SI2 = RequireTrue<SI_Aggregate>
-
-type SI_Wildcard = TableWildcard extends SelectItem ? true : false
-type _SI3 = RequireTrue<SI_Wildcard>
-
-// Test: SelectColumns is array
-type SC_Array = SelectColumns extends SelectItem[] ? true : false
-type _SC1 = RequireTrue<SC_Array>
-
-// Test: SelectClause structure
-type SC_Check = SelectClause extends {
-    type: "SelectClause"
-    columns: SelectColumns | "*"
-    from: TableSource
-    distinct: boolean
-}
-    ? true
-    : false
-type _SC2 = RequireTrue<SC_Check>
-
-// Test: SubquerySelectClause has required properties
-type SSC_Check = SubquerySelectClause extends { type: "SelectClause"; distinct: boolean } ? true : false
-type _SSC1 = RequireTrue<SSC_Check>
+// Test: SQLSelectQuery structure
+type SSQ = SQLSelectQuery<SelectClause>
+type _SSQ1 = RequireTrue<AssertEqual<SSQ["type"], "SQLQuery">>
+type _SSQ2 = RequireTrue<AssertEqual<SSQ["queryType"], "SELECT">>
 
 // ============================================================================
-// SQLSelectQuery Tests
+// Union Type Tests
 // ============================================================================
 
-// Test: SQLSelectQuery structure - can contain SelectClause or UnionClauseAny
-type SQ_Check = SQLSelectQuery extends { type: "SQLQuery"; query: SelectClause | UnionClauseAny } ? true : false
-type _SQ1 = RequireTrue<SQ_Check>
+// Test: UnionOperatorType
+type _UO1 = RequireTrue<AssertExtends<"UNION", UnionOperatorType>>
+type _UO2 = RequireTrue<AssertExtends<"UNION ALL", UnionOperatorType>>
+type _UO3 = RequireTrue<AssertExtends<"INTERSECT", UnionOperatorType>>
+type _UO4 = RequireTrue<AssertExtends<"INTERSECT ALL", UnionOperatorType>>
+type _UO5 = RequireTrue<AssertExtends<"EXCEPT", UnionOperatorType>>
+type _UO6 = RequireTrue<AssertExtends<"EXCEPT ALL", UnionOperatorType>>
+
+// Test: UnionClause structure
+type UC = UnionClause<SelectClause, "UNION", SelectClause>
+type _UC1 = RequireTrue<AssertEqual<UC["type"], "UnionClause">>
+type _UC2 = RequireTrue<AssertEqual<UC["operator"], "UNION">>
 
 // ============================================================================
 // Export for verification

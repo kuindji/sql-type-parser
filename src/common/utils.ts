@@ -252,10 +252,6 @@ export type IsMatchError<T> = T extends { readonly __error: true } ? true : fals
  * 
  * When T is a literal like "SELECT * FROM users", this returns true.
  * When T is `string` (the type), this returns false.
- * 
- * Note: Template literal types like `hello ${string}` are still considered literals
- * by this check because they're specific types (not plain `string`). The parser
- * will handle these by parsing the static parts and ignoring the dynamic parts.
  */
 export type IsStringLiteral<T extends string> = string extends T ? false : true
 
@@ -264,14 +260,6 @@ export type IsStringLiteral<T extends string> = string extends T ? false : true
  * 
  * Template literals like `hello ${string}` are NOT plain `string`, but they
  * contain dynamic parts that can't be validated at compile time.
- * 
- * This is more aggressive than IsStringLiteral and is used by validators
- * to skip validation when dynamic parts are present.
- * 
- * Detection strategy:
- * 1. Check for trailing ${string}: can we append characters and still match?
- * 2. Check for leading ${string}: can we prepend characters and still match?
- * 3. Check for internal ${string}: recursively check space-separated segments
  */
 export type HasTemplateHoles<T extends string> = 
   // First check plain string
@@ -288,8 +276,6 @@ export type HasTemplateHoles<T extends string> =
 
 /**
  * Check for internal ${string} holes by testing if different values can fill the same position.
- * For SQL queries, ${string} is typically surrounded by spaces, so we split on spaces
- * and check if any segment can accept multiple values.
  */
 type HasInternalHole<T extends string> =
   // Try matching with space-separated pattern

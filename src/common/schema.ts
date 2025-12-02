@@ -88,9 +88,6 @@ export type SchemaDefinition = {
 /**
  * Expected structure of a database schema with optional relations
  * 
- * Table definitions remain simple column->type mappings.
- * Relations are defined separately and don't affect table structure.
- * 
  * @example
  * ```typescript
  * type MySchema = {
@@ -99,28 +96,6 @@ export type SchemaDefinition = {
  *     public: {
  *       users: { id: number; name: string; email: string }
  *       orders: { id: number; user_id: number; total: number }
- *       products: { id: number; name: string; price: number }
- *       order_items: { order_id: number; product_id: number; quantity: number }
- *     }
- *   },
- *   relations: {
- *     // orders.user_id references users.id
- *     order_user: {
- *       from: { table: "orders", column: "user_id" },
- *       to: { table: "users", column: "id" },
- *       type: "many-to-one"
- *     },
- *     // order_items.order_id references orders.id
- *     order_items_order: {
- *       from: { table: "order_items", column: "order_id" },
- *       to: { table: "orders", column: "id" },
- *       type: "many-to-one"
- *     },
- *     // order_items.product_id references products.id
- *     order_items_product: {
- *       from: { table: "order_items", column: "product_id" },
- *       to: { table: "products", column: "id" },
- *       type: "many-to-one"
  *     }
  *   }
  * }

@@ -1,19 +1,13 @@
 /**
  * AST type definitions specific to SQL DELETE queries
- * 
+ *
  * This module contains AST nodes that are specific to DELETE:
  * - DeleteClause - the main DELETE statement
  * - Using clause for multi-table deletes
  */
 
 import type { Flatten } from "../common/utils.js"
-import type {
-  UnboundColumnRef,
-  TableRef,
-  TableSource,
-  WhereExpr,
-  JoinClause,
-} from "../common/ast.js"
+import type { UnboundColumnRef, TableRef, TableSource, WhereExpr } from "../common/ast.js"
 
 // ============================================================================
 // RETURNING Clause
@@ -23,8 +17,8 @@ import type {
  * RETURNING clause for DELETE
  * Can return *, specific columns, or expressions
  */
-export type ReturningClause<
-  Columns extends "*" | UnboundColumnRef[] = "*" | UnboundColumnRef[]
+export type DeleteReturningClause<
+  Columns extends "*" | UnboundColumnRef[] = "*" | UnboundColumnRef[],
 > = {
   readonly type: "ReturningClause"
   readonly columns: Columns
@@ -54,7 +48,7 @@ export type DeleteClause<
   Table extends TableRef = TableRef,
   Using extends UsingClause | undefined = UsingClause | undefined,
   Where extends WhereExpr | undefined = WhereExpr | undefined,
-  Returning extends ReturningClause | undefined = ReturningClause | undefined
+  Returning extends DeleteReturningClause | undefined = DeleteReturningClause | undefined,
 > = Flatten<{
   readonly type: "DeleteClause"
   readonly table: Table

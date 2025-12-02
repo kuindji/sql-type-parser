@@ -69,6 +69,7 @@ type SQLKeyword =
   | "NOTHING"
   | "CASCADE"
   | "RESTRICT"
+  | "USING"
 
 /**
  * Keywords that terminate the FROM clause

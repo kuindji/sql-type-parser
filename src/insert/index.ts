@@ -1,69 +1,72 @@
 /**
- * INSERT query parser, matcher, and validator
- * 
- * This module provides everything needed to parse, match, and validate INSERT queries:
- * 
- * Type Extraction (lightweight):
- * - ParseInsertSQL - parses an INSERT query string into an AST
- * - MatchInsertQuery - matches an INSERT AST against a schema
- * - InsertResult - convenience type that does both in one step
- * 
- * Validation (comprehensive):
- * - ValidateInsertSQL - validates an INSERT query with all checks
- * 
- * The separation between InsertResult and ValidateInsertSQL allows for:
- * - Fast type extraction without unnecessary deep validation
- * - Comprehensive validation for table/column existence checks
+ * INSERT Query Module
+ *
+ * This module provides type-level parsing, validation, and schema matching
+ * for SQL INSERT queries.
+ *
+ * @example
+ * ```typescript
+ * import type { ParseInsertSQL, InsertResult, ValidateInsertSQL } from './insert'
+ *
+ * // Parse INSERT query
+ * type AST = ParseInsertSQL<"INSERT INTO users (id, name) VALUES (1, 'John')">
+ *
+ * // Get result type (for RETURNING clause)
+ * type Result = InsertResult<"INSERT INTO users (id) VALUES (1) RETURNING *", Schema>
+ *
+ * // Validate query
+ * type Valid = ValidateInsertSQL<"INSERT INTO users (id) VALUES (1)", Schema>
+ * ```
  */
 
-// Re-export parser types
+// ============================================================================
+// Parser Exports
+// ============================================================================
+
 export type { ParseInsertSQL } from "./parser.js"
 
-// Re-export AST types
-export type {
-  // Query wrapper types
-  SQLInsertQuery,
+// ============================================================================
+// AST Type Exports
+// ============================================================================
 
-  // Insert clause types
+export type {
+  // Query wrapper
+  SQLInsertQuery,
+  // Main clause
   InsertClause,
+  // Column types
   InsertColumnList,
   InsertColumnRef,
-
   // Value types
+  InsertValue,
+  InsertValueRow,
   InsertValuesClause,
   InsertSelectClause,
-  InsertValueRow,
-  InsertValue,
   InsertSource,
-
   // RETURNING clause
   ReturningClause,
-
-  // ON CONFLICT clause
+  // ON CONFLICT types
   OnConflictClause,
   ConflictTarget,
   ConflictAction,
   ConflictUpdateSet,
 } from "./ast.js"
 
-// Re-export matcher types (lightweight type extraction)
+// ============================================================================
+// Matcher Exports
+// ============================================================================
+
 export type {
-  // Main matcher
   MatchInsertQuery,
-
-  // Error types
-  MatchError,
-
-  // Convenience types
   InsertResult,
   InsertInput,
   ValidateInsertResult,
 } from "./matcher.js"
 
-// Re-export schema types from common (for backwards compatibility)
-export type { DatabaseSchema } from "../common/schema.js"
+// ============================================================================
+// Validator Exports
+// ============================================================================
 
-// Re-export validator types (comprehensive validation)
 export type {
   ValidateInsertSQL,
   ValidateInsertOptions,

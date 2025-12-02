@@ -23,7 +23,6 @@
 
 import type { DatabaseSchema, QueryResult } from "./select/matcher.js"
 import type { ValidateSelectSQL } from "./select/validator.js"
-import type { MaxParamNumber } from "./params.js"
 
 
 // ============================================================================
@@ -44,8 +43,8 @@ export type ValidQuery<
     Schema extends DatabaseSchema,
 > = ValidateSelectSQL<Q, Schema> extends infer V
     ? V extends true
-      ? Q
-      : `[SQL Error] ${V & string}`
+    ? Q
+    : `[SQL Error] ${V & string}`
     : never
 
 /**
@@ -146,15 +145,3 @@ export type IsValidSelect<
     SQL extends string,
     Schema extends DatabaseSchema,
 > = ValidateSelectSQL<SQL, Schema> extends true ? true : false
-
-/**
- * Check if a query has parameters
- */
-export type HasParameters<SQL extends string> = MaxParamNumber<SQL> extends 0
-    ? false
-    : true
-
-/**
- * Get the expected number of parameters
- */
-export type ExpectedParamCount<SQL extends string> = MaxParamNumber<SQL>

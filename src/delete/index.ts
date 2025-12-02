@@ -1,50 +1,55 @@
 /**
- * DELETE query parser, matcher, and validator
- * 
- * This module provides everything needed to parse, match, and validate DELETE queries:
- * 
- * Type Extraction (lightweight):
- * - ParseDeleteSQL - parses a DELETE query string into an AST
- * - MatchDeleteQuery - matches a DELETE AST against a schema
- * - DeleteResult - convenience type that does both in one step
- * 
- * Validation (comprehensive):
- * - ValidateDeleteSQL - validates a DELETE query with all checks
+ * DELETE Query Module
+ *
+ * This module provides type-level parsing, validation, and schema matching
+ * for SQL DELETE queries.
+ *
+ * @example
+ * ```typescript
+ * import type { ParseDeleteSQL, DeleteResult, ValidateDeleteSQL } from './delete'
+ *
+ * // Parse DELETE query
+ * type AST = ParseDeleteSQL<"DELETE FROM users WHERE id = 1">
+ *
+ * // Get result type (for RETURNING clause)
+ * type Result = DeleteResult<"DELETE FROM users WHERE id = 1 RETURNING *", Schema>
+ *
+ * // Validate query
+ * type Valid = ValidateDeleteSQL<"DELETE FROM users WHERE id = 1", Schema>
+ * ```
  */
 
-// Re-export parser types
+// ============================================================================
+// Parser Exports
+// ============================================================================
+
 export type { ParseDeleteSQL } from "./parser.js"
 
-// Re-export AST types
+// ============================================================================
+// AST Type Exports
+// ============================================================================
+
 export type {
-  // Query wrapper types
+  // Query wrapper
   SQLDeleteQuery,
-
-  // Delete clause types
+  // Main clause
   DeleteClause,
+  // USING clause
   UsingClause,
-
   // RETURNING clause
-  ReturningClause,
+  DeleteReturningClause,
 } from "./ast.js"
 
-// Re-export matcher types (lightweight type extraction)
-export type {
-  // Main matcher
-  MatchDeleteQuery,
+// ============================================================================
+// Matcher Exports
+// ============================================================================
 
-  // Error types
-  MatchError,
+export type { MatchDeleteQuery, DeleteResult, ValidateDeleteResult } from "./matcher.js"
 
-  // Convenience types
-  DeleteResult,
-  ValidateDeleteResult,
-} from "./matcher.js"
+// ============================================================================
+// Validator Exports
+// ============================================================================
 
-// Re-export schema types from common (for backwards compatibility)
-export type { DatabaseSchema } from "../common/schema.js"
-
-// Re-export validator types (comprehensive validation)
 export type {
   ValidateDeleteSQL,
   ValidateDeleteOptions,

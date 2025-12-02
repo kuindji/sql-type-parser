@@ -1,6 +1,6 @@
 /**
  * AST type definitions specific to SQL INSERT queries
- * 
+ *
  * This module contains AST nodes that are specific to INSERT:
  * - InsertClause - the main INSERT statement
  * - InsertColumns - columns to insert into
@@ -23,7 +23,7 @@ import type {
  * A single value in an INSERT VALUES clause
  * Can be a literal, parameter placeholder, DEFAULT, or expression
  */
-export type InsertValue = 
+export type InsertValue =
   | { readonly type: "Literal"; readonly value: string | number | boolean | null }
   | { readonly type: "Default" }
   | { readonly type: "Param"; readonly name: string | number }
@@ -87,7 +87,7 @@ export type InsertColumnList<Columns extends InsertColumnRef[] = InsertColumnRef
  * Can return *, specific columns, or expressions
  */
 export type ReturningClause<
-  Columns extends "*" | UnboundColumnRef[] = "*" | UnboundColumnRef[]
+  Columns extends "*" | UnboundColumnRef[] = "*" | UnboundColumnRef[],
 > = {
   readonly type: "ReturningClause"
   readonly columns: Columns
@@ -102,7 +102,7 @@ export type ReturningClause<
  */
 export type ConflictTarget<
   Columns extends string[] | undefined = string[] | undefined,
-  Constraint extends string | undefined = string | undefined
+  Constraint extends string | undefined = string | undefined,
 > = {
   readonly type: "ConflictTarget"
   readonly columns: Columns
@@ -119,7 +119,7 @@ export type ConflictAction = "DO NOTHING" | "DO UPDATE"
  */
 export type ConflictUpdateSet<
   Column extends string = string,
-  Value extends InsertValue | "EXCLUDED" = InsertValue | "EXCLUDED"
+  Value extends InsertValue | "EXCLUDED" = InsertValue | "EXCLUDED",
 > = {
   readonly type: "ConflictUpdateSet"
   readonly column: Column
@@ -133,7 +133,7 @@ export type OnConflictClause<
   Target extends ConflictTarget | undefined = ConflictTarget | undefined,
   Action extends ConflictAction = ConflictAction,
   Updates extends ConflictUpdateSet[] | undefined = ConflictUpdateSet[] | undefined,
-  Where extends WhereExpr | undefined = WhereExpr | undefined
+  Where extends WhereExpr | undefined = WhereExpr | undefined,
 > = {
   readonly type: "OnConflictClause"
   readonly target: Target
@@ -154,7 +154,7 @@ export type InsertClause<
   Columns extends InsertColumnList | undefined = InsertColumnList | undefined,
   Source extends InsertSource = InsertSource,
   OnConflict extends OnConflictClause | undefined = OnConflictClause | undefined,
-  Returning extends ReturningClause | undefined = ReturningClause | undefined
+  Returning extends ReturningClause | undefined = ReturningClause | undefined,
 > = Flatten<{
   readonly type: "InsertClause"
   readonly table: Table

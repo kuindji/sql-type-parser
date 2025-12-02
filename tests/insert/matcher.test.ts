@@ -1,168 +1,198 @@
 /**
  * INSERT Matcher Type Tests
  *
- * Tests for the InsertResult type and related matching functionality.
+ * Tests for the InsertResult type and schema matching functionality.
  * If this file compiles without errors, all tests pass.
  */
 
 import type {
-    InsertResult,
-    InsertInput,
-    MatchInsertQuery,
-    ParseInsertSQL,
+  InsertResult,
+  InsertInput,
+  MatchInsertQuery,
+  ParseInsertSQL,
+  DatabaseSchema,
 } from "../../src/index.js"
-import type { AssertEqual, AssertExtends, RequireTrue, AssertIsMatchError } from "../helpers.js"
+import type { AssertEqual, RequireTrue, AssertIsMatchError } from "../helpers.js"
 
 // ============================================================================
 // Test Schema
 // ============================================================================
 
 type TestSchema = {
-    defaultSchema: "public"
-    schemas: {
-        public: {
-            users: {
-                id: number
-                name: string
-                email: string
-                active: boolean
-                created_at: string
-            }
-            orders: {
-                id: number
-                user_id: number
-                total: number
-                status: string
-            }
-            products: {
-                id: number
-                name: string
-                price: number
-                quantity: number
-            }
-        }
-        audit: {
-            logs: {
-                id: number
-                user_id: number
-                action: string
-                timestamp: string
-            }
-        }
+  defaultSchema: "public"
+  schemas: {
+    public: {
+      users: {
+        id: number
+        name: string
+        email: string
+        active: boolean
+      }
+      posts: {
+        id: number
+        title: string
+        content: string
+        author_id: number
+      }
     }
+    admin: {
+      settings: {
+        key: string
+        value: string
+      }
+    }
+  }
 }
 
 // ============================================================================
-// InsertResult - No RETURNING (returns void)
+// Basic INSERT Result Tests (without RETURNING)
 // ============================================================================
 
 // Test: INSERT without RETURNING returns void
-type IR_NoReturning = InsertResult<"INSERT INTO users ( id , name ) VALUES ( 1 , 'John' )", TestSchema>
-type _IR1 = RequireTrue<AssertEqual<IR_NoReturning, void>>
+type M_NoReturning = InsertResult<
+  "INSERT INTO users ( id , name , email ) VALUES ( 1 , 'John' , 'john@example.com' )",
+  TestSchema
+>
+type _M1 = RequireTrue<AssertEqual<M_NoReturning, void>>
 
-// Test: INSERT with multiple rows, no RETURNING
-type IR_MultiRowNoReturning = InsertResult<"INSERT INTO users ( id , name ) VALUES ( 1 , 'John' ) , ( 2 , 'Jane' )", TestSchema>
-type _IR2 = RequireTrue<AssertEqual<IR_MultiRowNoReturning, void>>
-
-// ============================================================================
-// InsertResult - RETURNING *
-// ============================================================================
-
-// Test: RETURNING * returns full row type
-type IR_ReturningStar = InsertResult<"INSERT INTO users ( id , name ) VALUES ( 1 , 'John' ) RETURNING *", TestSchema>
-type _IR3 = RequireTrue<AssertEqual<IR_ReturningStar, {
-    id: number
-    name: string
-    email: string
-    active: boolean
-    created_at: string
-}>>
-
-// Test: RETURNING * from schema-qualified table
-type IR_SchemaReturningStar = InsertResult<"INSERT INTO audit.logs ( id , user_id , action ) VALUES ( 1 , 1 , 'login' ) RETURNING *", TestSchema>
-type _IR4 = RequireTrue<AssertEqual<IR_SchemaReturningStar, {
-    id: number
-    user_id: number
-    action: string
-    timestamp: string
-}>>
+// Test: INSERT with multiple rows without RETURNING
+type M_MultiRow = InsertResult<
+  "INSERT INTO users ( id , name ) VALUES ( 1 , 'John' ) , ( 2 , 'Jane' )",
+  TestSchema
+>
+type _M2 = RequireTrue<AssertEqual<M_MultiRow, void>>
 
 // ============================================================================
-// InsertResult - RETURNING specific columns
+// RETURNING * Tests
+// ============================================================================
+
+// Test: RETURNING * returns full table row
+type M_ReturningStar = InsertResult<
+  "INSERT INTO users ( id , name , email , active ) VALUES ( 1 , 'John' , 'john@example.com' , TRUE ) RETURNING *",
+  TestSchema
+>
+type _M3 = RequireTrue<
+  AssertEqual<M_ReturningStar, { id: number; name: string; email: string; active: boolean }>
+>
+
+// Test: RETURNING * from posts table
+type M_ReturningStarPosts = InsertResult<
+  "INSERT INTO posts ( id , title , content , author_id ) VALUES ( 1 , 'Title' , 'Content' , 1 ) RETURNING *",
+  TestSchema
+>
+type _M4 = RequireTrue<
+  AssertEqual<M_ReturningStarPosts, { id: number; title: string; content: string; author_id: number }>
+>
+
+// ============================================================================
+// RETURNING Specific Columns Tests
 // ============================================================================
 
 // Test: RETURNING single column
-type IR_SingleColumn = InsertResult<"INSERT INTO users ( id , name ) VALUES ( 1 , 'John' ) RETURNING id", TestSchema>
-type _IR5 = RequireTrue<AssertEqual<IR_SingleColumn, { id: number }>>
+type M_ReturningSingle = InsertResult<
+  "INSERT INTO users ( id , name ) VALUES ( 1 , 'John' ) RETURNING id",
+  TestSchema
+>
+type _M5 = RequireTrue<AssertEqual<M_ReturningSingle, { id: number }>>
 
 // Test: RETURNING multiple columns
-type IR_MultiColumn = InsertResult<"INSERT INTO users ( id , name , email ) VALUES ( 1 , 'John' , 'john@example.com' ) RETURNING id , name", TestSchema>
-type _IR6 = RequireTrue<AssertEqual<IR_MultiColumn, { id: number; name: string }>>
+type M_ReturningMulti = InsertResult<
+  "INSERT INTO users ( id , name , email ) VALUES ( 1 , 'John' , 'john@example.com' ) RETURNING id , name",
+  TestSchema
+>
+type _M6 = RequireTrue<AssertEqual<M_ReturningMulti, { id: number; name: string }>>
 
 // Test: RETURNING all columns explicitly
-type IR_AllColumnsExplicit = InsertResult<"INSERT INTO users ( id ) VALUES ( 1 ) RETURNING id , name , email , active , created_at", TestSchema>
-type _IR7 = RequireTrue<AssertEqual<IR_AllColumnsExplicit, {
-    id: number
-    name: string
-    email: string
-    active: boolean
-    created_at: string
-}>>
+type M_ReturningAllExplicit = InsertResult<
+  "INSERT INTO users ( id , name , email , active ) VALUES ( 1 , 'John' , 'john@example.com' , TRUE ) RETURNING id , name , email , active",
+  TestSchema
+>
+type _M7 = RequireTrue<
+  AssertEqual<M_ReturningAllExplicit, { id: number; name: string; email: string; active: boolean }>
+>
 
 // ============================================================================
-// InsertResult - Error Cases
+// Schema.Table Tests
 // ============================================================================
 
-// Test: Invalid table returns error
-type IR_InvalidTable = InsertResult<"INSERT INTO nonexistent ( id ) VALUES ( 1 ) RETURNING *", TestSchema>
-type _IR8 = RequireTrue<AssertIsMatchError<IR_InvalidTable>>
+// Test: Schema-qualified table with RETURNING
+type M_SchemaTable = InsertResult<
+  "INSERT INTO admin.settings ( key , value ) VALUES ( 'theme' , 'dark' ) RETURNING *",
+  TestSchema
+>
+type _M8 = RequireTrue<AssertEqual<M_SchemaTable, { key: string; value: string }>>
 
-// Test: Invalid RETURNING column returns error
-type IR_InvalidColumn = InsertResult<"INSERT INTO users ( id ) VALUES ( 1 ) RETURNING invalid_col", TestSchema>
-type _IR9 = RequireTrue<AssertIsMatchError<IR_InvalidColumn>>
-
-// ============================================================================
-// InsertInput - Expected input type
-// ============================================================================
-
-// Test: Input type with explicit column list
-type II_ExplicitCols = InsertInput<"INSERT INTO users ( id , name , email ) VALUES ( 1 , 'John' , 'john@example.com' )", TestSchema>
-type _II1 = RequireTrue<AssertEqual<II_ExplicitCols, { id: number; name: string; email: string }>>
-
-// Test: Input type with single column
-type II_SingleCol = InsertInput<"INSERT INTO users ( id ) VALUES ( 1 )", TestSchema>
-type _II2 = RequireTrue<AssertEqual<II_SingleCol, { id: number }>>
-
-// Test: Input type from schema-qualified table
-type II_SchemaTable = InsertInput<"INSERT INTO audit.logs ( id , user_id ) VALUES ( 1 , 1 )", TestSchema>
-type _II3 = RequireTrue<AssertEqual<II_SchemaTable, { id: number; user_id: number }>>
+// Test: Explicit public schema
+type M_PublicSchema = InsertResult<
+  "INSERT INTO public.users ( id , name ) VALUES ( 1 , 'John' ) RETURNING name",
+  TestSchema
+>
+type _M9 = RequireTrue<AssertEqual<M_PublicSchema, { name: string }>>
 
 // ============================================================================
-// Complex Queries
+// ON CONFLICT with RETURNING Tests
 // ============================================================================
 
-// Test: Full INSERT with ON CONFLICT and RETURNING
-type IR_Full = InsertResult<`
-    INSERT INTO users ( id , name , email )
-    VALUES ( 1 , 'John' , 'john@example.com' )
-    ON CONFLICT ( id ) DO UPDATE SET name = 'Updated'
-    RETURNING id , name , email
-`, TestSchema>
-type _IR10 = RequireTrue<AssertEqual<IR_Full, { id: number; name: string; email: string }>>
+// Test: ON CONFLICT DO NOTHING with RETURNING
+type M_ConflictNothing = InsertResult<
+  "INSERT INTO users ( id , name ) VALUES ( 1 , 'John' ) ON CONFLICT DO NOTHING RETURNING id",
+  TestSchema
+>
+type _M10 = RequireTrue<AssertEqual<M_ConflictNothing, { id: number }>>
 
-// Test: INSERT with ON CONFLICT DO NOTHING and RETURNING *
-type IR_ConflictNothing = InsertResult<`
-    INSERT INTO orders ( id , user_id , total , status )
-    VALUES ( 1 , 1 , 99.99 , 'pending' )
-    ON CONFLICT DO NOTHING
-    RETURNING *
-`, TestSchema>
-type _IR11 = RequireTrue<AssertEqual<IR_ConflictNothing, {
-    id: number
-    user_id: number
-    total: number
-    status: string
-}>>
+// Test: ON CONFLICT DO UPDATE with RETURNING
+type M_ConflictUpdate = InsertResult<
+  "INSERT INTO users ( id , name ) VALUES ( 1 , 'John' ) ON CONFLICT ( id ) DO UPDATE SET name = 'Updated' RETURNING *",
+  TestSchema
+>
+type _M11 = RequireTrue<
+  AssertEqual<M_ConflictUpdate, { id: number; name: string; email: string; active: boolean }>
+>
+
+// ============================================================================
+// InsertInput Tests
+// ============================================================================
+
+// Test: InsertInput with column list
+type I_WithCols = InsertInput<
+  "INSERT INTO users ( id , name ) VALUES ( 1 , 'John' )",
+  TestSchema
+>
+type _I1 = RequireTrue<AssertEqual<I_WithCols, { id: number; name: string }>>
+
+// Test: InsertInput with all columns
+type I_AllCols = InsertInput<
+  "INSERT INTO users ( id , name , email , active ) VALUES ( 1 , 'John' , 'john@example.com' , TRUE )",
+  TestSchema
+>
+type _I2 = RequireTrue<
+  AssertEqual<I_AllCols, { id: number; name: string; email: string; active: boolean }>
+>
+
+// ============================================================================
+// Error Cases Tests
+// ============================================================================
+
+// Test: RETURNING non-existent column
+type M_BadReturningCol = InsertResult<
+  "INSERT INTO users ( id , name ) VALUES ( 1 , 'John' ) RETURNING nonexistent",
+  TestSchema
+>
+type _M12 = RequireTrue<AssertIsMatchError<M_BadReturningCol>>
+
+// Test: Non-existent table
+type M_BadTable = InsertResult<
+  "INSERT INTO nonexistent ( id ) VALUES ( 1 ) RETURNING *",
+  TestSchema
+>
+type _M13 = RequireTrue<AssertIsMatchError<M_BadTable>>
+
+// Test: Non-existent schema
+type M_BadSchema = InsertResult<
+  "INSERT INTO fake.users ( id ) VALUES ( 1 ) RETURNING *",
+  TestSchema
+>
+type _M14 = RequireTrue<AssertIsMatchError<M_BadSchema>>
 
 // ============================================================================
 // Export for verification

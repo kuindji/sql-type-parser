@@ -1,6 +1,6 @@
 /**
  * INSERT Query Validator
- * 
+ *
  * This module provides comprehensive validation for INSERT queries.
  * It validates:
  * - Table existence in schema
@@ -22,12 +22,15 @@ import type {
   ConflictUpdateSet,
 } from "./ast.js"
 
-import type {
-  TableRef,
-  UnboundColumnRef,
-} from "../common/ast.js"
+import type { TableRef, UnboundColumnRef } from "../common/ast.js"
 
-import type { MatchError, IsMatchError, ParseError, IsParseError, HasTemplateHoles } from "../common/utils.js"
+import type {
+  MatchError,
+  IsMatchError,
+  ParseError,
+  IsParseError,
+  HasTemplateHoles,
+} from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseInsertSQL } from "./parser.js"
@@ -52,7 +55,7 @@ export type ValidateInsertOptions = {
    * @default true
    */
   validateValueCount?: boolean
-  
+
   /**
    * Whether to validate RETURNING clause columns
    * @default true
@@ -71,10 +74,10 @@ type DefaultValidateOptions = { validateValueCount: true; validateReturning: tru
 
 /**
  * Validate an INSERT query against a schema
- * 
+ *
  * Returns true if valid, or an error message if invalid.
  * For dynamic queries (non-literal strings), returns true (can't validate at compile time).
- * 
+ *
  * @param SQL - The SQL query string to validate
  * @param Schema - The database schema to validate against
  * @param Options - Validation options (optional, defaults to full validation)
@@ -84,7 +87,7 @@ export type ValidateInsertSQL<
   Schema extends DatabaseSchema,
   Options extends ValidateInsertOptions = DefaultValidateOptions,
 > = HasTemplateHoles<SQL> extends true
-  ? true  // Dynamic queries bypass validation
+  ? true // Dynamic queries bypass validation
   : ParseInsertSQL<SQL> extends infer Parsed
     ? Parsed extends ParseError<infer E>
       ? E
@@ -137,12 +140,10 @@ type ValidateInsertClause<
 /**
  * Validate that the target table exists in the schema
  */
-type ValidateTable<
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
-  ? ResolveTableInSchema<TableName, TableSchema, Schema>
-  : `Invalid table reference`
+type ValidateTable<Table extends TableRef, Schema extends DatabaseSchema> =
+  Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
+    ? ResolveTableInSchema<TableName, TableSchema, Schema>
+    : `Invalid table reference`
 
 /**
  * Resolve a table in the database schema
@@ -179,7 +180,7 @@ type ValidateColumnsExist<
   Columns extends InsertColumnList | undefined,
   Schema extends DatabaseSchema,
 > = Columns extends undefined
-  ? true  // No explicit column list, will be validated with values
+  ? true // No explicit column list, will be validated with values
   : Columns extends InsertColumnList<infer ColList>
     ? ValidateColumnList<ColList, Table, Schema>
     : true
@@ -250,7 +251,7 @@ type ValidateSource<
     ? true
     : ValidateValueRows<Rows, Table, Columns, Schema>
   : Source extends InsertSelectClause
-    ? true  // SELECT validation would need full SELECT validation
+    ? true // SELECT validation would need full SELECT validation
     : true
 
 /**
@@ -286,7 +287,7 @@ type ValidateValueCount<
   ? Values["length"] extends ColList["length"]
     ? true
     : `Value count (${Values["length"]}) does not match column count (${ColList["length"]})`
-  : true  // Without explicit columns, we can't validate count at compile time
+  : true // Without explicit columns, we can't validate count at compile time
 
 // ============================================================================
 // ON CONFLICT Validation
@@ -295,34 +296,33 @@ type ValidateValueCount<
 /**
  * Validate ON CONFLICT clause
  */
-type ValidateOnConflict<
-  OnConflict,
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = OnConflict extends undefined
-  ? true
-  : OnConflict extends OnConflictClause<infer Target, infer _Action, infer Updates, infer _Where>
-    ? ValidateConflictTarget<Target, Table, Schema> extends infer TargetResult
-      ? TargetResult extends true
-        ? ValidateConflictUpdates<Updates, Table, Schema>
-        : TargetResult
-      : "Conflict target validation failed"
-    : true
+type ValidateOnConflict<OnConflict, Table extends TableRef, Schema extends DatabaseSchema> =
+  OnConflict extends undefined
+    ? true
+    : OnConflict extends OnConflictClause<
+          infer Target,
+          infer _Action,
+          infer Updates,
+          infer _Where
+        >
+      ? ValidateConflictTarget<Target, Table, Schema> extends infer TargetResult
+        ? TargetResult extends true
+          ? ValidateConflictUpdates<Updates, Table, Schema>
+          : TargetResult
+        : "Conflict target validation failed"
+      : true
 
 /**
  * Validate conflict target columns exist
  */
-type ValidateConflictTarget<
-  Target,
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = Target extends undefined
-  ? true
-  : Target extends { columns: infer Cols }
-    ? Cols extends string[]
-      ? ValidateStringColumns<Cols, Table, Schema>
+type ValidateConflictTarget<Target, Table extends TableRef, Schema extends DatabaseSchema> =
+  Target extends undefined
+    ? true
+    : Target extends { columns: infer Cols }
+      ? Cols extends string[]
+        ? ValidateStringColumns<Cols, Table, Schema>
+        : true
       : true
-    : true
 
 /**
  * Validate string column names
@@ -342,15 +342,12 @@ type ValidateStringColumns<
 /**
  * Validate conflict update SET clauses
  */
-type ValidateConflictUpdates<
-  Updates,
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = Updates extends undefined
-  ? true
-  : Updates extends ConflictUpdateSet[]
-    ? ValidateUpdateSetList<Updates, Table, Schema>
-    : true
+type ValidateConflictUpdates<Updates, Table extends TableRef, Schema extends DatabaseSchema> =
+  Updates extends undefined
+    ? true
+    : Updates extends ConflictUpdateSet[]
+      ? ValidateUpdateSetList<Updates, Table, Schema>
+      : true
 
 /**
  * Validate list of SET clauses
@@ -422,35 +419,37 @@ type ValidateReturningColumns<
  * Check if an INSERT query is valid
  * Returns true if valid, error message string if invalid
  */
-export type IsValidInsert<
-  SQL extends string,
-  Schema extends DatabaseSchema,
-> = ValidateInsertSQL<SQL, Schema> extends true ? true : false
+export type IsValidInsert<SQL extends string, Schema extends DatabaseSchema> =
+  ValidateInsertSQL<SQL, Schema> extends true ? true : false
 
 /**
  * Get the table columns that would be affected by an INSERT
  * Returns the table's column type definition
  */
-export type GetInsertTableColumns<
-  SQL extends string,
-  Schema extends DatabaseSchema,
-> = ParseInsertSQL<SQL> extends SQLInsertQuery<infer Query>
-  ? Query extends InsertClause<infer Table, infer _Cols, infer _Source, infer _Conflict, infer _Return>
-    ? Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
-      ? TableSchema extends undefined
-        ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
-          ? DefaultSchema extends keyof Schema["schemas"]
-            ? TableName extends keyof Schema["schemas"][DefaultSchema]
-              ? Schema["schemas"][DefaultSchema][TableName]
+export type GetInsertTableColumns<SQL extends string, Schema extends DatabaseSchema> =
+  ParseInsertSQL<SQL> extends SQLInsertQuery<infer Query>
+    ? Query extends InsertClause<
+        infer Table,
+        infer _Cols,
+        infer _Source,
+        infer _Conflict,
+        infer _Return
+      >
+      ? Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
+        ? TableSchema extends undefined
+          ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
+            ? DefaultSchema extends keyof Schema["schemas"]
+              ? TableName extends keyof Schema["schemas"][DefaultSchema]
+                ? Schema["schemas"][DefaultSchema][TableName]
+                : never
               : never
             : never
-          : never
-        : TableSchema extends keyof Schema["schemas"]
-          ? TableName extends keyof Schema["schemas"][TableSchema]
-            ? Schema["schemas"][TableSchema][TableName]
+          : TableSchema extends keyof Schema["schemas"]
+            ? TableName extends keyof Schema["schemas"][TableSchema]
+              ? Schema["schemas"][TableSchema][TableName]
+              : never
             : never
-          : never
+        : never
       : never
     : never
-  : never
 

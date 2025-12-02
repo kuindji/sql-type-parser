@@ -38,8 +38,8 @@ type _P1 = RequireTrue<AssertExtends<P_SelectAll, SQLSelectQuery>>
 // Test: SELECT * has columns: "*"
 type P_SelectAll_Columns = P_SelectAll extends SQLSelectQuery<infer Q>
     ? Q extends { columns: "*" }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P1a = RequireTrue<P_SelectAll_Columns>
 
@@ -51,8 +51,8 @@ type _P2 = RequireTrue<AssertExtends<P_SingleCol, SQLSelectQuery>>
 type P_MultiCol = ParseSQL<"SELECT id, name, email FROM users">
 type P_MultiCol_Columns = P_MultiCol extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [ColumnRef, ColumnRef, ColumnRef] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P3 = RequireTrue<P_MultiCol_Columns>
 
@@ -60,8 +60,8 @@ type _P3 = RequireTrue<P_MultiCol_Columns>
 type P_ColAlias = ParseSQL<"SELECT id AS user_id FROM users">
 type P_ColAlias_Check = P_ColAlias extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [ColumnRef<UnboundColumnRef<"id">, "user_id">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P4 = RequireTrue<P_ColAlias_Check>
 
@@ -69,8 +69,8 @@ type _P4 = RequireTrue<P_ColAlias_Check>
 type P_TableAlias = ParseSQL<"SELECT u.id FROM users AS u">
 type P_TableAlias_Check = P_TableAlias extends SQLSelectQuery<infer Q>
     ? Q extends { from: TableRef<"users", "u", undefined> }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P5 = RequireTrue<P_TableAlias_Check>
 
@@ -78,8 +78,8 @@ type _P5 = RequireTrue<P_TableAlias_Check>
 type P_TableCol = ParseSQL<"SELECT u.id FROM users AS u">
 type P_TableCol_Check = P_TableCol extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [ColumnRef<TableColumnRef<"u", "id", undefined>, "id">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P6 = RequireTrue<P_TableCol_Check>
 
@@ -91,8 +91,8 @@ type _P6 = RequireTrue<P_TableCol_Check>
 type P_Distinct = ParseSQL<"SELECT DISTINCT role FROM users">
 type P_Distinct_Check = P_Distinct extends SQLSelectQuery<infer Q>
     ? Q extends { distinct: true }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P7 = RequireTrue<P_Distinct_Check>
 
@@ -100,8 +100,8 @@ type _P7 = RequireTrue<P_Distinct_Check>
 type P_NoDistinct = ParseSQL<"SELECT role FROM users">
 type P_NoDistinct_Check = P_NoDistinct extends SQLSelectQuery<infer Q>
     ? Q extends { distinct: false }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P8 = RequireTrue<P_NoDistinct_Check>
 
@@ -113,8 +113,8 @@ type _P8 = RequireTrue<P_NoDistinct_Check>
 type P_SimpleTable = ParseSQL<"SELECT * FROM products">
 type P_SimpleTable_Check = P_SimpleTable extends SQLSelectQuery<infer Q>
     ? Q extends { from: TableRef<"products", "products", undefined> }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P9 = RequireTrue<P_SimpleTable_Check>
 
@@ -122,8 +122,8 @@ type _P9 = RequireTrue<P_SimpleTable_Check>
 type P_SchemaTable = ParseSQL<"SELECT * FROM public.users">
 type P_SchemaTable_Check = P_SchemaTable extends SQLSelectQuery<infer Q>
     ? Q extends { from: TableRef<"users", "users", "public"> }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P10 = RequireTrue<P_SchemaTable_Check>
 
@@ -131,8 +131,8 @@ type _P10 = RequireTrue<P_SchemaTable_Check>
 type P_QuotedTable = ParseSQL<'SELECT * FROM "UserAccounts"'>
 type P_QuotedTable_Check = P_QuotedTable extends SQLSelectQuery<infer Q>
     ? Q extends { from: TableRef<"UserAccounts", "UserAccounts", undefined> }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P11 = RequireTrue<P_QuotedTable_Check>
 
@@ -140,8 +140,8 @@ type _P11 = RequireTrue<P_QuotedTable_Check>
 type P_QuotedSchemaTable = ParseSQL<'SELECT * FROM "mySchema"."MyTable"'>
 type P_QuotedSchemaTable_Check = P_QuotedSchemaTable extends SQLSelectQuery<infer Q>
     ? Q extends { from: TableRef<"MyTable", "MyTable", "mySchema"> }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P12 = RequireTrue<P_QuotedSchemaTable_Check>
 
@@ -153,8 +153,8 @@ type _P12 = RequireTrue<P_QuotedSchemaTable_Check>
 type P_InnerJoin = ParseSQL<"SELECT * FROM users INNER JOIN orders ON users.id = orders.user_id">
 type P_InnerJoin_Check = P_InnerJoin extends SQLSelectQuery<infer Q>
     ? Q extends { joins: [JoinClause<"INNER", TableRef, ParsedCondition>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P13 = RequireTrue<P_InnerJoin_Check>
 
@@ -162,8 +162,8 @@ type _P13 = RequireTrue<P_InnerJoin_Check>
 type P_LeftJoin = ParseSQL<"SELECT * FROM users LEFT JOIN orders ON users.id = orders.user_id">
 type P_LeftJoin_Check = P_LeftJoin extends SQLSelectQuery<infer Q>
     ? Q extends { joins: [JoinClause<"LEFT", TableRef, ParsedCondition>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P14 = RequireTrue<P_LeftJoin_Check>
 
@@ -171,8 +171,8 @@ type _P14 = RequireTrue<P_LeftJoin_Check>
 type P_RightJoin = ParseSQL<"SELECT * FROM users RIGHT JOIN orders ON users.id = orders.user_id">
 type P_RightJoin_Check = P_RightJoin extends SQLSelectQuery<infer Q>
     ? Q extends { joins: [JoinClause<"RIGHT", TableRef, ParsedCondition>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P15 = RequireTrue<P_RightJoin_Check>
 
@@ -180,8 +180,8 @@ type _P15 = RequireTrue<P_RightJoin_Check>
 type P_FullJoin = ParseSQL<"SELECT * FROM users FULL OUTER JOIN orders ON users.id = orders.user_id">
 type P_FullJoin_Check = P_FullJoin extends SQLSelectQuery<infer Q>
     ? Q extends { joins: [JoinClause<"FULL OUTER", TableRef, ParsedCondition>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P16 = RequireTrue<P_FullJoin_Check>
 
@@ -189,8 +189,8 @@ type _P16 = RequireTrue<P_FullJoin_Check>
 type P_LeftOuterJoin = ParseSQL<"SELECT * FROM users LEFT OUTER JOIN orders ON users.id = orders.user_id">
 type P_LeftOuterJoin_Check = P_LeftOuterJoin extends SQLSelectQuery<infer Q>
     ? Q extends { joins: [JoinClause<"LEFT OUTER", TableRef, ParsedCondition>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P17 = RequireTrue<P_LeftOuterJoin_Check>
 
@@ -203,8 +203,8 @@ type P_MultiJoin = ParseSQL<`
 `>
 type P_MultiJoin_Check = P_MultiJoin extends SQLSelectQuery<infer Q>
     ? Q extends { joins: [JoinClause, JoinClause] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P18 = RequireTrue<P_MultiJoin_Check>
 
@@ -212,8 +212,8 @@ type _P18 = RequireTrue<P_MultiJoin_Check>
 type P_PlainJoin = ParseSQL<"SELECT * FROM users JOIN orders ON users.id = orders.user_id">
 type P_PlainJoin_Check = P_PlainJoin extends SQLSelectQuery<infer Q>
     ? Q extends { joins: [JoinClause<"INNER", TableRef, ParsedCondition>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P19 = RequireTrue<P_PlainJoin_Check>
 
@@ -225,8 +225,8 @@ type _P19 = RequireTrue<P_PlainJoin_Check>
 type P_Where = ParseSQL<"SELECT * FROM users WHERE id = 1">
 type P_Where_Check = P_Where extends SQLSelectQuery<infer Q>
     ? Q extends { where: object }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P20 = RequireTrue<P_Where_Check>
 
@@ -234,8 +234,8 @@ type _P20 = RequireTrue<P_Where_Check>
 type P_NoWhere = ParseSQL<"SELECT * FROM users">
 type P_NoWhere_Check = P_NoWhere extends SQLSelectQuery<infer Q>
     ? Q extends { where: undefined }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P21 = RequireTrue<P_NoWhere_Check>
 
@@ -247,8 +247,8 @@ type _P21 = RequireTrue<P_NoWhere_Check>
 type P_OrderBy = ParseSQL<"SELECT * FROM users ORDER BY name">
 type P_OrderBy_Check = P_OrderBy extends SQLSelectQuery<infer Q>
     ? Q extends { orderBy: [OrderByItem<any, "ASC">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P22 = RequireTrue<P_OrderBy_Check>
 
@@ -256,8 +256,8 @@ type _P22 = RequireTrue<P_OrderBy_Check>
 type P_OrderByDesc = ParseSQL<"SELECT * FROM users ORDER BY created_at DESC">
 type P_OrderByDesc_Check = P_OrderByDesc extends SQLSelectQuery<infer Q>
     ? Q extends { orderBy: [OrderByItem<any, "DESC">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P23 = RequireTrue<P_OrderByDesc_Check>
 
@@ -265,8 +265,8 @@ type _P23 = RequireTrue<P_OrderByDesc_Check>
 type P_OrderByAsc = ParseSQL<"SELECT * FROM users ORDER BY name ASC">
 type P_OrderByAsc_Check = P_OrderByAsc extends SQLSelectQuery<infer Q>
     ? Q extends { orderBy: [OrderByItem<any, "ASC">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P24 = RequireTrue<P_OrderByAsc_Check>
 
@@ -274,8 +274,8 @@ type _P24 = RequireTrue<P_OrderByAsc_Check>
 type P_MultiOrder = ParseSQL<"SELECT * FROM users ORDER BY role DESC, name ASC">
 type P_MultiOrder_Check = P_MultiOrder extends SQLSelectQuery<infer Q>
     ? Q extends { orderBy: [OrderByItem<any, "DESC">, OrderByItem<any, "ASC">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P25 = RequireTrue<P_MultiOrder_Check>
 
@@ -283,8 +283,8 @@ type _P25 = RequireTrue<P_MultiOrder_Check>
 type P_NoOrderBy = ParseSQL<"SELECT * FROM users">
 type P_NoOrderBy_Check = P_NoOrderBy extends SQLSelectQuery<infer Q>
     ? Q extends { orderBy: undefined }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P26 = RequireTrue<P_NoOrderBy_Check>
 
@@ -296,8 +296,8 @@ type _P26 = RequireTrue<P_NoOrderBy_Check>
 type P_GroupBy = ParseSQL<"SELECT role, COUNT ( * ) FROM users GROUP BY role">
 type P_GroupBy_Check = P_GroupBy extends SQLSelectQuery<infer Q>
     ? Q extends { groupBy: [UnboundColumnRef<"role">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P27 = RequireTrue<P_GroupBy_Check>
 
@@ -305,8 +305,8 @@ type _P27 = RequireTrue<P_GroupBy_Check>
 type P_GroupByMulti = ParseSQL<"SELECT role, status FROM users GROUP BY role, status">
 type P_GroupByMulti_Check = P_GroupByMulti extends SQLSelectQuery<infer Q>
     ? Q extends { groupBy: [UnboundColumnRef<"role">, UnboundColumnRef<"status">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P28 = RequireTrue<P_GroupByMulti_Check>
 
@@ -314,8 +314,8 @@ type _P28 = RequireTrue<P_GroupByMulti_Check>
 type P_NoGroupBy = ParseSQL<"SELECT * FROM users">
 type P_NoGroupBy_Check = P_NoGroupBy extends SQLSelectQuery<infer Q>
     ? Q extends { groupBy: undefined }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P29 = RequireTrue<P_NoGroupBy_Check>
 
@@ -324,11 +324,11 @@ type _P29 = RequireTrue<P_NoGroupBy_Check>
 // ============================================================================
 
 // Test: HAVING clause
-type P_Having = ParseSQL<"SELECT role, COUNT ( * ) FROM users GROUP BY role HAVING COUNT ( * ) > 5">
+type P_Having = ParseSQL<"SELECT ((role)), COUNT ( * ) FROM users GROUP BY role HAVING COUNT ( * ) > 5">
 type P_Having_Check = P_Having extends SQLSelectQuery<infer Q>
     ? Q extends { having: object }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P30 = RequireTrue<P_Having_Check>
 
@@ -336,8 +336,8 @@ type _P30 = RequireTrue<P_Having_Check>
 type P_NoHaving = ParseSQL<"SELECT * FROM users GROUP BY role">
 type P_NoHaving_Check = P_NoHaving extends SQLSelectQuery<infer Q>
     ? Q extends { having: undefined }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P31 = RequireTrue<P_NoHaving_Check>
 
@@ -349,8 +349,8 @@ type _P31 = RequireTrue<P_NoHaving_Check>
 type P_Limit = ParseSQL<"SELECT * FROM users LIMIT 10">
 type P_Limit_Check = P_Limit extends SQLSelectQuery<infer Q>
     ? Q extends { limit: 10 }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P32 = RequireTrue<P_Limit_Check>
 
@@ -358,13 +358,13 @@ type _P32 = RequireTrue<P_Limit_Check>
 type P_LimitOffset = ParseSQL<"SELECT * FROM users LIMIT 10 OFFSET 20">
 type P_LimitOffset_Limit = P_LimitOffset extends SQLSelectQuery<infer Q>
     ? Q extends { limit: 10 }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type P_LimitOffset_Offset = P_LimitOffset extends SQLSelectQuery<infer Q>
     ? Q extends { offset: 20 }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P33 = RequireTrue<P_LimitOffset_Limit>
 type _P34 = RequireTrue<P_LimitOffset_Offset>
@@ -373,13 +373,13 @@ type _P34 = RequireTrue<P_LimitOffset_Offset>
 type P_OnlyOffset = ParseSQL<"SELECT * FROM users OFFSET 5">
 type P_OnlyOffset_Offset = P_OnlyOffset extends SQLSelectQuery<infer Q>
     ? Q extends { offset: 5 }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type P_OnlyOffset_Limit = P_OnlyOffset extends SQLSelectQuery<infer Q>
     ? Q extends { limit: undefined }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P35 = RequireTrue<P_OnlyOffset_Offset>
 type _P36 = RequireTrue<P_OnlyOffset_Limit>
@@ -388,8 +388,8 @@ type _P36 = RequireTrue<P_OnlyOffset_Limit>
 type P_NoLimitOffset = ParseSQL<"SELECT * FROM users">
 type P_NoLimitOffset_Check = P_NoLimitOffset extends SQLSelectQuery<infer Q>
     ? Q extends { limit: undefined; offset: undefined }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P37 = RequireTrue<P_NoLimitOffset_Check>
 
@@ -397,21 +397,30 @@ type _P37 = RequireTrue<P_NoLimitOffset_Check>
 // Aggregate Function Tests
 // ============================================================================
 
-// Test: COUNT(*)
+// Test: COUNT(*) with spaces
 type P_Count = ParseSQL<"SELECT COUNT ( * ) AS total FROM users">
 type P_Count_Check = P_Count extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [AggregateExpr<"COUNT", "*", "total">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P38 = RequireTrue<P_Count_Check>
+
+// Test: COUNT(*) without spaces - tokenizer normalizes parentheses
+type P_CountNoSpaces = ParseSQL<"SELECT COUNT(*) AS total FROM users">
+type P_CountNoSpaces_Check = P_CountNoSpaces extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [AggregateExpr<"COUNT", "*", "total">] }
+    ? true
+    : false
+    : false
+type _P38b = RequireTrue<P_CountNoSpaces_Check>
 
 // Test: SUM
 type P_Sum = ParseSQL<"SELECT SUM ( amount ) AS total FROM orders">
 type P_Sum_Check = P_Sum extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [AggregateExpr<"SUM", any, "total">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P39 = RequireTrue<P_Sum_Check>
 
@@ -419,8 +428,8 @@ type _P39 = RequireTrue<P_Sum_Check>
 type P_Avg = ParseSQL<"SELECT AVG ( price ) AS average FROM products">
 type P_Avg_Check = P_Avg extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [AggregateExpr<"AVG", any, "average">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P40 = RequireTrue<P_Avg_Check>
 
@@ -428,8 +437,8 @@ type _P40 = RequireTrue<P_Avg_Check>
 type P_Min = ParseSQL<"SELECT MIN ( price ) AS lowest FROM products">
 type P_Min_Check = P_Min extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [AggregateExpr<"MIN", any, "lowest">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P41 = RequireTrue<P_Min_Check>
 
@@ -437,8 +446,8 @@ type _P41 = RequireTrue<P_Min_Check>
 type P_Max = ParseSQL<"SELECT MAX ( price ) AS highest FROM products">
 type P_Max_Check = P_Max extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [AggregateExpr<"MAX", any, "highest">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P42 = RequireTrue<P_Max_Check>
 
@@ -446,8 +455,8 @@ type _P42 = RequireTrue<P_Max_Check>
 type P_CountNoAlias = ParseSQL<"SELECT COUNT ( * ) FROM users">
 type P_CountNoAlias_Check = P_CountNoAlias extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [AggregateExpr<"COUNT", "*", "COUNT_result">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P43 = RequireTrue<P_CountNoAlias_Check>
 
@@ -459,8 +468,8 @@ type _P43 = RequireTrue<P_CountNoAlias_Check>
 type P_TableWildcard = ParseSQL<"SELECT u.* FROM users AS u">
 type P_TableWildcard_Check = P_TableWildcard extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [TableWildcard<"u", undefined>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P44 = RequireTrue<P_TableWildcard_Check>
 
@@ -468,8 +477,8 @@ type _P44 = RequireTrue<P_TableWildcard_Check>
 type P_SchemaTableWildcard = ParseSQL<"SELECT public.users.* FROM public.users">
 type P_SchemaTableWildcard_Check = P_SchemaTableWildcard extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [TableWildcard<"users", "public">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P45 = RequireTrue<P_SchemaTableWildcard_Check>
 
@@ -486,8 +495,8 @@ type P_CTE = ParseSQL<`
 `>
 type P_CTE_Check = P_CTE extends SQLSelectQuery<infer Q>
     ? Q extends { ctes: [CTEDefinition<"active_users", SelectClause>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P46 = RequireTrue<P_CTE_Check>
 
@@ -500,8 +509,8 @@ type P_MultiCTE = ParseSQL<`
 `>
 type P_MultiCTE_Check = P_MultiCTE extends SQLSelectQuery<infer Q>
     ? Q extends { ctes: [CTEDefinition<"cte1", SelectClause>, CTEDefinition<"cte2", SelectClause>] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P47 = RequireTrue<P_MultiCTE_Check>
 
@@ -509,8 +518,8 @@ type _P47 = RequireTrue<P_MultiCTE_Check>
 type P_NoCTE = ParseSQL<"SELECT * FROM users">
 type P_NoCTE_Check = P_NoCTE extends SQLSelectQuery<infer Q>
     ? Q extends { ctes: undefined }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P48 = RequireTrue<P_NoCTE_Check>
 
@@ -525,8 +534,8 @@ type P_DerivedTable = ParseSQL<`
 `>
 type P_DerivedTable_Check = P_DerivedTable extends SQLSelectQuery<infer Q>
     ? Q extends { from: DerivedTableRef<SelectClause, "sub"> }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P49 = RequireTrue<P_DerivedTable_Check>
 
@@ -538,8 +547,8 @@ type _P49 = RequireTrue<P_DerivedTable_Check>
 type P_TypeCast = ParseSQL<"SELECT id::text AS id_str FROM users">
 type P_TypeCast_Check = P_TypeCast extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [ColumnRef<any, "id_str">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P50 = RequireTrue<P_TypeCast_Check>
 
@@ -551,8 +560,8 @@ type _P50 = RequireTrue<P_TypeCast_Check>
 type P_JsonOp = ParseSQL<"SELECT data->>'name' AS name FROM documents">
 type P_JsonOp_Check = P_JsonOp extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [ColumnRef<ComplexExpr, "name">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P51 = RequireTrue<P_JsonOp_Check>
 
@@ -571,8 +580,8 @@ type P_ScalarSubquery_Check = P_ScalarSubquery extends SQLSelectQuery<infer Q>
     ? Q extends {
         columns: [ColumnRef, ColumnRef<SubqueryExpr<SelectClause, undefined>, "order_count">]
     }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P52 = RequireTrue<P_ScalarSubquery_Check>
 
@@ -589,8 +598,8 @@ type P_QuotedCol_Check = P_QuotedCol extends SQLSelectQuery<infer Q>
             ColumnRef<UnboundColumnRef<"lastName">, "lastName">,
         ]
     }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P53 = RequireTrue<P_QuotedCol_Check>
 
@@ -601,8 +610,8 @@ type P_QuotedBoth_Check = P_QuotedBoth extends SQLSelectQuery<infer Q>
         from: TableRef<"Users", "u", undefined>
         columns: [ColumnRef<TableColumnRef<"u", "firstName", undefined>, "firstName">]
     }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P54 = RequireTrue<P_QuotedBoth_Check>
 
@@ -614,8 +623,8 @@ type _P54 = RequireTrue<P_QuotedBoth_Check>
 type P_ThreePart = ParseSQL<"SELECT public.users.id FROM public.users">
 type P_ThreePart_Check = P_ThreePart extends SQLSelectQuery<infer Q>
     ? Q extends { columns: [ColumnRef<TableColumnRef<"users", "id", "public">, "id">] }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P55 = RequireTrue<P_ThreePart_Check>
 
@@ -641,8 +650,8 @@ type P_MixedCols_Check = P_MixedCols extends SQLSelectQuery<infer Q>
             AggregateExpr<"MAX", any, "last_post">,
         ]
     }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P56 = RequireTrue<P_MixedCols_Check>
 
@@ -682,8 +691,8 @@ type P_Full_Check = P_Full extends SQLSelectQuery<infer Q>
         offset: 0
         ctes: [CTEDefinition<"recent_orders", SelectClause>]
     }
-        ? true
-        : false
+    ? true
+    : false
     : false
 type _P57 = RequireTrue<P_Full_Check>
 

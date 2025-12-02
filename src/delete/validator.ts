@@ -1,6 +1,6 @@
 /**
  * DELETE Query Validator
- * 
+ *
  * This module provides comprehensive validation for DELETE queries.
  * It validates:
  * - Table existence in schema
@@ -13,7 +13,7 @@ import type {
   SQLDeleteQuery,
   DeleteClause,
   UsingClause,
-  ReturningClause,
+  DeleteReturningClause,
 } from "./ast.js"
 
 import type {
@@ -25,7 +25,13 @@ import type {
   ParsedCondition,
 } from "../common/ast.js"
 
-import type { MatchError, IsMatchError, ParseError, IsParseError, HasTemplateHoles } from "../common/utils.js"
+import type {
+  MatchError,
+  IsMatchError,
+  ParseError,
+  IsParseError,
+  HasTemplateHoles,
+} from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
 import type { ParseDeleteSQL } from "./parser.js"
@@ -50,7 +56,7 @@ export type ValidateDeleteOptions = {
    * @default true
    */
   validateWhere?: boolean
-  
+
   /**
    * Whether to validate RETURNING clause columns
    * @default true
@@ -69,7 +75,7 @@ type DefaultValidateOptions = { validateWhere: true; validateReturning: true }
 
 /**
  * Validate a DELETE query against a schema
- * 
+ *
  * Returns true if valid, or an error message if invalid.
  * For dynamic queries (non-literal strings), returns true (can't validate at compile time).
  */
@@ -78,7 +84,7 @@ export type ValidateDeleteSQL<
   Schema extends DatabaseSchema,
   Options extends ValidateDeleteOptions = DefaultValidateOptions,
 > = HasTemplateHoles<SQL> extends true
-  ? true  // Dynamic queries bypass validation
+  ? true // Dynamic queries bypass validation
   : ParseDeleteSQL<SQL> extends infer Parsed
     ? Parsed extends ParseError<infer E>
       ? E
@@ -98,12 +104,7 @@ type ValidateDeleteClause<
   Delete extends DeleteClause,
   Schema extends DatabaseSchema,
   Options extends ValidateDeleteOptions = DefaultValidateOptions,
-> = Delete extends DeleteClause<
-  infer Table,
-  infer Using,
-  infer Where,
-  infer Returning
->
+> = Delete extends DeleteClause<infer Table, infer Using, infer Where, infer Returning>
   ? ValidateTable<Table, Schema> extends infer TableResult
     ? TableResult extends true
       ? ValidateUsingClause<Using, Schema> extends infer UsingResult
@@ -130,12 +131,10 @@ type ValidateDeleteClause<
 /**
  * Validate that the target table exists in the schema
  */
-type ValidateTable<
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
-  ? ResolveTableInSchema<TableName, TableSchema, Schema>
-  : `Invalid table reference`
+type ValidateTable<Table extends TableRef, Schema extends DatabaseSchema> =
+  Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
+    ? ResolveTableInSchema<TableName, TableSchema, Schema>
+    : `Invalid table reference`
 
 /**
  * Resolve a table in the database schema
@@ -167,10 +166,7 @@ type ResolveTableInSchema<
 /**
  * Validate USING clause tables exist
  */
-type ValidateUsingClause<
-  Using,
-  Schema extends DatabaseSchema,
-> = Using extends undefined
+type ValidateUsingClause<Using, Schema extends DatabaseSchema> = Using extends undefined
   ? true
   : Using extends UsingClause<infer Tables>
     ? ValidateTableList<Tables, Schema>
@@ -216,24 +212,22 @@ type BuildValidationContext<
 /**
  * Resolve table to context entry
  */
-type ResolveTableContext<
-  Table extends TableRef,
-  Schema extends DatabaseSchema,
-> = Table extends TableRef<infer TableName, infer Alias, infer TableSchema>
-  ? TableSchema extends undefined
-    ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
-      ? DefaultSchema extends keyof Schema["schemas"]
-        ? TableName extends keyof Schema["schemas"][DefaultSchema]
-          ? { [K in Alias]: Schema["schemas"][DefaultSchema][TableName] }
-          : MatchError<`Table '${TableName}' not found`>
-        : MatchError<`Default schema not found`>
-      : MatchError<`Cannot determine default schema`>
-    : TableSchema extends keyof Schema["schemas"]
-      ? TableName extends keyof Schema["schemas"][TableSchema]
-        ? { [K in Alias]: Schema["schemas"][TableSchema][TableName] }
-        : MatchError<`Table '${TableName}' not found in schema '${TableSchema}'`>
-      : MatchError<`Schema '${TableSchema}' not found`>
-  : MatchError<`Invalid table reference`>
+type ResolveTableContext<Table extends TableRef, Schema extends DatabaseSchema> =
+  Table extends TableRef<infer TableName, infer Alias, infer TableSchema>
+    ? TableSchema extends undefined
+      ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
+        ? DefaultSchema extends keyof Schema["schemas"]
+          ? TableName extends keyof Schema["schemas"][DefaultSchema]
+            ? { [K in Alias]: Schema["schemas"][DefaultSchema][TableName] }
+            : MatchError<`Table '${TableName}' not found`>
+          : MatchError<`Default schema not found`>
+        : MatchError<`Cannot determine default schema`>
+      : TableSchema extends keyof Schema["schemas"]
+        ? TableName extends keyof Schema["schemas"][TableSchema]
+          ? { [K in Alias]: Schema["schemas"][TableSchema][TableName] }
+          : MatchError<`Table '${TableName}' not found in schema '${TableSchema}'`>
+        : MatchError<`Schema '${TableSchema}' not found`>
+    : MatchError<`Invalid table reference`>
 
 /**
  * Merge USING tables into context
@@ -294,15 +288,12 @@ type ValidateColumnRefList<
 /**
  * Validate a single column reference
  */
-type ValidateSingleRef<
-  Ref,
-  Context,
-  Schema extends DatabaseSchema,
-> = Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
-  ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
-  : Ref extends UnboundColumnRef<infer Column>
-    ? ValidateUnboundColumn<Column, Context>
-    : true
+type ValidateSingleRef<Ref, Context, Schema extends DatabaseSchema> =
+  Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+    ? ValidateTableColumn<Table, Column, ColSchema, Context, Schema>
+    : Ref extends UnboundColumnRef<infer Column>
+      ? ValidateUnboundColumn<Column, Context>
+      : true
 
 /**
  * Validate a table-qualified column
@@ -334,19 +325,16 @@ type ValidateTableColumn<
 /**
  * Validate an unbound column exists in some table
  */
-type ValidateUnboundColumn<
-  Column extends string,
+type ValidateUnboundColumn<Column extends string, Context> = ColumnExistsInContext<
+  Column,
   Context,
-> = ColumnExistsInContext<Column, Context, keyof Context>
+  keyof Context
+>
 
 /**
  * Check if column exists in any table in context
  */
-type ColumnExistsInContext<
-  Column extends string,
-  Context,
-  Keys,
-> = [Keys] extends [never]
+type ColumnExistsInContext<Column extends string, Context, Keys> = [Keys] extends [never]
   ? `Column '${Column}' not found in any table`
   : Keys extends keyof Context
     ? Context[Keys] extends infer Table
@@ -372,7 +360,7 @@ type ValidateReturningClause<
   ? true
   : Returning extends undefined
     ? true
-    : Returning extends ReturningClause<infer Cols>
+    : Returning extends DeleteReturningClause<infer Cols>
       ? Cols extends "*"
         ? true
         : Cols extends UnboundColumnRef[]
@@ -435,34 +423,30 @@ type ValidateColumnExists<
 /**
  * Check if a DELETE query is valid
  */
-export type IsValidDelete<
-  SQL extends string,
-  Schema extends DatabaseSchema,
-> = ValidateDeleteSQL<SQL, Schema> extends true ? true : false
+export type IsValidDelete<SQL extends string, Schema extends DatabaseSchema> =
+  ValidateDeleteSQL<SQL, Schema> extends true ? true : false
 
 /**
  * Get the table columns that would be affected by a DELETE
  */
-export type GetDeleteTableColumns<
-  SQL extends string,
-  Schema extends DatabaseSchema,
-> = ParseDeleteSQL<SQL> extends SQLDeleteQuery<infer Query>
-  ? Query extends DeleteClause<infer Table, infer _Using, infer _Where, infer _Return>
-    ? Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
-      ? TableSchema extends undefined
-        ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
-          ? DefaultSchema extends keyof Schema["schemas"]
-            ? TableName extends keyof Schema["schemas"][DefaultSchema]
-              ? Schema["schemas"][DefaultSchema][TableName]
+export type GetDeleteTableColumns<SQL extends string, Schema extends DatabaseSchema> =
+  ParseDeleteSQL<SQL> extends SQLDeleteQuery<infer Query>
+    ? Query extends DeleteClause<infer Table, infer _Using, infer _Where, infer _Return>
+      ? Table extends TableRef<infer TableName, infer _Alias, infer TableSchema>
+        ? TableSchema extends undefined
+          ? GetDefaultSchema<Schema> extends infer DefaultSchema extends string
+            ? DefaultSchema extends keyof Schema["schemas"]
+              ? TableName extends keyof Schema["schemas"][DefaultSchema]
+                ? Schema["schemas"][DefaultSchema][TableName]
+                : never
               : never
             : never
-          : never
-        : TableSchema extends keyof Schema["schemas"]
-          ? TableName extends keyof Schema["schemas"][TableSchema]
-            ? Schema["schemas"][TableSchema][TableName]
+          : TableSchema extends keyof Schema["schemas"]
+            ? TableName extends keyof Schema["schemas"][TableSchema]
+              ? Schema["schemas"][TableSchema][TableName]
+              : never
             : never
-          : never
+        : never
       : never
     : never
-  : never
 

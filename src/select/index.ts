@@ -1,20 +1,13 @@
 /**
- * SELECT query parser, matcher, and validator
+ * SELECT query parser
  * 
- * This module provides everything needed to parse, match, and validate SELECT queries:
+ * This module provides everything needed to parse SELECT queries:
  * 
- * Type Extraction (lightweight):
  * - ParseSelectSQL - parses a SELECT query string into an AST
- * - MatchSelectQuery - matches a SELECT AST against a schema
- * - QueryResult - convenience type that does both in one step
- * 
- * Validation (comprehensive):
- * - ValidateSelectSQL - validates a SELECT query with all checks
- * - ValidateSQL - alias for ValidateSelectSQL (for backwards compatibility)
- * 
- * The separation between QueryResult and ValidateSelectSQL allows for:
- * - Fast type extraction without unnecessary deep validation
- * - Comprehensive validation that can include JOIN/WHERE field checks
+ * - MatchSelectQuery - matches parsed AST against a schema
+ * - QueryResult - convenience type for parsing and matching in one step
+ * - ValidateSQL - validates a query against a schema
+ * - ValidateSelectSQL - comprehensive validation with options
  */
 
 // Re-export parser types
@@ -41,26 +34,17 @@ export type {
   UnionOperatorType,
 } from "./ast.js"
 
-// Re-export matcher types (lightweight type extraction)
+// Re-export matcher types
 export type {
-  // Main matcher
   MatchSelectQuery,
-
-  // Error types
   MatchError,
-
-  // Convenience types
   QueryResult,
   ValidateQuery,
-
-  // Legacy validation (delegates to validator)
   ValidateSQL,
+  DatabaseSchema,
 } from "./matcher.js"
 
-// Re-export schema types from common (for backwards compatibility)
-export type { DatabaseSchema } from "../common/schema.js"
-
-// Re-export validator types (comprehensive validation)
+// Re-export validator types
 export type {
   ValidateSelectSQL,
   ValidateSelectOptions,

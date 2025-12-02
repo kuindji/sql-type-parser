@@ -1,7 +1,7 @@
 {
   "name": "@kuindji/sql-type-parser",
-  "version": "0.2.8",
-  "description": "Type-level SQL SELECT parser for TypeScript",
+  "version": "0.3.0",
+  "description": "Type-level SQL parser for TypeScript",
   "author": "Ivan Kuindzhi",
   "license": "MIT",
   "repository": {

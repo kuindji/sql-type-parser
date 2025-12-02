@@ -113,22 +113,13 @@ export type AnySQLQuery = SQLSelectQuery | SQLInsertQuery | SQLUpdateQuery | SQL
  * type SelectAST = ParseSQL<"SELECT id, name FROM users">
  * // Returns SQLSelectQuery<SelectClause<...>>
  * 
- * type InsertAST = ParseSQL<"INSERT INTO users (id) VALUES (1)">
- * // Returns SQLInsertQuery<InsertClause<...>>
- * 
- * type UpdateAST = ParseSQL<"UPDATE users SET name = 'John' WHERE id = 1">
- * // Returns SQLUpdateQuery<UpdateClause<...>>
- * 
- * type DeleteAST = ParseSQL<"DELETE FROM users WHERE id = 1">
- * // Returns SQLDeleteQuery<DeleteClause<...>>
- * 
  * // Dynamic queries pass through without validation
  * declare const dynamic: string
  * type DynamicAST = ParseSQL<`SELECT * FROM users ${typeof dynamic}`>
  * // Returns DynamicQuery (passes through without errors)
  * ```
  */
-export type ParseSQL<T extends string> = 
+export type ParseSQL<T extends string> =
   // If T is not a string literal (e.g., it's `string` or contains unresolved template parts),
   // return DynamicQuery to indicate we can't parse it at compile time
   IsStringLiteral<T> extends false
@@ -176,14 +167,14 @@ export type IsDeleteQuery<T> = T extends SQLDeleteQuery ? true : false
 // Re-export the SELECT-specific parser for direct use
 export type { ParseSelectSQL } from "./select/index.js"
 
-// Re-export the INSERT-specific parser and types for direct use
-export type { ParseInsertSQL, SQLInsertQuery } from "./insert/index.js"
+// Re-export the INSERT-specific parser for direct use
+export type { ParseInsertSQL } from "./insert/index.js"
 
-// Re-export the UPDATE-specific parser and types for direct use
-export type { ParseUpdateSQL, SQLUpdateQuery } from "./update/index.js"
+// Re-export the UPDATE-specific parser for direct use
+export type { ParseUpdateSQL } from "./update/index.js"
 
-// Re-export the DELETE-specific parser and types for direct use
-export type { ParseDeleteSQL, SQLDeleteQuery } from "./delete/index.js"
+// Re-export the DELETE-specific parser for direct use
+export type { ParseDeleteSQL } from "./delete/index.js"
 
 // Re-export dynamic query support
 export type { DynamicQuery } from "./common/utils.js"
