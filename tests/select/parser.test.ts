@@ -747,6 +747,32 @@ type P_MixedCase = ParseSQL<"Select Id From Users Where Active = True">
 type _P65 = RequireTrue<AssertExtends<P_MixedCase, SQLSelectQuery>>
 
 // ============================================================================
+// PostgreSQL Concatenation Operator Tests
+// ============================================================================
+
+// Test: Simple string concatenation with || operator
+type P_Concat = ParseSQL<"SELECT first_name || ' ' || last_name AS full_name FROM users">
+type P_Concat_Check = P_Concat extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, "full_name">] }
+    ? true
+    : false
+    : false
+type _P66 = RequireTrue<P_Concat_Check>
+
+// Test: Concatenation with table-qualified columns
+type P_ConcatQualified = ParseSQL<"SELECT u.first_name || u.last_name FROM users u">
+type P_ConcatQualified_Check = P_ConcatQualified extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, string>] }
+    ? true
+    : false
+    : false
+type _P67 = RequireTrue<P_ConcatQualified_Check>
+
+// Test: Concatenation without alias (should still be recognized as complex expression)
+type P_ConcatNoAlias = ParseSQL<"SELECT first_name || last_name FROM users">
+type _P68 = RequireTrue<AssertExtends<P_ConcatNoAlias, SQLSelectQuery>>
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

@@ -560,13 +560,15 @@ type IsFunctionCall<T extends string> =
     : false
 
 /**
- * Check if the expression is complex (contains JSON operators, function calls, nested parens, type casts, etc.)
+ * Check if the expression is complex (contains JSON operators, concatenation, function calls, nested parens, type casts, etc.)
  */
 type IsComplexExpression<T extends string> = 
   T extends `${string}->${string}` ? true :
   T extends `${string}->>${string}` ? true :
   T extends `${string}#>${string}` ? true :
   T extends `${string}#>>${string}` ? true :
+  T extends `${string}||${string}` ? true :
+  T extends `${string} || ${string}` ? true :
   T extends `( ${string}` ? true :
   IsFunctionCall<T> extends true ? true :
   HasTypeCast<T> extends true ? true :
@@ -855,7 +857,7 @@ type ExtractBeforeCast<T extends string> =
 type IsSimpleIdentifier<T extends string> = 
   T extends "" ? false :
   T extends `${string} ${string}` ? false :
-  T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" | "<" | ">" | "!" ? false :
+  T extends "(" | ")" | "," | "/" | "*" | "+" | "-" | "=" | "<" | ">" | "!" | "||" ? false :
   // Exclude string literal parts (tokens that start or end with single quotes)
   T extends `'${string}` ? false :
   T extends `${string}'` ? false :

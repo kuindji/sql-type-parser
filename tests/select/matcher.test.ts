@@ -767,6 +767,30 @@ type M_ToCharFuncCast = QueryResult<"SELECT to_char ( created_at, 'YYYY-MM-DD' )
 type _F40 = RequireTrue<AssertEqual<M_ToCharFuncCast, { date_str: string }>>
 
 // ============================================================================
+// PostgreSQL Concatenation Operator Tests
+// ============================================================================
+
+// Test: Simple string concatenation with || operator returns unknown (no type cast)
+type M_ConcatSimple = QueryResult<"SELECT name || email AS combined FROM users", TestSchema>
+type _C1 = RequireTrue<AssertEqual<M_ConcatSimple, { combined: unknown }>>
+
+// Test: Concatenation with type cast returns casted type
+type M_ConcatCast = QueryResult<"SELECT (name || email)::text AS combined FROM users", TestSchema>
+type _C2 = RequireTrue<AssertEqual<M_ConcatCast, { combined: string }>>
+
+// Test: Concatenation with literal strings
+type M_ConcatLiteral = QueryResult<"SELECT name || ' - ' || email AS display FROM users", TestSchema>
+type _C3 = RequireTrue<AssertEqual<M_ConcatLiteral, { display: unknown }>>
+
+// Test: ValidateSQL returns true for concatenation queries (columns are validated)
+type V_ConcatValid = ValidateSQL<"SELECT name || email FROM users", TestSchema>
+type _C4 = RequireTrue<AssertEqual<V_ConcatValid, true>>
+
+// Test: ValidateSQL catches invalid column in concatenation
+type V_ConcatInvalid = ValidateSQL<"SELECT name || invalid_col FROM users", TestSchema>
+type _C5 = RequireTrue<AssertExtends<V_ConcatInvalid, string>>
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 
