@@ -829,6 +829,9 @@ type IsKeywordOrOperator<T extends string> =
       | "COUNT" | "SUM" | "AVG" | "MIN" | "MAX" | "COALESCE" | "NULLIF" | "CAST"
       | "FOR" | "USING" | "WITH" | "OVER" | "PARTITION" | "ROWS" | "RANGE" | "PRECEDING" | "FOLLOWING"
       ? true
+      // Comparison operators
+      : T extends "=" | "!=" | "<>" | "<" | ">" | "<=" | ">="
+        ? true
       // Lowercase versions of keywords (after normalization some might be lowercased in certain contexts)
       : T extends "for" | "from" | "using" | "with" | "over" | "partition" | "rows" | "range"
         ? true

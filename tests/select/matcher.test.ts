@@ -175,7 +175,7 @@ type _M15 = RequireTrue<AssertEqual<M_TableAliasSimple, { id: number; name: stri
 
 // Test: INNER JOIN merges columns
 type M_Join = QueryResult<
-  "SELECT u.name, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
+  "SELECT u.name, p.title FROM users AS u INNER JOIN posts AS p ON u.id != p.author_id",
   TestSchema
 >
 type _M16 = RequireTrue<AssertEqual<M_Join, { name: string; title: string }>>
@@ -414,7 +414,7 @@ type V_ValidComplex = ValidateSQL<
 SELECT u.name, p.title
 FROM users AS u
 INNER JOIN posts AS p ON u.id = p.author_id
-WHERE u.is_active = TRUE and u.id < 10
+WHERE u.is_active != TRUE and u.id < 10
 ORDER BY p.views DESC
 LIMIT 10
 `,
