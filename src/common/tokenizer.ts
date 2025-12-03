@@ -167,6 +167,32 @@ type SplitSpecial<T extends string> = T extends `${infer L},${infer R}`
       : T
 
 /**
+ * Remove block comments (multi-line style)
+ * Processes nested-style by removing from outermost opening to first closing
+ */
+type RemoveBlockComments<T extends string> = T extends `${infer L}/*${infer _}*/${infer R}`
+  ? RemoveBlockComments<`${L} ${R}`>
+  : T
+
+/**
+ * Remove single-line comments (-- to end of line)
+ * Handles both mid-string comments (with newline) and end-of-string comments
+ */
+type RemoveLineComments<T extends string> = T extends `${infer L}--${infer _}\n${infer R}`
+  ? RemoveLineComments<`${L}\n${R}`>
+  : T extends `${infer L}--${infer _}\r${infer R}`
+    ? RemoveLineComments<`${L}\r${R}`>
+    : T extends `${infer L}--${infer _}`
+      ? L
+      : T
+
+/**
+ * Remove all SQL comments (both block and line comments)
+ * Block comments are removed first, then line comments
+ */
+type RemoveComments<T extends string> = RemoveLineComments<RemoveBlockComments<T>>
+
+/**
  * Replace tabs and newlines with spaces
  */
 type ReplaceWhitespace<T extends string> = T extends `${infer L}\t${infer R}`
@@ -187,9 +213,16 @@ type CollapseSpaces<T extends string> = T extends `${infer L}  ${infer R}`
 /**
  * Normalize a SQL query string
  * Uses ProcessWords to combine split/normalize/join into one pass
+ * 
+ * Pipeline:
+ * 1. RemoveComments - strip SQL comments (-- line and block style)
+ * 2. ReplaceWhitespace - normalize tabs/newlines to spaces
+ * 3. SplitSpecial - add spaces around special characters
+ * 4. CollapseSpaces - reduce multiple spaces to single
+ * 5. ProcessWords - normalize SQL keywords to uppercase
  */
 export type NormalizeSQL<T extends string> = ProcessWords<
-  CollapseSpaces<SplitSpecial<ReplaceWhitespace<T>>>
+  CollapseSpaces<SplitSpecial<ReplaceWhitespace<RemoveComments<T>>>>
 >
 
 // ============================================================================

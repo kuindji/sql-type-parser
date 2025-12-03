@@ -1,28 +1,31 @@
 /**
  * Matcher Examples
- * 
+ *
  * Comprehensive examples demonstrating schema matching and type inference.
  * Shows how parsed SQL queries are matched against database schemas to
  * produce result types.
  */
 
-import type { QueryResult, ValidateSQL } from "../../src/index.js"
-import type { BlogSchema, ECommerceSchema } from "../schema.js"
+import type { QueryResult, ValidateSQL } from "../../src/index.js";
+import type { BlogSchema, ECommerceSchema } from "../schema.js";
 
 // ============================================================================
 // 1. Basic Column Selection
 // ============================================================================
 
 /** Select all columns with * */
-type SelectAllUsers = QueryResult<"SELECT * FROM users", BlogSchema>
+type SelectAllUsers = QueryResult<"SELECT * FROM users", BlogSchema>;
 // Result: { id: number; name: string; email: string; role: "admin" | "author" | "reader"; is_active: boolean; created_at: string }
 
 /** Select specific columns */
-type SelectSpecificColumns = QueryResult<"SELECT id, name, email FROM users", BlogSchema>
+type SelectSpecificColumns = QueryResult<
+    "SELECT id, name, email FROM users",
+    BlogSchema
+>;
 // Result: { id: number; name: string; email: string }
 
 /** Select single column */
-type SelectSingleColumn = QueryResult<"SELECT email FROM users", BlogSchema>
+type SelectSingleColumn = QueryResult<"SELECT email FROM users", BlogSchema>;
 // Result: { email: string }
 
 // ============================================================================
@@ -31,16 +34,16 @@ type SelectSingleColumn = QueryResult<"SELECT email FROM users", BlogSchema>
 
 /** Columns with aliases */
 type ColumnsWithAliases = QueryResult<
-  "SELECT id AS user_id, name AS display_name FROM users",
-  BlogSchema
->
+    "SELECT id AS user_id, name AS display_name FROM users",
+    BlogSchema
+>;
 // Result: { user_id: number; display_name: string }
 
 /** Mixed aliased and non-aliased */
 type MixedAliases = QueryResult<
-  "SELECT id AS pk, name, email AS mail FROM users",
-  BlogSchema
->
+    "SELECT id AS pk, name, email AS mail FROM users",
+    BlogSchema
+>;
 // Result: { pk: number; name: string; mail: string }
 
 // ============================================================================
@@ -49,16 +52,16 @@ type MixedAliases = QueryResult<
 
 /** Table alias with qualified columns */
 type TableAliasQualified = QueryResult<
-  "SELECT u.id, u.name FROM users AS u",
-  BlogSchema
->
+    "SELECT u.id, u.name FROM users AS u",
+    BlogSchema
+>;
 // Result: { id: number; name: string }
 
 /** Alias without AS keyword */
 type TableAliasNoAS = QueryResult<
-  "SELECT u.id, u.email FROM users u",
-  BlogSchema
->
+    "SELECT u.id, u.email FROM users u",
+    BlogSchema
+>;
 // Result: { id: number; email: string }
 
 // ============================================================================
@@ -67,16 +70,16 @@ type TableAliasNoAS = QueryResult<
 
 /** Single table wildcard */
 type SingleTableWildcard = QueryResult<
-  "SELECT u.* FROM users AS u",
-  BlogSchema
->
+    "SELECT u.* FROM users AS u",
+    BlogSchema
+>;
 // Result: { id: number; name: string; email: string; role: ...; is_active: boolean; created_at: string }
 
 /** Multiple table wildcards with JOIN */
 type MultipleTableWildcards = QueryResult<
-  "SELECT u.*, p.* FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
-  BlogSchema
->
+    "SELECT u.*, p.* FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
+    BlogSchema
+>;
 // Result: All columns from both users and posts
 
 // ============================================================================
@@ -85,25 +88,28 @@ type MultipleTableWildcards = QueryResult<
 
 /** INNER JOIN - columns from both tables */
 type InnerJoinResult = QueryResult<
-  "SELECT u.name, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
-  BlogSchema
->
+    "SELECT u.name, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
+    BlogSchema
+>;
 // Result: { name: string; title: string }
 
 /** LEFT JOIN - preserves nullable relationships */
 type LeftJoinResult = QueryResult<
-  "SELECT u.name, p.title, p.views FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
-  BlogSchema
->
+    "SELECT u.name, p.title, p.views FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
+    BlogSchema
+>;
 // Result: { name: string; title: string; views: number }
 
 /** Multiple JOINs */
-type MultipleJoinsResult = QueryResult<`
+type MultipleJoinsResult = QueryResult<
+    `
   SELECT u.name, p.title, c.content AS comment_text
   FROM users AS u
   INNER JOIN posts AS p ON u.id = p.author_id
   LEFT JOIN comments AS c ON p.id = c.post_id
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { name: string; title: string; comment_text: string }
 
 // ============================================================================
@@ -112,41 +118,42 @@ type MultipleJoinsResult = QueryResult<`
 
 /** COUNT returns number */
 type CountResult = QueryResult<
-  "SELECT COUNT ( * ) AS total FROM users",
-  BlogSchema
->
+    "SELECT COUNT ( * ) AS total FROM users",
+    BlogSchema
+>;
 // Result: { total: number }
 
 /** SUM returns number */
 type SumResult = QueryResult<
-  "SELECT SUM ( views ) AS total_views FROM posts",
-  BlogSchema
->
+    "SELECT SUM ( views ) AS total_views FROM posts",
+    BlogSchema
+>;
 // Result: { total_views: number }
 
 /** AVG returns number */
 type AvgResult = QueryResult<
-  "SELECT AVG ( views ) AS avg_views FROM posts",
-  BlogSchema
->
+    "SELECT AVG ( views ) AS avg_views FROM posts",
+    BlogSchema
+>;
 // Result: { avg_views: number }
 
 /** MIN preserves column type */
 type MinResult = QueryResult<
-  "SELECT MIN ( views ) AS min_views FROM posts",
-  BlogSchema
->
+    "SELECT MIN ( views ) AS min_views FROM posts",
+    BlogSchema
+>;
 // Result: { min_views: number }
 
 /** MAX preserves column type */
 type MaxResult = QueryResult<
-  "SELECT MAX ( created_at ) AS latest FROM posts",
-  BlogSchema
->
+    "SELECT MAX ( created_at ) AS latest FROM posts",
+    BlogSchema
+>;
 // Result: { latest: string }
 
 /** Multiple aggregates */
-type MultiAggregates = QueryResult<`
+type MultiAggregates = QueryResult<
+    `
   SELECT 
     COUNT ( * ) AS count,
     SUM ( views ) AS total_views,
@@ -154,7 +161,9 @@ type MultiAggregates = QueryResult<`
     MIN ( views ) AS min_views,
     MAX ( views ) AS max_views
   FROM posts
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { count: number; total_views: number; avg_views: number; min_views: number; max_views: number }
 
 // ============================================================================
@@ -162,19 +171,25 @@ type MultiAggregates = QueryResult<`
 // ============================================================================
 
 /** Group by with aggregate */
-type GroupByAggregate = QueryResult<`
+type GroupByAggregate = QueryResult<
+    `
   SELECT author_id, COUNT ( * ) AS post_count
   FROM posts
   GROUP BY author_id
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { author_id: number; post_count: number }
 
 /** Group by multiple columns */
-type GroupByMultiple = QueryResult<`
+type GroupByMultiple = QueryResult<
+    `
   SELECT status, author_id, COUNT ( * ) AS count
   FROM posts
   GROUP BY status, author_id
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { status: "draft" | "published" | "archived"; author_id: number; count: number }
 
 // ============================================================================
@@ -183,23 +198,23 @@ type GroupByMultiple = QueryResult<`
 
 /** Cast to text - returns string */
 type CastToText = QueryResult<
-  "SELECT id::text AS id_str FROM users",
-  BlogSchema
->
+    "SELECT id::text AS id_str FROM users",
+    BlogSchema
+>;
 // Result: { id_str: string } - cast type determines result type
 
 /** Cast in complex expression with parentheses */
 type CastInExpr = QueryResult<
-  "SELECT ( id ) ::text AS id_str FROM users",
-  BlogSchema
->
+    "SELECT ( id ) ::text AS id_str FROM users",
+    BlogSchema
+>;
 // Result: { id_str: string } - cast type is preserved
 
 /** Cast to integer - returns number */
 type CastToInt = QueryResult<
-  "SELECT views::integer AS int_views FROM posts",
-  BlogSchema
->
+    "SELECT views::integer AS int_views FROM posts",
+    BlogSchema
+>;
 // Result: { int_views: number } - cast to integer returns number
 
 // ============================================================================
@@ -208,16 +223,16 @@ type CastToInt = QueryResult<
 
 /** Union type preserved */
 type UnionTypePreserved = QueryResult<
-  "SELECT role FROM users",
-  BlogSchema
->
+    "SELECT role FROM users",
+    BlogSchema
+>;
 // Result: { role: "admin" | "author" | "reader" }
 
 /** Multiple union type columns */
 type MultipleUnionTypes = QueryResult<
-  "SELECT u.role, p.status FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
-  BlogSchema
->
+    "SELECT u.role, p.status FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
+    BlogSchema
+>;
 // Result: { role: "admin" | "author" | "reader"; status: "draft" | "published" | "archived" }
 
 // ============================================================================
@@ -226,16 +241,16 @@ type MultipleUnionTypes = QueryResult<
 
 /** Nullable column preserved */
 type NullableColumn = QueryResult<
-  "SELECT published_at FROM posts",
-  BlogSchema
->
+    "SELECT published_at FROM posts",
+    BlogSchema
+>;
 // Result: { published_at: string | null }
 
 /** Mix of nullable and non-nullable */
 type MixedNullable = QueryResult<
-  "SELECT title, published_at FROM posts",
-  BlogSchema
->
+    "SELECT title, published_at FROM posts",
+    BlogSchema
+>;
 // Result: { title: string; published_at: string | null }
 
 // ============================================================================
@@ -243,27 +258,34 @@ type MixedNullable = QueryResult<
 // ============================================================================
 
 /** Simple CTE */
-type SimpleCTE = QueryResult<`
+type SimpleCTE = QueryResult<
+    `
   WITH active_users AS (
     SELECT id, name FROM users WHERE is_active = TRUE
   )
   SELECT * FROM active_users
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { id: number; name: string }
 
 /** CTE with JOIN to regular table */
-type CTEWithJoin = QueryResult<`
+type CTEWithJoin = QueryResult<
+    `
   WITH published_posts AS (
     SELECT id, author_id, title FROM posts WHERE status = 'published'
   )
   SELECT u.name, pp.title
   FROM users AS u
   INNER JOIN published_posts AS pp ON u.id = pp.author_id
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { name: string; title: string }
 
 /** Multiple CTEs */
-type MultipleCTEs = QueryResult<`
+type MultipleCTEs = QueryResult<
+    `
   WITH 
     active_users AS (
       SELECT id, name FROM users WHERE is_active = TRUE
@@ -274,7 +296,9 @@ type MultipleCTEs = QueryResult<`
   SELECT au.name, pc.post_count
   FROM active_users AS au
   LEFT JOIN post_counts AS pc ON au.id = pc.author_id
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { name: string; post_count: number }
 
 // ============================================================================
@@ -282,20 +306,29 @@ type MultipleCTEs = QueryResult<`
 // ============================================================================
 
 /** Simple derived table */
-type DerivedTableSimple = QueryResult<`
+type DerivedTableSimple = QueryResult<
+    `
   SELECT sub.user_name, sub.post_count
   FROM (
     SELECT u.name AS user_name, COUNT ( p.id ) AS post_count
     FROM users AS u
     LEFT JOIN posts AS p ON u.id = p.author_id
     GROUP BY u.name
+    -- comment line 1
+    -- comment line 2
   ) AS sub
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { user_name: string; post_count: number }
 
 /** Derived table with filter */
-type DerivedTableFiltered = QueryResult<`
-  SELECT top_authors.name
+type DerivedTableFiltered = QueryResult<
+    `
+  SELECT 
+  -- comment line 1
+  top_authors.name
+  -- comment line 2
   FROM (
     SELECT author_id, COUNT ( * ) AS cnt
     FROM posts
@@ -303,7 +336,9 @@ type DerivedTableFiltered = QueryResult<`
   ) AS counts
   LEFT JOIN users AS top_authors ON top_authors.id = counts.author_id
   WHERE counts.cnt > 5
-`, BlogSchema>
+`,
+    BlogSchema
+>;
 // Result: { name: string }
 
 // ============================================================================
@@ -311,7 +346,8 @@ type DerivedTableFiltered = QueryResult<`
 // ============================================================================
 
 /** Order with customer info */
-type OrderWithCustomer = QueryResult<`
+type OrderWithCustomer = QueryResult<
+    `
   SELECT 
     o.order_number,
     o.total_amount,
@@ -320,11 +356,14 @@ type OrderWithCustomer = QueryResult<`
     u.last_name
   FROM orders AS o
   INNER JOIN users AS u ON o.user_id = u.id
-`, ECommerceSchema>
+`,
+    ECommerceSchema
+>;
 // Result: { order_number: string; total_amount: number; customer_email: string; first_name: string | null; last_name: string | null }
 
 /** Product with category and brand */
-type ProductWithDetails = QueryResult<`
+type ProductWithDetails = QueryResult<
+    `
   SELECT 
     p.name AS product_name,
     p.price,
@@ -334,11 +373,14 @@ type ProductWithDetails = QueryResult<`
   FROM products AS p
   INNER JOIN categories AS c ON p.category_id = c.id
   LEFT JOIN brands AS b ON p.brand_id = b.id
-`, ECommerceSchema>
+`,
+    ECommerceSchema
+>;
 // Result: { product_name: string; price: number; status: "draft" | "active" | "archived"; category_name: string; brand_name: string }
 
 /** Order summary with aggregates */
-type OrderSummary = QueryResult<`
+type OrderSummary = QueryResult<
+    `
   SELECT 
     user_id,
     COUNT ( * ) AS order_count,
@@ -347,11 +389,14 @@ type OrderSummary = QueryResult<`
     MAX ( created_at ) AS last_order
   FROM orders
   GROUP BY user_id
-`, ECommerceSchema>
+`,
+    ECommerceSchema
+>;
 // Result: { user_id: number; order_count: number; total_spent: number; avg_order: number; last_order: string }
 
 /** Review statistics */
-type ReviewStats = QueryResult<`
+type ReviewStats = QueryResult<
+    `
   SELECT 
     product_id,
     COUNT ( * ) AS review_count,
@@ -362,7 +407,9 @@ type ReviewStats = QueryResult<`
   WHERE is_approved = TRUE
   GROUP BY product_id
   HAVING COUNT ( * ) >= 3
-`, ECommerceSchema>
+`,
+    ECommerceSchema
+>;
 // Result: { product_id: number; review_count: number; avg_rating: number; min_rating: number; max_rating: number }
 
 // ============================================================================
@@ -371,23 +418,23 @@ type ReviewStats = QueryResult<`
 
 /** Unknown column produces error */
 type UnknownColumnError = QueryResult<
-  "SELECT unknown_column FROM users",
-  BlogSchema
->
+    "SELECT unknown_column FROM users",
+    BlogSchema
+>;
 // Result: { unknown_column: MatchError<"Column 'unknown_column' not found in any table"> }
 
 /** Unknown table produces error */
 type UnknownTableError = QueryResult<
-  "SELECT * FROM nonexistent_table",
-  BlogSchema
->
+    "SELECT * FROM nonexistent_table",
+    BlogSchema
+>;
 // Result: MatchError<"Table 'nonexistent_table' not found in schema">
 
 /** Wrong table qualifier */
 type WrongQualifierError = QueryResult<
-  "SELECT wrong_alias.id FROM users AS u",
-  BlogSchema
->
+    "SELECT wrong_alias.id FROM users AS u",
+    BlogSchema
+>;
 // Result: { id: MatchError<"Table or alias 'wrong_alias' not found"> }
 
 // ============================================================================
@@ -395,21 +442,21 @@ type WrongQualifierError = QueryResult<
 // ============================================================================
 
 /** Valid query returns true */
-type ValidQuery = ValidateSQL<"SELECT id, name FROM users", BlogSchema>
+type ValidQuery = ValidateSQL<"SELECT id, name FROM users", BlogSchema>;
 // Result: true
 
 /** Invalid column returns error message */
 type InvalidColumnValidation = ValidateSQL<
-  "SELECT bad_column FROM users",
-  BlogSchema
->
+    "SELECT bad_column FROM users",
+    BlogSchema
+>;
 // Result: "Column 'bad_column' not found in any table"
 
 /** Invalid table returns error message */
 type InvalidTableValidation = ValidateSQL<
-  "SELECT * FROM bad_table",
-  BlogSchema
->
+    "SELECT * FROM bad_table",
+    BlogSchema
+>;
 // Result: "Table 'bad_table' not found in schema"
 
 // ============================================================================
@@ -417,7 +464,8 @@ type InvalidTableValidation = ValidateSQL<
 // ============================================================================
 
 /** Customer order history */
-type CustomerOrderHistory = QueryResult<`
+type CustomerOrderHistory = QueryResult<
+    `
   WITH customer_orders AS (
     SELECT 
       user_id,
@@ -441,11 +489,14 @@ type CustomerOrderHistory = QueryResult<`
   WHERE u.role = 'customer'
   ORDER BY co.lifetime_value DESC
   LIMIT 100
-`, ECommerceSchema>
+`,
+    ECommerceSchema
+>;
 // Result: { email: string; first_name: string | null; last_name: string | null; account_status: "active" | "suspended" | "deleted"; total_orders: number; lifetime_value: number; last_order_date: string }
 
 /** Inventory report */
-type InventoryReport = QueryResult<`
+type InventoryReport = QueryResult<
+    `
   SELECT 
     p.sku,
     p.name AS product_name,
@@ -460,50 +511,52 @@ type InventoryReport = QueryResult<`
   INNER JOIN warehouses AS w ON i.warehouse_id = w.id
   WHERE p.status = 'active' AND w.is_active = TRUE
   ORDER BY i.quantity ASC
-`, ECommerceSchema>
+`,
+    ECommerceSchema
+>;
 // Result: { sku: string; product_name: string; category: string; warehouse: string; quantity: number; reserved_quantity: number; reorder_level: number | null }
 
 // ============================================================================
 // 17. camelCase Identifiers (quoted to preserve case)
 // ============================================================================
 
-import type { CamelCaseSchema } from "../schema.js"
+import type { CamelCaseSchema } from "../schema.js";
 
 // Note: In SQL, identifiers with uppercase letters must be quoted to preserve case.
 
 /** camelCased columns - quoted to preserve case */
 type CamelCaseColumns = QueryResult<
-  'SELECT "firstName", "lastName", "emailAddress" FROM "userAccounts"',
-  CamelCaseSchema
->
+    'SELECT "firstName", "lastName", "emailAddress" FROM "userAccounts"',
+    CamelCaseSchema
+>;
 // Result: { firstName: string; lastName: string; emailAddress: string }
 
 /** camelCased table with alias */
 type CamelCaseWithAlias = QueryResult<
-  'SELECT ua."firstName", ua."lastName", ua."isActive" FROM "userAccounts" AS ua',
-  CamelCaseSchema
->
+    'SELECT ua."firstName", ua."lastName", ua."isActive" FROM "userAccounts" AS ua',
+    CamelCaseSchema
+>;
 // Result: { firstName: string; lastName: string; isActive: boolean }
 
 /** Mixed_Case columns */
 type MixedCaseColumns = QueryResult<
-  'SELECT "Account_Status", "Last_Login_Date" FROM "userAccounts"',
-  CamelCaseSchema
->
+    'SELECT "Account_Status", "Last_Login_Date" FROM "userAccounts"',
+    CamelCaseSchema
+>;
 // Result: { Account_Status: "active" | "suspended" | "deleted"; Last_Login_Date: string | null }
 
 /** PascalCase table name */
 type PascalCaseTable = QueryResult<
-  'SELECT id, "unitPrice", "totalPrice", "Item_Status" FROM "OrderItems"',
-  CamelCaseSchema
->
+    'SELECT id, "unitPrice", "totalPrice", "Item_Status" FROM "OrderItems"',
+    CamelCaseSchema
+>;
 // Result: { id: number; unitPrice: number; totalPrice: number; Item_Status: "pending" | "shipped" | "delivered" }
 
 /** Mixed_Case table name */
 type MixedCaseTable = QueryResult<
-  'SELECT "categoryName", "Display_Name", "Is_Active" FROM "Product_Categories"',
-  CamelCaseSchema
->
+    'SELECT "categoryName", "Display_Name", "Is_Active" FROM "Product_Categories"',
+    CamelCaseSchema
+>;
 // Result: { categoryName: string; Display_Name: string; Is_Active: boolean }
 
 // ============================================================================
@@ -512,30 +565,30 @@ type MixedCaseTable = QueryResult<
 
 /** Quoted table with hyphen */
 type QuotedTableHyphen = QueryResult<
-  'SELECT id, userId, sessionToken FROM "user-sessions"',
-  CamelCaseSchema
->
+    'SELECT id, userId, sessionToken FROM "user-sessions"',
+    CamelCaseSchema
+>;
 // Result: { id: number; userId: number; sessionToken: string }
 
 /** Quoted columns with hyphens */
 type QuotedColumnsHyphen = QueryResult<
-  'SELECT "ip-address", "user-agent" FROM "user-sessions"',
-  CamelCaseSchema
->
+    'SELECT "ip-address", "user-agent" FROM "user-sessions"',
+    CamelCaseSchema
+>;
 // Result: { "ip-address": string; "user-agent": string | null }
 
 /** Quoted table with underscores */
 type QuotedTableUnderscore = QueryResult<
-  'SELECT id, action FROM "audit_logs"',
-  CamelCaseSchema
->
+    'SELECT id, action FROM "audit_logs"',
+    CamelCaseSchema
+>;
 // Result: { id: number; action: string }
 
 /** Quoted columns with underscores */
 type QuotedColumnsUnderscore = QueryResult<
-  'SELECT "user_id", "entity_type" FROM "audit_logs"',
-  CamelCaseSchema
->
+    'SELECT "user_id", "entity_type" FROM "audit_logs"',
+    CamelCaseSchema
+>;
 // Result: { "user_id": number | null; "entity_type": string }
 
 // Note: Quoted identifiers with spaces (e.g., "audit logs") are not supported
@@ -547,16 +600,16 @@ type QuotedColumnsUnderscore = QueryResult<
 
 /** Alias preserves case */
 type AliasPreservesCase = QueryResult<
-  'SELECT "firstName" AS "FirstName", "lastName" AS last_name FROM "userAccounts"',
-  CamelCaseSchema
->
+    'SELECT "firstName" AS "FirstName", "lastName" AS last_name FROM "userAccounts"',
+    CamelCaseSchema
+>;
 // Result: { FirstName: string; last_name: string }
 
 /** Quoted alias with spaces */
 type QuotedAliasSpaces = QueryResult<
-  'SELECT "firstName" AS "First Name", "lastName" AS "Last Name" FROM "userAccounts"',
-  CamelCaseSchema
->
+    'SELECT "firstName" AS "First Name", "lastName" AS "Last Name" FROM "userAccounts"',
+    CamelCaseSchema
+>;
 // Result: { "First Name": string; "Last Name": string }
 
 // ============================================================================
@@ -564,19 +617,25 @@ type QuotedAliasSpaces = QueryResult<
 // ============================================================================
 
 /** JOIN with camelCase tables */
-type CamelCaseJoin = QueryResult<`
+type CamelCaseJoin = QueryResult<
+    `
   SELECT ua."firstName", ua."lastName", oi."unitPrice", oi."Item_Status"
   FROM "userAccounts" AS ua
   INNER JOIN "OrderItems" AS oi ON ua.id = oi."orderId"
-`, CamelCaseSchema>
+`,
+    CamelCaseSchema
+>;
 // Result: { firstName: string; lastName: string; unitPrice: number; Item_Status: "pending" | "shipped" | "delivered" }
 
 /** JOIN with Mixed_Case table */
-type MixedCaseJoin = QueryResult<`
+type MixedCaseJoin = QueryResult<
+    `
   SELECT ua."firstName", pc."categoryName", pc."Display_Name"
   FROM "userAccounts" AS ua
   LEFT JOIN "Product_Categories" AS pc ON ua.id = pc.id
-`, CamelCaseSchema>
+`,
+    CamelCaseSchema
+>;
 // Result: { firstName: string; categoryName: string; Display_Name: string }
 
 // ============================================================================
@@ -584,21 +643,27 @@ type MixedCaseJoin = QueryResult<`
 // ============================================================================
 
 /** GROUP BY with camelCase */
-type CamelCaseGroupBy = QueryResult<`
+type CamelCaseGroupBy = QueryResult<
+    `
   SELECT "Account_Status", COUNT ( * ) AS "statusCount"
   FROM "userAccounts"
   GROUP BY "Account_Status"
-`, CamelCaseSchema>
+`,
+    CamelCaseSchema
+>;
 // Result: { Account_Status: "active" | "suspended" | "deleted"; statusCount: number }
 
 /** Aggregate on camelCase column */
-type CamelCaseAggregate = QueryResult<`
+type CamelCaseAggregate = QueryResult<
+    `
   SELECT 
     COUNT ( * ) AS "totalUsers",
     MIN ( "createdAt" ) AS "firstCreated",
     MAX ( "updatedAt" ) AS "lastUpdated"
   FROM "userAccounts"
-`, CamelCaseSchema>
+`,
+    CamelCaseSchema
+>;
 // Result: { totalUsers: number; firstCreated: string; lastUpdated: string }
 
 // ============================================================================
@@ -606,7 +671,8 @@ type CamelCaseAggregate = QueryResult<`
 // ============================================================================
 
 /** Full query with mixed identifiers (all properly quoted) */
-type ComplexCamelCase = QueryResult<`
+type ComplexCamelCase = QueryResult<
+    `
   SELECT 
     ua."firstName",
     ua."lastName",
@@ -621,45 +687,48 @@ type ComplexCamelCase = QueryResult<`
   WHERE ua."isActive" = TRUE
   ORDER BY ua."lastName" ASC
   LIMIT 20
-`, CamelCaseSchema>
+`,
+    CamelCaseSchema
+>;
 // Result: { firstName: string; lastName: string; Account_Status: "active" | "suspended" | "deleted"; Last_Login_Date: string | null; unitPrice: number; Item_Status: "pending" | "shipped" | "delivered"; categoryDisplay: string }
 
 // ============================================================================
 // 23. Schema-Qualified Queries
 // ============================================================================
 
-import type { MultiSchemaExample } from "../schema.js"
+import type { MultiSchemaExample } from "../schema.js";
 
 /** Query table from default schema (public) */
 type DefaultSchemaQuery = QueryResult<
-  "SELECT id, name, email FROM users",
-  MultiSchemaExample
->
+    "SELECT id, name, email FROM users",
+    MultiSchemaExample
+>;
 // Result: { id: number; name: string; email: string }
 
 /** Query table with explicit schema prefix */
 type ExplicitSchemaQuery = QueryResult<
-  "SELECT id, email FROM public.users",
-  MultiSchemaExample
->
+    "SELECT id, email FROM public.users",
+    MultiSchemaExample
+>;
 // Result: { id: number; email: string }
 
 /** Query table from non-default schema */
 type AuditSchemaQuery = QueryResult<
-  "SELECT id, action, table_name FROM audit.logs",
-  MultiSchemaExample
->
+    "SELECT id, action, table_name FROM audit.logs",
+    MultiSchemaExample
+>;
 // Result: { id: number; action: string; table_name: string }
 
 /** Query analytics schema */
 type AnalyticsSchemaQuery = QueryResult<
-  "SELECT id, page, viewed_at FROM analytics.page_views",
-  MultiSchemaExample
->
+    "SELECT id, page, viewed_at FROM analytics.page_views",
+    MultiSchemaExample
+>;
 // Result: { id: number; page: string; viewed_at: string }
 
 /** Cross-schema JOIN */
-type CrossSchemaJoin = QueryResult<`
+type CrossSchemaJoin = QueryResult<
+    `
   SELECT 
     u.name AS user_name,
     u.email,
@@ -667,29 +736,35 @@ type CrossSchemaJoin = QueryResult<`
     al.created_at AS log_time
   FROM public.users AS u
   INNER JOIN audit.logs AS al ON u.id = al.user_id
-`, MultiSchemaExample>
+`,
+    MultiSchemaExample
+>;
 // Result: { user_name: string; email: string; action: string; log_time: string }
 
 /** Mix schema-qualified and alias-qualified columns */
-type MixedQualifiers = QueryResult<`
+type MixedQualifiers = QueryResult<
+    `
   SELECT 
     public.users.id AS user_id,
     u.name,
     audit.logs.action
   FROM public.users AS u
   INNER JOIN audit.logs ON u.id = audit.logs.user_id
-`, MultiSchemaExample>
+`,
+    MultiSchemaExample
+>;
 // Result: { user_id: number; name: string; action: string } - note: schema.table.column defaults to column name only
 
 /** Schema-qualified wildcard */
 type SchemaWildcard = QueryResult<
-  "SELECT public.users.* FROM public.users",
-  MultiSchemaExample
->
+    "SELECT public.users.* FROM public.users",
+    MultiSchemaExample
+>;
 // Result: { id: number; email: string; name: string; created_at: string }
 
 /** Multiple schema tables in single query */
-type MultiSchemaQuery = QueryResult<`
+type MultiSchemaQuery = QueryResult<
+    `
   SELECT 
     p.title AS post_title,
     pv.page,
@@ -697,28 +772,30 @@ type MultiSchemaQuery = QueryResult<`
   FROM public.posts AS p
   LEFT JOIN analytics.page_views AS pv ON pv.page = p.title
   LEFT JOIN analytics.events AS e ON e.user_id = p.user_id
-`, MultiSchemaExample>
+`,
+    MultiSchemaExample
+>;
 // Result: { post_title: string; page: string; event_type: string }
 
 /** Validate schema-qualified query */
 type ValidSchemaQuery = ValidateSQL<
-  "SELECT id, action FROM audit.logs where id = '122'",
-  MultiSchemaExample
->
+    "SELECT id, action FROM audit.logs where id = '122'",
+    MultiSchemaExample
+>;
 // Result: true
 
 /** Invalid schema produces error */
 type InvalidSchemaError = ValidateSQL<
-  "SELECT id FROM nonexistent.users",
-  MultiSchemaExample
->
+    "SELECT id FROM nonexistent.users",
+    MultiSchemaExample
+>;
 // Result: "Schema 'nonexistent' not found"
 
 /** Invalid table in valid schema produces error */
 type InvalidTableInSchemaError = ValidateSQL<
-  "SELECT id FROM audit.nonexistent",
-  MultiSchemaExample
->
+    "SELECT id FROM audit.nonexistent",
+    MultiSchemaExample
+>;
 // Result: "Table 'nonexistent' not found in schema 'audit'"
 
 // ============================================================================
@@ -726,21 +803,22 @@ type InvalidTableInSchemaError = ValidateSQL<
 // ============================================================================
 
 // Ensure results are proper object types
-type _AssertObject1 = SelectSpecificColumns extends { id: number; name: string; email: string } ? true : false
-type _AssertObject2 = UnionTypePreserved extends { role: "admin" | "author" | "reader" } ? true : false
+type _AssertObject1 = SelectSpecificColumns extends
+    { id: number; name: string; email: string; } ? true : false;
+type _AssertObject2 = UnionTypePreserved extends
+    { role: "admin" | "author" | "reader"; } ? true : false;
 
 // Ensure validation works
-type _AssertValid = ValidQuery extends true ? true : false
+type _AssertValid = ValidQuery extends true ? true : false;
 
 // Export for type checking
 export type {
-  SelectAllUsers,
-  SelectSpecificColumns,
-  ColumnsWithAliases,
-  InnerJoinResult,
-  CountResult,
-  SimpleCTE,
-  OrderWithCustomer,
-  CustomerOrderHistory,
-}
-
+    ColumnsWithAliases,
+    CountResult,
+    CustomerOrderHistory,
+    InnerJoinResult,
+    OrderWithCustomer,
+    SelectAllUsers,
+    SelectSpecificColumns,
+    SimpleCTE,
+};
