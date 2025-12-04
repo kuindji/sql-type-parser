@@ -305,9 +305,23 @@ type HasHoleAtOtherBoundaries<T extends string> =
         ? `${A}=__X__=${B}` extends T
           ? `${A}=__Y__=${B}` extends T
             ? true
-            : false
-          : false
-        : false
+            : HasHoleAtOtherBoundaries<B>
+          : HasHoleAtOtherBoundaries<B>
+        : // Check open paren boundaries - handles cases like `in (${string})`
+          T extends `${infer A}(${infer B}`
+            ? `${A}(__X__${B}` extends T
+              ? `${A}(__Y__${B}` extends T
+                ? true
+                : HasHoleAtOtherBoundaries<B>
+              : HasHoleAtOtherBoundaries<B>
+            : // Check close paren boundaries - handles cases like `${string})`
+              T extends `${infer A})${infer B}`
+                ? `${A}__X__)${B}` extends T
+                  ? `${A}__Y__)${B}` extends T
+                    ? true
+                    : HasHoleAtOtherBoundaries<B>
+                  : HasHoleAtOtherBoundaries<B>
+                : false
 
 /**
  * Marker for dynamic/non-literal queries that can't be validated at compile time.
