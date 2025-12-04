@@ -1134,6 +1134,62 @@ type V_LiteralValid = ValidateSQL<"SELECT 1 AS num, 'test' AS str FROM users", T
 type _L9 = RequireTrue<AssertEqual<V_LiteralValid, true>>;
 
 // ============================================================================
+// Parameter Placeholder Type Inference Tests
+// ============================================================================
+
+// Test: Parameter placeholder returns unknown
+type M_ParamPlaceholder = QueryResult<"SELECT $1 AS field_name FROM users", TestSchema>;
+type _PP1 = RequireTrue<AssertEqual<M_ParamPlaceholder, { field_name: unknown; }>>;
+
+// Test: Named parameter returns unknown
+type M_NamedParam = QueryResult<"SELECT :user_id AS uid FROM users", TestSchema>;
+type _PP2 = RequireTrue<AssertEqual<M_NamedParam, { uid: unknown; }>>;
+
+// Test: Mix of parameters and columns
+type M_MixedParams = QueryResult<"SELECT id, $1 AS param FROM users", TestSchema>;
+type _PP3 = RequireTrue<AssertEqual<M_MixedParams, { id: number; param: unknown; }>>;
+
+// ============================================================================
+// Function Call Type Inference Tests
+// ============================================================================
+
+// Test: now() returns unknown
+type M_FuncNow = QueryResult<"SELECT now ( ) AS created_at FROM users", TestSchema>;
+type _FN1 = RequireTrue<AssertEqual<M_FuncNow, { created_at: unknown; }>>;
+
+// Test: concat() returns unknown
+type M_FuncConcat2 = QueryResult<"SELECT concat ( 'a' , 'b' ) AS combined FROM users", TestSchema>;
+type _FN2 = RequireTrue<AssertEqual<M_FuncConcat2, { combined: unknown; }>>;
+
+// Test: Function with column argument validates the column
+type M_FuncWithCol = QueryResult<"SELECT upper ( name ) AS upper_name FROM users", TestSchema>;
+type _FN3 = RequireTrue<AssertEqual<M_FuncWithCol, { upper_name: unknown; }>>;
+
+// Test: Function with type cast returns cast type
+type M_FuncCast = QueryResult<"SELECT now ( ) ::text AS ts FROM users", TestSchema>;
+type _FN4 = RequireTrue<AssertEqual<M_FuncCast, { ts: string; }>>;
+
+// Test: ValidateSQL catches invalid column in function
+type V_FuncInvalidCol2 = ValidateSQL<"SELECT upper ( invalid_col ) AS upper_name FROM users", TestSchema>;
+type _FN5 = RequireTrue<AssertExtends<V_FuncInvalidCol2, string>>;
+
+// ============================================================================
+// Arithmetic Expression Type Inference Tests
+// ============================================================================
+
+// Test: Arithmetic with literals returns unknown
+type M_ArithLiteral = QueryResult<"SELECT 1 + 1 AS two FROM users", TestSchema>;
+type _AR1 = RequireTrue<AssertEqual<M_ArithLiteral, { two: unknown; }>>;
+
+// Test: Arithmetic with columns returns unknown
+type M_ArithCols = QueryResult<"SELECT views + 1 AS incremented FROM posts", TestSchema>;
+type _AR2 = RequireTrue<AssertEqual<M_ArithCols, { incremented: unknown; }>>;
+
+// Test: Arithmetic with type cast returns cast type
+type M_ArithCast = QueryResult<"SELECT ( views + 1 ) ::int AS incremented FROM posts", TestSchema>;
+type _AR3 = RequireTrue<AssertEqual<M_ArithCast, { incremented: number; }>>;
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

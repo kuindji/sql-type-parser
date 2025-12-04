@@ -835,6 +835,89 @@ type P_MixedLiteralsCols = ParseSQL<"SELECT id, 1 AS one, name, 'test' AS str FR
 type _P75 = RequireTrue<AssertExtends<P_MixedLiteralsCols, SQLSelectQuery>>
 
 // ============================================================================
+// Parameter Placeholder Tests
+// ============================================================================
+
+// Test: Parameter placeholder with alias
+type P_ParamPlaceholder = ParseSQL<"SELECT $1 AS field_name FROM users">
+type P_ParamPlaceholder_Check = P_ParamPlaceholder extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, "field_name">] }
+    ? true
+    : false
+    : false
+type _P76 = RequireTrue<P_ParamPlaceholder_Check>
+
+// Test: Named parameter placeholder
+type P_NamedParam = ParseSQL<"SELECT :user_id AS uid FROM users">
+type P_NamedParam_Check = P_NamedParam extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, "uid">] }
+    ? true
+    : false
+    : false
+type _P77 = RequireTrue<P_NamedParam_Check>
+
+// Test: Multiple parameter placeholders
+type P_MultiParams = ParseSQL<"SELECT $1 AS first, $2 AS second FROM users">
+type _P78 = RequireTrue<AssertExtends<P_MultiParams, SQLSelectQuery>>
+
+// ============================================================================
+// Function Call Tests
+// ============================================================================
+
+// Test: Function call with no arguments (now())
+type P_FuncNoArgs = ParseSQL<"SELECT now ( ) AS created_at FROM users">
+type P_FuncNoArgs_Check = P_FuncNoArgs extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, "created_at">] }
+    ? true
+    : false
+    : false
+type _P79 = RequireTrue<P_FuncNoArgs_Check>
+
+// Test: Function call with string arguments
+type P_FuncConcat = ParseSQL<"SELECT concat ( 'hello' , ' ' , 'world' ) AS greeting FROM users">
+type P_FuncConcat_Check = P_FuncConcat extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, "greeting">] }
+    ? true
+    : false
+    : false
+type _P80 = RequireTrue<P_FuncConcat_Check>
+
+// Test: Function call with column argument
+type P_FuncWithCol = ParseSQL<"SELECT upper ( name ) AS upper_name FROM users">
+type P_FuncWithCol_Check = P_FuncWithCol extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, "upper_name">] }
+    ? true
+    : false
+    : false
+type _P81 = RequireTrue<P_FuncWithCol_Check>
+
+// Test: Nested function calls
+type P_NestedFuncs = ParseSQL<"SELECT lower ( trim ( name ) ) AS cleaned FROM users">
+type _P82 = RequireTrue<AssertExtends<P_NestedFuncs, SQLSelectQuery>>
+
+// ============================================================================
+// Arithmetic Expression Tests
+// ============================================================================
+
+// Test: Simple addition
+type P_Addition = ParseSQL<"SELECT 1 + 1 AS two FROM users">
+type P_Addition_Check = P_Addition extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, "two">] }
+    ? true
+    : false
+    : false
+type _P83 = RequireTrue<P_Addition_Check>
+
+// Test: Column arithmetic
+type P_ColArith = ParseSQL<"SELECT price * quantity AS total FROM orders">
+type P_ColArith_Check = P_ColArith extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<ComplexExpr, "total">] }
+    ? true
+    : false
+    : false
+type _P84 = RequireTrue<P_ColArith_Check>
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

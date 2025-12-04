@@ -356,7 +356,10 @@ type OrderWithCustomer = QueryResult<
     u.last_name,
     'something' as something,
     null as nullish,
-    1 as num
+    1 as num,
+    $1 as param1,
+    now() as stamp,
+    concat('1', '2') as str
   FROM orders AS o
   INNER JOIN users AS u ON o.user_id = u.id
 `,

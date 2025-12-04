@@ -633,7 +633,8 @@ type IsFunctionCall<T extends string> =
     : false
 
 /**
- * Check if the expression is complex (contains JSON operators, concatenation, function calls, nested parens, type casts, etc.)
+ * Check if the expression is complex (contains JSON operators, concatenation, function calls, 
+ * nested parens, type casts, parameter placeholders, arithmetic, etc.)
  */
 type IsComplexExpression<T extends string> = 
   T extends `${string}->${string}` ? true :
@@ -645,6 +646,39 @@ type IsComplexExpression<T extends string> =
   T extends `( ${string}` ? true :
   IsFunctionCall<T> extends true ? true :
   HasTypeCast<T> extends true ? true :
+  IsParameterRef<T> extends true ? true :
+  IsArithmeticExpression<T> extends true ? true :
+  false
+
+/**
+ * Check if the expression is a parameter placeholder ($1, $2, :name)
+ * Handles: $1, $1 AS alias, $1::type, $1::type AS alias
+ */
+type IsParameterRef<T extends string> =
+  StripAliasAndCast<Trim<T>> extends infer Base extends string
+    ? Base extends `$${number}` ? true :
+      Base extends `:${string}` ? true :
+      false
+    : false
+
+/**
+ * Strip alias and type cast from expression
+ */
+type StripAliasAndCast<T extends string> =
+  T extends `${infer Expr} AS ${string}`
+    ? StripTypeCast<Trim<Expr>>
+    : StripTypeCast<T>
+
+/**
+ * Check if the expression contains arithmetic operators (+, -, *, /)
+ * This catches expressions like: 1 + 1, a - b, etc.
+ */
+type IsArithmeticExpression<T extends string> =
+  T extends `${string} + ${string}` ? true :
+  T extends `${string} - ${string}` ? true :
+  T extends `${string} * ${string}` ? true :
+  T extends `${string} / ${string}` ? true :
+  T extends `${string} % ${string}` ? true :
   false
 
 /**
