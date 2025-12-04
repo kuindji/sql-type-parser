@@ -1182,6 +1182,8 @@ type IsKeywordOrOperator<T extends string> =
       | "INTERVAL" | "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND" | "MILLISECOND" | "MICROSECOND"
       | "YEARS" | "MONTHS" | "DAYS" | "HOURS" | "MINUTES" | "SECONDS" | "MILLISECONDS" | "MICROSECONDS"
       | "WEEK" | "WEEKS" | "TO"
+      // NULLS FIRST/LAST for ORDER BY
+      | "NULLS" | "FIRST" | "LAST"
       ? true
       // SQL constants (CURRENT_DATE, CURRENT_TIMESTAMP, etc.)
       : T extends SQLConstantName
@@ -1938,12 +1940,32 @@ type ParseOrderByItems<T extends string[]> = T extends [
 
 /**
  * Parse a single ORDER BY item
+ * Handles: col, col ASC, col DESC, col NULLS FIRST, col DESC NULLS LAST, etc.
  */
-type ParseOrderByItem<T extends string> = Trim<T> extends `${infer Col} DESC`
-  ? OrderByItem<ParseOrderByColumnRef<Col>, "DESC">
-  : Trim<T> extends `${infer Col} ASC`
-  ? OrderByItem<ParseOrderByColumnRef<Col>, "ASC">
-  : OrderByItem<ParseOrderByColumnRef<Trim<T>>, "ASC">
+type ParseOrderByItem<T extends string> = 
+  // Pattern: col DESC NULLS FIRST/LAST
+  Trim<T> extends `${infer Col} DESC NULLS FIRST`
+    ? OrderByItem<ParseOrderByColumnRef<Col>, "DESC">
+    : Trim<T> extends `${infer Col} DESC NULLS LAST`
+      ? OrderByItem<ParseOrderByColumnRef<Col>, "DESC">
+      // Pattern: col ASC NULLS FIRST/LAST
+      : Trim<T> extends `${infer Col} ASC NULLS FIRST`
+        ? OrderByItem<ParseOrderByColumnRef<Col>, "ASC">
+        : Trim<T> extends `${infer Col} ASC NULLS LAST`
+          ? OrderByItem<ParseOrderByColumnRef<Col>, "ASC">
+          // Pattern: col NULLS FIRST/LAST (defaults to ASC)
+          : Trim<T> extends `${infer Col} NULLS FIRST`
+            ? OrderByItem<ParseOrderByColumnRef<Col>, "ASC">
+            : Trim<T> extends `${infer Col} NULLS LAST`
+              ? OrderByItem<ParseOrderByColumnRef<Col>, "ASC">
+              // Pattern: col DESC (no NULLS)
+              : Trim<T> extends `${infer Col} DESC`
+                ? OrderByItem<ParseOrderByColumnRef<Col>, "DESC">
+                // Pattern: col ASC (no NULLS)
+                : Trim<T> extends `${infer Col} ASC`
+                  ? OrderByItem<ParseOrderByColumnRef<Col>, "ASC">
+                  // Pattern: just col (defaults to ASC)
+                  : OrderByItem<ParseOrderByColumnRef<Trim<T>>, "ASC">
 
 /**
  * Parse column reference for ORDER BY, handling JSON accessors

@@ -708,6 +708,45 @@ type V_IntervalComplex = ValidateSelectSQL<
 type _V66 = RequireTrue<AssertEqual<V_IntervalComplex, true>>;
 
 // ============================================================================
+// ORDER BY NULLS FIRST/LAST Validation Tests
+// ============================================================================
+
+// Test: ORDER BY NULLS FIRST validates successfully
+type V_NullsFirst = ValidateSelectSQL<
+    "SELECT id, name FROM users ORDER BY deleted_at NULLS FIRST",
+    TestSchema
+>;
+type _V67 = RequireTrue<AssertEqual<V_NullsFirst, true>>;
+
+// Test: ORDER BY NULLS LAST validates successfully
+type V_NullsLast = ValidateSelectSQL<
+    "SELECT id, name FROM users ORDER BY deleted_at NULLS LAST",
+    TestSchema
+>;
+type _V68 = RequireTrue<AssertEqual<V_NullsLast, true>>;
+
+// Test: ORDER BY DESC NULLS FIRST validates successfully
+type V_DescNullsFirst = ValidateSelectSQL<
+    "SELECT id, name FROM users ORDER BY deleted_at DESC NULLS FIRST",
+    TestSchema
+>;
+type _V69 = RequireTrue<AssertEqual<V_DescNullsFirst, true>>;
+
+// Test: ORDER BY ASC NULLS LAST validates successfully
+type V_AscNullsLast = ValidateSelectSQL<
+    "SELECT id, name FROM users ORDER BY deleted_at ASC NULLS LAST",
+    TestSchema
+>;
+type _V70 = RequireTrue<AssertEqual<V_AscNullsLast, true>>;
+
+// Test: Multiple ORDER BY with NULLS validates successfully
+type V_MultiNulls = ValidateSelectSQL<
+    "SELECT id, name FROM users ORDER BY deleted_at DESC NULLS FIRST, created_at ASC NULLS LAST",
+    TestSchema
+>;
+type _V71 = RequireTrue<AssertEqual<V_MultiNulls, true>>;
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

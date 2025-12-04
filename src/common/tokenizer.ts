@@ -81,6 +81,10 @@ type SQLKeyword =
   | "SECOND"
   | "WEEK"
   | "TO"
+  // NULLS FIRST/LAST for ORDER BY
+  | "NULLS"
+  | "FIRST"
+  | "LAST"
   // SQL Constants (date/time, user/session)
   | "CURRENT_DATE"
   | "CURRENT_TIME"
