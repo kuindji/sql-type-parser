@@ -284,8 +284,14 @@ type HasInternalHole<T extends string> =
       `${Before} __X__ ${After}` extends T
         ? `${Before} __Y__ ${After}` extends T
           ? true  // Found a hole! Both test values match
-          : HasInternalHole<After>  // Try next segment
-        : HasInternalHole<After>  // Try next segment
+          : // Check both Before (for boundary holes) and After (for space holes)
+            HasHoleAtOtherBoundaries<Before> extends true
+              ? true
+              : HasInternalHole<After>
+        : // Check both Before (for boundary holes) and After (for space holes)
+          HasHoleAtOtherBoundaries<Before> extends true
+            ? true
+            : HasInternalHole<After>
     : // Also check for holes at other common SQL boundaries
       HasHoleAtOtherBoundaries<T>
 

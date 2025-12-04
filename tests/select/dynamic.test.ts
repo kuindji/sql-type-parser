@@ -12,6 +12,7 @@ import type {
     ParseSQL,
     SQLSelectQuery,
     ValidateSelectSQL,
+    ValidQuery,
 } from "../../src/index.js";
 import type {
     AssertEqual,
@@ -148,10 +149,11 @@ const generateIn = function() {
 };
 const queryDynamicIn = /*sql*/ `
     select * 
-    from users 
-    where "id" in (${generateIn()})` as const;
-type Test_ParseDynamicIn = ValidateSelectSQL<typeof queryDynamicIn, TestSchema>;
-type _P6 = RequireTrue<AssertEqual<Test_ParseDynamicIn, true>>;
+    from "users"
+    where "id" in (${generateIn()})
+  ` as const;
+type Test_ParseDynamicIn = ValidQuery<typeof queryDynamicIn, TestSchema>;
+type _P6 = RequireTrue<AssertEqual<Test_ParseDynamicIn, typeof queryDynamicIn>>;
 
 // ============================================================================
 // Export for verification
