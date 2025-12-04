@@ -473,6 +473,39 @@ type V_TypeCast = ValidateSelectSQL<"SELECT id::text AS id_str FROM users", Test
 type _V48 = RequireTrue<AssertEqual<V_TypeCast, true>>
 
 // ============================================================================
+// SQL Constants Validation Tests
+// ============================================================================
+
+// Test: CURRENT_DATE validates successfully
+type V_CurrentDate = ValidateSelectSQL<"SELECT CURRENT_DATE AS dt FROM users", TestSchema>
+type _V49 = RequireTrue<AssertEqual<V_CurrentDate, true>>
+
+// Test: CURRENT_TIMESTAMP validates successfully
+type V_CurrentTimestamp = ValidateSelectSQL<"SELECT CURRENT_TIMESTAMP AS ts FROM users", TestSchema>
+type _V50 = RequireTrue<AssertEqual<V_CurrentTimestamp, true>>
+
+// Test: Multiple SQL constants validate successfully
+type V_MultiConstants = ValidateSelectSQL<
+  "SELECT CURRENT_DATE AS dt, CURRENT_TIME AS tm, CURRENT_TIMESTAMP AS ts FROM users",
+  TestSchema
+>
+type _V51 = RequireTrue<AssertEqual<V_MultiConstants, true>>
+
+// Test: SQL constants mixed with columns validate successfully
+type V_MixedConstants = ValidateSelectSQL<
+  "SELECT id, name, CURRENT_DATE AS dt FROM users",
+  TestSchema
+>
+type _V52 = RequireTrue<AssertEqual<V_MixedConstants, true>>
+
+// Test: SQL constants in INSERT (via SELECT) validate successfully
+type V_ConstantWithJoin = ValidateSelectSQL<
+  "SELECT u.id, CURRENT_USER AS cu FROM users u",
+  TestSchema
+>
+type _V53 = RequireTrue<AssertEqual<V_ConstantWithJoin, true>>
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

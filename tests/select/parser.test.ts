@@ -24,6 +24,7 @@ import type {
     UnparsedExpr,
     ParsedCondition,
     ParseError,
+    SQLConstantExpr,
 } from "../../src/index.js"
 import type { AssertEqual, AssertExtends, RequireTrue, AssertIsParseError } from "../helpers.js"
 
@@ -916,6 +917,55 @@ type P_ColArith_Check = P_ColArith extends SQLSelectQuery<infer Q>
     : false
     : false
 type _P84 = RequireTrue<P_ColArith_Check>
+
+// ============================================================================
+// SQL Constants Parser Tests
+// ============================================================================
+
+// Test: CURRENT_DATE parses to SQLConstantExpr
+type P_CurrentDate = ParseSQL<"SELECT CURRENT_DATE FROM users">
+type P_CurrentDate_Check = P_CurrentDate extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<SQLConstantExpr<"CURRENT_DATE">, "current_date">] }
+    ? true
+    : false
+    : false
+type _PSC1 = RequireTrue<P_CurrentDate_Check>
+
+// Test: CURRENT_TIMESTAMP parses to SQLConstantExpr
+type P_CurrentTimestamp = ParseSQL<"SELECT CURRENT_TIMESTAMP FROM users">
+type P_CurrentTimestamp_Check = P_CurrentTimestamp extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<SQLConstantExpr<"CURRENT_TIMESTAMP">, "current_timestamp">] }
+    ? true
+    : false
+    : false
+type _PSC2 = RequireTrue<P_CurrentTimestamp_Check>
+
+// Test: CURRENT_DATE with alias
+type P_CurrentDateAlias = ParseSQL<"SELECT CURRENT_DATE AS today FROM users">
+type P_CurrentDateAlias_Check = P_CurrentDateAlias extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<SQLConstantExpr<"CURRENT_DATE">, "today">] }
+    ? true
+    : false
+    : false
+type _PSC3 = RequireTrue<P_CurrentDateAlias_Check>
+
+// Test: Multiple SQL constants
+type P_MultiConstants = ParseSQL<"SELECT CURRENT_DATE AS dt, CURRENT_TIME AS tm FROM users">
+type P_MultiConstants_Check = P_MultiConstants extends SQLSelectQuery<infer Q>
+    ? Q extends {
+        columns: [
+            ColumnRef<SQLConstantExpr<"CURRENT_DATE">, "dt">,
+            ColumnRef<SQLConstantExpr<"CURRENT_TIME">, "tm">
+        ]
+    }
+    ? true
+    : false
+    : false
+type _PSC4 = RequireTrue<P_MultiConstants_Check>
+
+// Test: SQL constants mixed with columns
+type P_MixedSQLConst = ParseSQL<"SELECT id, CURRENT_DATE AS dt FROM users">
+type _PSC5 = RequireTrue<AssertExtends<P_MixedSQLConst, SQLSelectQuery>>
 
 // ============================================================================
 // Export for verification

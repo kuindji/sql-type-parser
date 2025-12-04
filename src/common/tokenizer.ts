@@ -70,6 +70,17 @@ type SQLKeyword =
   | "CASCADE"
   | "RESTRICT"
   | "USING"
+  // SQL Constants (date/time, user/session)
+  | "CURRENT_DATE"
+  | "CURRENT_TIME"
+  | "CURRENT_TIMESTAMP"
+  | "LOCALTIME"
+  | "LOCALTIMESTAMP"
+  | "CURRENT_USER"
+  | "SESSION_USER"
+  | "CURRENT_CATALOG"
+  | "CURRENT_SCHEMA"
+  | "CURRENT_ROLE"
 
 /**
  * Keywords that terminate the FROM clause

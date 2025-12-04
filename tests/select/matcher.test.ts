@@ -1190,6 +1190,62 @@ type M_ArithCast = QueryResult<"SELECT ( views + 1 ) ::int AS incremented FROM p
 type _AR3 = RequireTrue<AssertEqual<M_ArithCast, { incremented: number; }>>;
 
 // ============================================================================
+// SQL Constants Type Inference Tests
+// ============================================================================
+
+// Test: CURRENT_DATE returns string (date type)
+type M_CurrentDate = QueryResult<"SELECT CURRENT_DATE AS dt FROM users", TestSchema>;
+type _SC1 = RequireTrue<AssertEqual<M_CurrentDate, { dt: string; }>>;
+
+// Test: CURRENT_TIMESTAMP returns string (timestamp type)
+type M_CurrentTimestamp = QueryResult<"SELECT CURRENT_TIMESTAMP AS ts FROM users", TestSchema>;
+type _SC2 = RequireTrue<AssertEqual<M_CurrentTimestamp, { ts: string; }>>;
+
+// Test: CURRENT_TIME returns string (time type)
+type M_CurrentTime = QueryResult<"SELECT CURRENT_TIME AS t FROM users", TestSchema>;
+type _SC3 = RequireTrue<AssertEqual<M_CurrentTime, { t: string; }>>;
+
+// Test: LOCALTIME returns string (time type)
+type M_LocalTime = QueryResult<"SELECT LOCALTIME AS lt FROM users", TestSchema>;
+type _SC4 = RequireTrue<AssertEqual<M_LocalTime, { lt: string; }>>;
+
+// Test: LOCALTIMESTAMP returns string (timestamp type)
+type M_LocalTimestamp = QueryResult<"SELECT LOCALTIMESTAMP AS lts FROM users", TestSchema>;
+type _SC5 = RequireTrue<AssertEqual<M_LocalTimestamp, { lts: string; }>>;
+
+// Test: CURRENT_USER returns string
+type M_CurrentUser = QueryResult<"SELECT CURRENT_USER AS u FROM users", TestSchema>;
+type _SC6 = RequireTrue<AssertEqual<M_CurrentUser, { u: string; }>>;
+
+// Test: SESSION_USER returns string
+type M_SessionUser = QueryResult<"SELECT SESSION_USER AS su FROM users", TestSchema>;
+type _SC7 = RequireTrue<AssertEqual<M_SessionUser, { su: string; }>>;
+
+// Test: CURRENT_SCHEMA returns string
+type M_CurrentSchema = QueryResult<"SELECT CURRENT_SCHEMA AS schema FROM users", TestSchema>;
+type _SC8 = RequireTrue<AssertEqual<M_CurrentSchema, { schema: string; }>>;
+
+// Test: Mix of SQL constants and columns
+type M_MixedConstants = QueryResult<"SELECT id, CURRENT_DATE AS dt FROM users", TestSchema>;
+type _SC9 = RequireTrue<AssertEqual<M_MixedConstants, { id: number; dt: string; }>>;
+
+// Test: SQL constant with alias
+type M_ConstantAlias = QueryResult<"SELECT CURRENT_DATE AS today FROM users", TestSchema>;
+type _SC10 = RequireTrue<AssertEqual<M_ConstantAlias, { today: string; }>>;
+
+// Test: Multiple SQL constants
+type M_MultiConstants = QueryResult<"SELECT CURRENT_DATE AS dt, CURRENT_TIME AS tm FROM users", TestSchema>;
+type _SC11 = RequireTrue<AssertEqual<M_MultiConstants, { dt: string; tm: string; }>>;
+
+// Test: SQL constants in function calls (concat, etc.) - lowercase should work too
+type M_ConstantInFunc = QueryResult<"SELECT concat ( '1' , '2' , current_date ) AS result FROM users", TestSchema>;
+type _SC12 = RequireTrue<AssertEqual<M_ConstantInFunc, { result: unknown; }>>;
+
+// Test: SQL constants in function calls with uppercase
+type M_ConstantInFuncUpper = QueryResult<"SELECT concat ( 'test' , CURRENT_TIMESTAMP ) AS result FROM users", TestSchema>;
+type _SC13 = RequireTrue<AssertEqual<M_ConstantInFuncUpper, { result: unknown; }>>;
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

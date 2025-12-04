@@ -17,6 +17,8 @@ import type {
   UnionClauseAny,
   UnionOperatorType,
   SQLSelectQuery,
+  SQLConstantExpr,
+  SQLConstantName,
 } from "./ast.js"
 
 import type {
@@ -386,22 +388,25 @@ type ParseSimpleColumn<T extends string> =
   // Check for literal values first (number, string, null, boolean)
   IsLiteralExpression<T> extends true
     ? ParseLiteralColumn<T>
-    // Check for table.* wildcard
-    : IsTableWildcard<T> extends true
-      ? ParseTableWildcard<T>
-      // Check for scalar subquery (parenthesized SELECT)
-      : IsSubqueryExpression<T> extends true
-        ? ParseSubqueryColumn<T>
-        // Check for CAST function (must be before general complex expression check)
-        : IsCastExpression<T> extends true
-          ? ParseCastColumn<T>
-          // Check for complex expression (contains JSON operators or parentheses with operators)
-          : IsComplexExpression<T> extends true
-            ? ParseComplexColumn<T>
-            // Simple column with optional alias
-            : T extends `${infer Col} AS ${infer Alias}`
-              ? ColumnRef<ParseColumnRefType<StripTypeCast<Trim<Col>>>, RemoveQuotes<Alias>>
-              : ColumnRef<ParseColumnRefType<StripTypeCast<T>>, ExtractColumnName<StripTypeCast<T>>>
+    // Check for SQL constants (CURRENT_DATE, CURRENT_TIMESTAMP, etc.)
+    : IsSQLConstantExpression<T> extends true
+      ? ParseSQLConstantColumn<T>
+      // Check for table.* wildcard
+      : IsTableWildcard<T> extends true
+        ? ParseTableWildcard<T>
+        // Check for scalar subquery (parenthesized SELECT)
+        : IsSubqueryExpression<T> extends true
+          ? ParseSubqueryColumn<T>
+          // Check for CAST function (must be before general complex expression check)
+          : IsCastExpression<T> extends true
+            ? ParseCastColumn<T>
+            // Check for complex expression (contains JSON operators or parentheses with operators)
+            : IsComplexExpression<T> extends true
+              ? ParseComplexColumn<T>
+              // Simple column with optional alias
+              : T extends `${infer Col} AS ${infer Alias}`
+                ? ColumnRef<ParseColumnRefType<StripTypeCast<Trim<Col>>>, RemoveQuotes<Alias>>
+                : ColumnRef<ParseColumnRefType<StripTypeCast<T>>, ExtractColumnName<StripTypeCast<T>>>
 
 /**
  * Check if the expression is a literal value (number, string, null, boolean)
@@ -428,6 +433,22 @@ type IsLiteralValue<T extends string> =
   // Boolean literals
   T extends "TRUE" | "FALSE" ? true :
   false
+
+/**
+ * Check if the expression is a SQL constant (CURRENT_DATE, CURRENT_TIMESTAMP, etc.)
+ * These are special SQL keywords that return typed values without function call syntax
+ */
+type IsSQLConstantExpression<T extends string> =
+  // Check with alias first
+  Trim<T> extends `${infer Expr} AS ${string}`
+    ? IsSQLConstant<Trim<Expr>>
+    : IsSQLConstant<Trim<T>>
+
+/**
+ * Check if the value is a SQL constant
+ */
+type IsSQLConstant<T extends string> =
+  T extends SQLConstantName ? true : false
 
 /**
  * Parse a literal column expression
@@ -471,6 +492,39 @@ type ExtractLiteralAlias<T extends string> =
   T extends `'${string}'` ? "text" :
   T extends `${number}` | `-${number}` ? "int4" :
   "literal"
+
+/**
+ * Parse a SQL constant column expression
+ * Handles: CURRENT_DATE AS dt, CURRENT_TIMESTAMP AS ts, etc.
+ */
+type ParseSQLConstantColumn<T extends string> =
+  Trim<T> extends `${infer Expr} AS ${infer Alias}`
+    ? ColumnRef<ParseSQLConstantExpr<Trim<Expr>>, RemoveQuotes<Alias>>
+    : ColumnRef<ParseSQLConstantExpr<Trim<T>>, ExtractSQLConstantAlias<Trim<T>>>
+
+/**
+ * Parse a SQL constant expression into a SQLConstantExpr AST node
+ */
+type ParseSQLConstantExpr<T extends string> =
+  T extends SQLConstantName
+    ? SQLConstantExpr<T>
+    : SQLConstantExpr<SQLConstantName>
+
+/**
+ * Extract a default alias for a SQL constant (returns the lowercase name)
+ */
+type ExtractSQLConstantAlias<T extends string> =
+  T extends "CURRENT_DATE" ? "current_date" :
+  T extends "CURRENT_TIME" ? "current_time" :
+  T extends "CURRENT_TIMESTAMP" ? "current_timestamp" :
+  T extends "LOCALTIME" ? "localtime" :
+  T extends "LOCALTIMESTAMP" ? "localtimestamp" :
+  T extends "CURRENT_USER" ? "current_user" :
+  T extends "SESSION_USER" ? "session_user" :
+  T extends "CURRENT_CATALOG" ? "current_catalog" :
+  T extends "CURRENT_SCHEMA" ? "current_schema" :
+  T extends "CURRENT_ROLE" ? "current_role" :
+  "constant"
 
 /**
  * Check if the expression is a CAST function
@@ -940,6 +994,9 @@ type IsKeywordOrOperator<T extends string> =
       | "COUNT" | "SUM" | "AVG" | "MIN" | "MAX" | "COALESCE" | "NULLIF" | "CAST"
       | "FOR" | "USING" | "WITH" | "OVER" | "PARTITION" | "ROWS" | "RANGE" | "PRECEDING" | "FOLLOWING"
       ? true
+      // SQL constants (CURRENT_DATE, CURRENT_TIMESTAMP, etc.)
+      : T extends SQLConstantName
+        ? true
       // Comparison operators
       : T extends "=" | "!=" | "<>" | "<" | ">" | "<=" | ">="
         ? true

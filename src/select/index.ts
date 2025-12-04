@@ -24,6 +24,10 @@ export type {
   SubqueryExpr,
   ExtendedColumnRefType,
 
+  // SQL constants
+  SQLConstantExpr,
+  SQLConstantName,
+
   // Select types
   SelectClause,
   SelectItem,

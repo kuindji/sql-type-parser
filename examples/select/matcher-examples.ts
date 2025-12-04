@@ -356,8 +356,8 @@ type OrderWithCustomer = QueryResult<
     u.last_name,
     'something' as something,
     $1::text as param1,
-    now() as stamp,
-    concat('1', '2') as str
+    now()::int4 as stamp,
+    concat('1', '2', $1, current_date)::text as str
   FROM orders AS o
   INNER JOIN users AS u ON o.user_id = u.id
 `,

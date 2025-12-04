@@ -38,6 +38,40 @@ export type LiteralExpr<
 }
 
 // ============================================================================
+// SQL Constants (SELECT-specific)
+// ============================================================================
+
+/**
+ * SQL constant names that can be used without parentheses
+ * These are database constants that return typed values
+ */
+export type SQLConstantName =
+  // Date/Time constants (PostgreSQL & MySQL)
+  | "CURRENT_DATE"
+  | "CURRENT_TIME"
+  | "CURRENT_TIMESTAMP"
+  | "LOCALTIME"
+  | "LOCALTIMESTAMP"
+  // User/Session constants
+  | "CURRENT_USER"
+  | "SESSION_USER"
+  | "CURRENT_CATALOG"
+  | "CURRENT_SCHEMA"
+  // Transaction constants (PostgreSQL)
+  | "CURRENT_ROLE"
+
+/**
+ * A SQL constant expression (like CURRENT_DATE, CURRENT_TIMESTAMP)
+ * These are special SQL keywords that return typed values without requiring function call syntax
+ */
+export type SQLConstantExpr<
+  Name extends SQLConstantName = SQLConstantName,
+> = {
+  readonly type: "SQLConstantExpr"
+  readonly name: Name
+}
+
+// ============================================================================
 // Subquery Expression (SELECT-specific)
 // ============================================================================
 
@@ -56,10 +90,10 @@ export type SubqueryExpr<
 }
 
 /**
- * Extended column reference type that includes subqueries and literals
+ * Extended column reference type that includes subqueries, literals, and SQL constants
  * Used only in parser output for SELECT columns
  */
-export type ExtendedColumnRefType = ColumnRefType | SubqueryExpr | LiteralExpr
+export type ExtendedColumnRefType = ColumnRefType | SubqueryExpr | LiteralExpr | SQLConstantExpr
 
 /**
  * A column reference with optional alias

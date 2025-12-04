@@ -15,6 +15,8 @@ import type {
   UnionClauseAny,
   UnionOperatorType,
   SelectItem,
+  SQLConstantExpr,
+  SQLConstantName,
 } from "./ast.js"
 
 import type {
@@ -486,15 +488,17 @@ type ResolveColumnRef<
   Schema extends DatabaseSchema = DatabaseSchema,
 > = Ref extends LiteralExpr<infer Value>
   ? ResolveLiteralExpr<Value>
-  : Ref extends SubqueryExpr<infer Query, infer CastType>
-    ? ResolveSubqueryExpr<Query, CastType, Context, Schema>
-    : Ref extends ComplexExpr<infer ColumnRefs, infer CastType>
-      ? ResolveComplexExpr<ColumnRefs, CastType, Context, Schema>
-      : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
-        ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
-        : Ref extends UnboundColumnRef<infer Column>
-          ? ResolveUnboundColumn<Column, Context>
-          : MatchError<"Invalid column reference">
+  : Ref extends SQLConstantExpr<infer Name>
+    ? ResolveSQLConstant<Name>
+    : Ref extends SubqueryExpr<infer Query, infer CastType>
+      ? ResolveSubqueryExpr<Query, CastType, Context, Schema>
+      : Ref extends ComplexExpr<infer ColumnRefs, infer CastType>
+        ? ResolveComplexExpr<ColumnRefs, CastType, Context, Schema>
+        : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+          ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
+          : Ref extends UnboundColumnRef<infer Column>
+            ? ResolveUnboundColumn<Column, Context>
+            : MatchError<"Invalid column reference">
 
 /**
  * Resolve a literal expression to its TypeScript type
@@ -505,6 +509,25 @@ type ResolveLiteralExpr<Value> =
   Value extends boolean ? Value :
   Value extends number ? Value :
   Value extends string ? Value :
+  unknown
+
+/**
+ * Resolve a SQL constant to its TypeScript type
+ * Maps SQL constants like CURRENT_DATE to their expected return types
+ */
+type ResolveSQLConstant<Name extends SQLConstantName> =
+  // Date/Time constants
+  Name extends "CURRENT_DATE" ? string :  // DATE type maps to string
+  Name extends "CURRENT_TIME" ? string :  // TIME type maps to string
+  Name extends "CURRENT_TIMESTAMP" ? string :  // TIMESTAMP type maps to string
+  Name extends "LOCALTIME" ? string :  // TIME type maps to string
+  Name extends "LOCALTIMESTAMP" ? string :  // TIMESTAMP type maps to string
+  // User/Session constants
+  Name extends "CURRENT_USER" ? string :
+  Name extends "SESSION_USER" ? string :
+  Name extends "CURRENT_CATALOG" ? string :
+  Name extends "CURRENT_SCHEMA" ? string :
+  Name extends "CURRENT_ROLE" ? string :
   unknown
 
 /**
