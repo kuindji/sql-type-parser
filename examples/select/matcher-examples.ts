@@ -551,7 +551,14 @@ type MixedCaseColumns = QueryResult<
 
 /** PascalCase table name */
 type PascalCaseTable = QueryResult<
-    'SELECT id, "unitPrice", "totalPrice", "Item_Status" FROM "OrderItems"',
+    `SELECT id, "unitPrice", "totalPrice", "Item_Status" 
+    FROM "OrderItems"
+    where "Item_Status" = $1 
+    and coalesce("totalPrice", 0) > $2
+    and not exists(
+        select 1 from "OrderItems" oi2
+        where oi2."orderId" = "OrderItems"."orderId"
+    )`,
     CamelCaseSchema
 >;
 // Result: { id: number; unitPrice: number; totalPrice: number; Item_Status: "pending" | "shipped" | "delivered" }
