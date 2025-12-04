@@ -44,6 +44,7 @@ import type {
     SelectClause,
     SelectItem,
     ColumnRef,
+    LiteralExpr,
     SubqueryExpr,
     SQLSelectQuery,
     UnionClause,
@@ -183,6 +184,26 @@ type _AE4 = RequireTrue<AssertEqual<AE["alias"], "total">>
 // ============================================================================
 // SELECT-specific Type Tests
 // ============================================================================
+
+// Test: LiteralExpr structure (numeric)
+type LE_Num = LiteralExpr<42>
+type _LE1 = RequireTrue<AssertEqual<LE_Num["type"], "LiteralExpr">>
+type _LE2 = RequireTrue<AssertEqual<LE_Num["value"], 42>>
+
+// Test: LiteralExpr structure (string)
+type LE_Str = LiteralExpr<"hello">
+type _LE3 = RequireTrue<AssertEqual<LE_Str["type"], "LiteralExpr">>
+type _LE4 = RequireTrue<AssertEqual<LE_Str["value"], "hello">>
+
+// Test: LiteralExpr structure (null)
+type LE_Null = LiteralExpr<null>
+type _LE5 = RequireTrue<AssertEqual<LE_Null["type"], "LiteralExpr">>
+type _LE6 = RequireTrue<AssertEqual<LE_Null["value"], null>>
+
+// Test: LiteralExpr structure (boolean)
+type LE_Bool = LiteralExpr<true>
+type _LE7 = RequireTrue<AssertEqual<LE_Bool["type"], "LiteralExpr">>
+type _LE8 = RequireTrue<AssertEqual<LE_Bool["value"], true>>
 
 // Test: ColumnRef structure
 type CR = ColumnRef<UnboundColumnRef<"id">, "user_id">

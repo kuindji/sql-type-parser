@@ -19,7 +19,23 @@ import type {
   OrderByItem,
   AggregateExpr,
   SubquerySelectClause,
+  LiteralValue,
 } from "../common/ast.js"
+
+// ============================================================================
+// Literal Expression (SELECT-specific)
+// ============================================================================
+
+/**
+ * A literal value expression used directly in SELECT columns
+ * Examples: SELECT 1 AS num, SELECT 'hello' AS str, SELECT NULL AS nothing
+ */
+export type LiteralExpr<
+  Value extends string | number | boolean | null = string | number | boolean | null,
+> = {
+  readonly type: "LiteralExpr"
+  readonly value: Value
+}
 
 // ============================================================================
 // Subquery Expression (SELECT-specific)
@@ -40,10 +56,10 @@ export type SubqueryExpr<
 }
 
 /**
- * Extended column reference type that includes subqueries
+ * Extended column reference type that includes subqueries and literals
  * Used only in parser output for SELECT columns
  */
-export type ExtendedColumnRefType = ColumnRefType | SubqueryExpr
+export type ExtendedColumnRefType = ColumnRefType | SubqueryExpr | LiteralExpr
 
 /**
  * A column reference with optional alias

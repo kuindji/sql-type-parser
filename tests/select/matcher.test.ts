@@ -1091,6 +1091,49 @@ type V_ConcatInvalid = ValidateSQL<
 type _C5 = RequireTrue<AssertExtends<V_ConcatInvalid, string>>;
 
 // ============================================================================
+// Literal Value Type Inference Tests
+// ============================================================================
+
+// Test: Numeric literal returns the exact number type
+type M_NumericLiteral = QueryResult<"SELECT 1 AS num FROM users", TestSchema>;
+type _L1 = RequireTrue<AssertEqual<M_NumericLiteral, { num: 1; }>>;
+
+// Test: String literal returns the exact string type
+type M_StringLiteral = QueryResult<"SELECT 'hello' AS greeting FROM users", TestSchema>;
+type _L2 = RequireTrue<AssertEqual<M_StringLiteral, { greeting: "hello"; }>>;
+
+// Test: NULL literal returns null type
+type M_NullLiteral = QueryResult<"SELECT NULL AS nothing FROM users", TestSchema>;
+type _L3 = RequireTrue<AssertEqual<M_NullLiteral, { nothing: null; }>>;
+
+// Test: TRUE literal returns true type
+type M_TrueLiteral = QueryResult<"SELECT TRUE AS flag FROM users", TestSchema>;
+type _L4 = RequireTrue<AssertEqual<M_TrueLiteral, { flag: true; }>>;
+
+// Test: FALSE literal returns false type
+type M_FalseLiteral = QueryResult<"SELECT FALSE AS inactive FROM users", TestSchema>;
+type _L5 = RequireTrue<AssertEqual<M_FalseLiteral, { inactive: false; }>>;
+
+// Test: Mix of literals and columns
+type M_MixedLiteralsCols = QueryResult<
+    "SELECT id, 1 AS one, name, 'test' AS str FROM users",
+    TestSchema
+>;
+type _L6 = RequireTrue<AssertEqual<M_MixedLiteralsCols, { id: number; one: 1; name: string; str: "test"; }>>;
+
+// Test: Larger numeric literal
+type M_LargeNumeric = QueryResult<"SELECT 42 AS answer FROM users", TestSchema>;
+type _L7 = RequireTrue<AssertEqual<M_LargeNumeric, { answer: 42; }>>;
+
+// Test: String literal with spaces
+type M_StringWithSpaces = QueryResult<"SELECT 'hello world' AS msg FROM users", TestSchema>;
+type _L8 = RequireTrue<AssertEqual<M_StringWithSpaces, { msg: "hello world"; }>>;
+
+// Test: ValidateSQL passes for literal values (no column reference to validate)
+type V_LiteralValid = ValidateSQL<"SELECT 1 AS num, 'test' AS str FROM users", TestSchema>;
+type _L9 = RequireTrue<AssertEqual<V_LiteralValid, true>>;
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

@@ -9,6 +9,7 @@ import type {
   SQLSelectQuery,
   SelectClause,
   ColumnRef,
+  LiteralExpr,
   SubqueryExpr,
   UnionClause,
   UnionClauseAny,
@@ -483,15 +484,28 @@ type ResolveColumnRef<
   Ref,
   Context,
   Schema extends DatabaseSchema = DatabaseSchema,
-> = Ref extends SubqueryExpr<infer Query, infer CastType>
-  ? ResolveSubqueryExpr<Query, CastType, Context, Schema>
-  : Ref extends ComplexExpr<infer ColumnRefs, infer CastType>
-    ? ResolveComplexExpr<ColumnRefs, CastType, Context, Schema>
-    : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
-      ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
-      : Ref extends UnboundColumnRef<infer Column>
-        ? ResolveUnboundColumn<Column, Context>
-        : MatchError<"Invalid column reference">
+> = Ref extends LiteralExpr<infer Value>
+  ? ResolveLiteralExpr<Value>
+  : Ref extends SubqueryExpr<infer Query, infer CastType>
+    ? ResolveSubqueryExpr<Query, CastType, Context, Schema>
+    : Ref extends ComplexExpr<infer ColumnRefs, infer CastType>
+      ? ResolveComplexExpr<ColumnRefs, CastType, Context, Schema>
+      : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+        ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
+        : Ref extends UnboundColumnRef<infer Column>
+          ? ResolveUnboundColumn<Column, Context>
+          : MatchError<"Invalid column reference">
+
+/**
+ * Resolve a literal expression to its TypeScript type
+ * The literal value is directly used as the type
+ */
+type ResolveLiteralExpr<Value> =
+  Value extends null ? null :
+  Value extends boolean ? Value :
+  Value extends number ? Value :
+  Value extends string ? Value :
+  unknown
 
 /**
  * Resolve a complex expression

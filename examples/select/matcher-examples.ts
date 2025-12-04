@@ -353,7 +353,10 @@ type OrderWithCustomer = QueryResult<
     o.total_amount,
     u.email AS customer_email,
     u.first_name,
-    u.last_name
+    u.last_name,
+    'something' as something,
+    null as nullish,
+    1 as num
   FROM orders AS o
   INNER JOIN users AS u ON o.user_id = u.id
 `,

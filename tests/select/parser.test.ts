@@ -773,6 +773,68 @@ type P_ConcatNoAlias = ParseSQL<"SELECT first_name || last_name FROM users">
 type _P68 = RequireTrue<AssertExtends<P_ConcatNoAlias, SQLSelectQuery>>
 
 // ============================================================================
+// Literal Value Tests
+// ============================================================================
+
+// Test: Numeric literal with alias
+type P_NumericLiteral = ParseSQL<"SELECT 1 AS num FROM users">
+type P_NumericLiteral_Check = P_NumericLiteral extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<import("../../src/index.js").LiteralExpr<1>, "num">] }
+    ? true
+    : false
+    : false
+type _P69 = RequireTrue<P_NumericLiteral_Check>
+
+// Test: String literal with alias
+type P_StringLiteral = ParseSQL<"SELECT 'hello' AS greeting FROM users">
+type P_StringLiteral_Check = P_StringLiteral extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<import("../../src/index.js").LiteralExpr<"hello">, "greeting">] }
+    ? true
+    : false
+    : false
+type _P70 = RequireTrue<P_StringLiteral_Check>
+
+// Test: NULL literal with alias
+type P_NullLiteral = ParseSQL<"SELECT NULL AS nothing FROM users">
+type P_NullLiteral_Check = P_NullLiteral extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<import("../../src/index.js").LiteralExpr<null>, "nothing">] }
+    ? true
+    : false
+    : false
+type _P71 = RequireTrue<P_NullLiteral_Check>
+
+// Test: TRUE literal with alias
+type P_TrueLiteral = ParseSQL<"SELECT TRUE AS flag FROM users">
+type P_TrueLiteral_Check = P_TrueLiteral extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<import("../../src/index.js").LiteralExpr<true>, "flag">] }
+    ? true
+    : false
+    : false
+type _P72 = RequireTrue<P_TrueLiteral_Check>
+
+// Test: FALSE literal with alias
+type P_FalseLiteral = ParseSQL<"SELECT FALSE AS inactive FROM users">
+type P_FalseLiteral_Check = P_FalseLiteral extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<import("../../src/index.js").LiteralExpr<false>, "inactive">] }
+    ? true
+    : false
+    : false
+type _P73 = RequireTrue<P_FalseLiteral_Check>
+
+// Test: Numeric literal without alias (gets default alias)
+type P_NumericNoAlias = ParseSQL<"SELECT 42 FROM users">
+type P_NumericNoAlias_Check = P_NumericNoAlias extends SQLSelectQuery<infer Q>
+    ? Q extends { columns: [ColumnRef<import("../../src/index.js").LiteralExpr<42>, "int4">] }
+    ? true
+    : false
+    : false
+type _P74 = RequireTrue<P_NumericNoAlias_Check>
+
+// Test: Mix of literals and columns
+type P_MixedLiteralsCols = ParseSQL<"SELECT id, 1 AS one, name, 'test' AS str FROM users">
+type _P75 = RequireTrue<AssertExtends<P_MixedLiteralsCols, SQLSelectQuery>>
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

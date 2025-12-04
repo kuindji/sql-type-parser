@@ -144,6 +144,7 @@ export type {
 
   // Column types
   ColumnRef,
+  LiteralExpr,
   SubqueryExpr,
   ExtendedColumnRefType,
 

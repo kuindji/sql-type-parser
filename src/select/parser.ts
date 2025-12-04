@@ -10,6 +10,7 @@ import type {
   SelectClause,
   SelectItem,
   ColumnRef,
+  LiteralExpr,
   SubqueryExpr,
   ExtendedColumnRefType,
   UnionClause,
@@ -379,25 +380,97 @@ type ParseAggregateArg<T extends string> = Trim<T> extends "*"
 
 /**
  * Parse a simple column reference with optional alias
- * Handles PostgreSQL type casting syntax (::type), complex expressions, and subqueries
+ * Handles PostgreSQL type casting syntax (::type), complex expressions, subqueries, and literals
  */
 type ParseSimpleColumn<T extends string> =
-  // Check for table.* wildcard first
-  IsTableWildcard<T> extends true
-    ? ParseTableWildcard<T>
-    // Check for scalar subquery (parenthesized SELECT)
-    : IsSubqueryExpression<T> extends true
-      ? ParseSubqueryColumn<T>
-      // Check for CAST function (must be before general complex expression check)
-      : IsCastExpression<T> extends true
-        ? ParseCastColumn<T>
-        // Check for complex expression (contains JSON operators or parentheses with operators)
-        : IsComplexExpression<T> extends true
-          ? ParseComplexColumn<T>
-          // Simple column with optional alias
-          : T extends `${infer Col} AS ${infer Alias}`
-            ? ColumnRef<ParseColumnRefType<StripTypeCast<Trim<Col>>>, RemoveQuotes<Alias>>
-            : ColumnRef<ParseColumnRefType<StripTypeCast<T>>, ExtractColumnName<StripTypeCast<T>>>
+  // Check for literal values first (number, string, null, boolean)
+  IsLiteralExpression<T> extends true
+    ? ParseLiteralColumn<T>
+    // Check for table.* wildcard
+    : IsTableWildcard<T> extends true
+      ? ParseTableWildcard<T>
+      // Check for scalar subquery (parenthesized SELECT)
+      : IsSubqueryExpression<T> extends true
+        ? ParseSubqueryColumn<T>
+        // Check for CAST function (must be before general complex expression check)
+        : IsCastExpression<T> extends true
+          ? ParseCastColumn<T>
+          // Check for complex expression (contains JSON operators or parentheses with operators)
+          : IsComplexExpression<T> extends true
+            ? ParseComplexColumn<T>
+            // Simple column with optional alias
+            : T extends `${infer Col} AS ${infer Alias}`
+              ? ColumnRef<ParseColumnRefType<StripTypeCast<Trim<Col>>>, RemoveQuotes<Alias>>
+              : ColumnRef<ParseColumnRefType<StripTypeCast<T>>, ExtractColumnName<StripTypeCast<T>>>
+
+/**
+ * Check if the expression is a literal value (number, string, null, boolean)
+ * Examples: 1, 42, 'hello', 'world', NULL, TRUE, FALSE
+ */
+type IsLiteralExpression<T extends string> =
+  // Check with alias first
+  Trim<T> extends `${infer Expr} AS ${string}`
+    ? IsLiteralValue<Trim<Expr>>
+    : IsLiteralValue<Trim<T>>
+
+/**
+ * Check if the value is a literal
+ */
+type IsLiteralValue<T extends string> =
+  // Numeric literals
+  T extends `${number}` ? true :
+  // Negative numeric literals
+  T extends `-${number}` ? true :
+  // String literals (single-quoted)
+  T extends `'${string}'` ? true :
+  // NULL literal
+  T extends "NULL" ? true :
+  // Boolean literals
+  T extends "TRUE" | "FALSE" ? true :
+  false
+
+/**
+ * Parse a literal column expression
+ * Handles: 1 AS num, 'hello' AS str, NULL AS nothing, TRUE AS flag
+ */
+type ParseLiteralColumn<T extends string> =
+  Trim<T> extends `${infer Expr} AS ${infer Alias}`
+    ? ColumnRef<ParseLiteralExpr<Trim<Expr>>, RemoveQuotes<Alias>>
+    : ColumnRef<ParseLiteralExpr<Trim<T>>, ExtractLiteralAlias<Trim<T>>>
+
+/**
+ * Parse a literal expression into a LiteralExpr AST node
+ */
+type ParseLiteralExpr<T extends string> =
+  // NULL literal
+  T extends "NULL"
+    ? LiteralExpr<null>
+  // Boolean TRUE
+  : T extends "TRUE"
+    ? LiteralExpr<true>
+  // Boolean FALSE
+  : T extends "FALSE"
+    ? LiteralExpr<false>
+  // String literal (single-quoted)
+  : T extends `'${infer Str}'`
+    ? LiteralExpr<Str>
+  // Negative number literal
+  : T extends `-${infer Num extends number}`
+    ? LiteralExpr<`-${Num}` extends `${infer N extends number}` ? N : number>
+  // Positive number literal
+  : T extends `${infer Num extends number}`
+    ? LiteralExpr<Num>
+  : LiteralExpr<string | number | boolean | null>
+
+/**
+ * Extract a default alias for a literal (returns a descriptive name)
+ */
+type ExtractLiteralAlias<T extends string> =
+  T extends "NULL" ? "null" :
+  T extends "TRUE" | "FALSE" ? "bool" :
+  T extends `'${string}'` ? "text" :
+  T extends `${number}` | `-${number}` ? "int4" :
+  "literal"
 
 /**
  * Check if the expression is a CAST function
