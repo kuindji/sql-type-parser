@@ -409,22 +409,22 @@ type ValidateTableColumn<
  */
 type ValidateUnboundColumn<Column extends string, Context> = ColumnExistsInContext<
   Column,
-  Context,
-  keyof Context
+  Context
 >
 
 /**
  * Check if column exists in any table in context
+ * Uses mapped type to avoid distributive conditional infinite recursion
  */
-type ColumnExistsInContext<Column extends string, Context, Keys> = [Keys] extends [never]
-  ? `Column '${Column}' not found in any table`
-  : Keys extends keyof Context
-    ? Context[Keys] extends infer Table
-      ? Column extends keyof Table
-        ? true
-        : ColumnExistsInContext<Column, Context, Exclude<keyof Context, Keys>>
-      : ColumnExistsInContext<Column, Context, Exclude<keyof Context, Keys>>
-    : `Column '${Column}' not found in any table`
+type ColumnExistsInContext<
+  Column extends string,
+  Context,
+  _Keys = keyof Context,  // Kept for backwards compatibility, not used
+> = true extends {
+  [K in keyof Context]: Column extends keyof Context[K] ? true : never
+}[keyof Context]
+  ? true
+  : `Column '${Column}' not found in any table`
 
 // ============================================================================
 // RETURNING Clause Validation (PostgreSQL 17+ OLD/NEW support)

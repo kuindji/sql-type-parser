@@ -355,9 +355,7 @@ type OrderWithCustomer = QueryResult<
     u.first_name,
     u.last_name,
     'something' as something,
-    null as nullish,
-    1 as num,
-    $1 as param1,
+    $1::text as param1,
     now() as stamp,
     concat('1', '2') as str
   FROM orders AS o

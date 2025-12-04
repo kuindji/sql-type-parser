@@ -674,20 +674,17 @@ type ValidateSchemaTableColumn<
 
 /**
  * Check if an unbound column exists in any table
+ * Uses mapped type to avoid distributive conditional infinite recursion
  */
 type FindColumnExists<
   Column extends string,
   Context,
-  Keys,
-> = [Keys] extends [never]
-  ? MatchError<`Column '${Column}' not found in any table`>
-  : Keys extends keyof Context
-    ? Context[Keys] extends infer Table
-      ? Column extends keyof Table
-        ? true
-        : FindColumnExists<Column, Context, Exclude<keyof Context, Keys>>
-      : FindColumnExists<Column, Context, Exclude<keyof Context, Keys>>
-    : MatchError<`Column '${Column}' not found in any table`>
+  _Keys = keyof Context,  // Kept for backwards compatibility, not used
+> = true extends {
+  [K in keyof Context]: Column extends keyof Context[K] ? true : never
+}[keyof Context]
+  ? true
+  : MatchError<`Column '${Column}' not found in any table`>
 
 /**
  * Resolve a table-qualified column (table.column, alias.column, or schema.table.column)
@@ -736,25 +733,23 @@ type ResolveSchemaTableColumn<
 type ResolveUnboundColumn<
   Column extends string,
   Context,
-> = FindColumnInContext<Column, Context, keyof Context>
+> = FindColumnInContext<Column, Context>
 
 /**
  * Search for a column across all tables in context
- * Note: We use [Keys] extends [never] to prevent distributive conditional behavior
+ * Uses mapped type to avoid distributive conditional infinite recursion
  */
 type FindColumnInContext<
   Column extends string,
   Context,
-  Keys,
-> = [Keys] extends [never]
-  ? MatchError<`Column '${Column}' not found in any table`>
-  : Keys extends keyof Context
-    ? Context[Keys] extends infer Table
-      ? Column extends keyof Table
-        ? Table[Column]
-        : FindColumnInContext<Column, Context, Exclude<keyof Context, Keys>>
-      : FindColumnInContext<Column, Context, Exclude<keyof Context, Keys>>
-    : MatchError<`Column '${Column}' not found in any table`>
+  _Keys = keyof Context,  // Kept for backwards compatibility, not used
+> = {
+  [K in keyof Context]: Column extends keyof Context[K] ? Context[K][Column] : never
+}[keyof Context] extends infer Result
+  ? [Result] extends [never]
+    ? MatchError<`Column '${Column}' not found in any table`>
+    : Result
+  : never
 
 // ============================================================================
 // Aggregate Result Types

@@ -912,7 +912,9 @@ type ExtractTwoPartOrSimpleColumnRef<T extends string> =
   // Pattern: column::type (unquoted simple column with cast) - after JSON check
   : T extends `${infer Col}::${string}`
     ? IsSimpleIdentifier<ExtractBeforeCast<Col>> extends true
-      ? UnboundColumnRef<ExtractBeforeCast<Col>>
+      ? IsKeywordOrOperator<ExtractBeforeCast<Col>> extends true
+        ? never  // Parameter placeholders ($1, :param) are values, not columns
+        : UnboundColumnRef<ExtractBeforeCast<Col>>
       : never
   // Pattern: simple unquoted identifier (unbound column)
   : IsSimpleIdentifier<T> extends true
