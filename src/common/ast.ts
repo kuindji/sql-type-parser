@@ -323,6 +323,7 @@ export type MapSQLTypeToTS<T extends string> =
   T extends "bool" | "boolean" ? boolean :
   T extends "json" | "jsonb" ? object :
   T extends "date" | "timestamp" | "timestamptz" | "time" | "timetz" ? string :
+  T extends "interval" ? string :
   T extends "uuid" ? string :
   T extends "bytea" ? Uint8Array :
   unknown

@@ -1099,11 +1099,17 @@ type M_NumericLiteral = QueryResult<"SELECT 1 AS num FROM users", TestSchema>;
 type _L1 = RequireTrue<AssertEqual<M_NumericLiteral, { num: 1; }>>;
 
 // Test: String literal returns the exact string type
-type M_StringLiteral = QueryResult<"SELECT 'hello' AS greeting FROM users", TestSchema>;
+type M_StringLiteral = QueryResult<
+    "SELECT 'hello' AS greeting FROM users",
+    TestSchema
+>;
 type _L2 = RequireTrue<AssertEqual<M_StringLiteral, { greeting: "hello"; }>>;
 
 // Test: NULL literal returns null type
-type M_NullLiteral = QueryResult<"SELECT NULL AS nothing FROM users", TestSchema>;
+type M_NullLiteral = QueryResult<
+    "SELECT NULL AS nothing FROM users",
+    TestSchema
+>;
 type _L3 = RequireTrue<AssertEqual<M_NullLiteral, { nothing: null; }>>;
 
 // Test: TRUE literal returns true type
@@ -1111,7 +1117,10 @@ type M_TrueLiteral = QueryResult<"SELECT TRUE AS flag FROM users", TestSchema>;
 type _L4 = RequireTrue<AssertEqual<M_TrueLiteral, { flag: true; }>>;
 
 // Test: FALSE literal returns false type
-type M_FalseLiteral = QueryResult<"SELECT FALSE AS inactive FROM users", TestSchema>;
+type M_FalseLiteral = QueryResult<
+    "SELECT FALSE AS inactive FROM users",
+    TestSchema
+>;
 type _L5 = RequireTrue<AssertEqual<M_FalseLiteral, { inactive: false; }>>;
 
 // Test: Mix of literals and columns
@@ -1119,18 +1128,31 @@ type M_MixedLiteralsCols = QueryResult<
     "SELECT id, 1 AS one, name, 'test' AS str FROM users",
     TestSchema
 >;
-type _L6 = RequireTrue<AssertEqual<M_MixedLiteralsCols, { id: number; one: 1; name: string; str: "test"; }>>;
+type _L6 = RequireTrue<
+    AssertEqual<
+        M_MixedLiteralsCols,
+        { id: number; one: 1; name: string; str: "test"; }
+    >
+>;
 
 // Test: Larger numeric literal
 type M_LargeNumeric = QueryResult<"SELECT 42 AS answer FROM users", TestSchema>;
 type _L7 = RequireTrue<AssertEqual<M_LargeNumeric, { answer: 42; }>>;
 
 // Test: String literal with spaces
-type M_StringWithSpaces = QueryResult<"SELECT 'hello world' AS msg FROM users", TestSchema>;
-type _L8 = RequireTrue<AssertEqual<M_StringWithSpaces, { msg: "hello world"; }>>;
+type M_StringWithSpaces = QueryResult<
+    "SELECT 'hello world' AS msg FROM users",
+    TestSchema
+>;
+type _L8 = RequireTrue<
+    AssertEqual<M_StringWithSpaces, { msg: "hello world"; }>
+>;
 
 // Test: ValidateSQL passes for literal values (no column reference to validate)
-type V_LiteralValid = ValidateSQL<"SELECT 1 AS num, 'test' AS str FROM users", TestSchema>;
+type V_LiteralValid = ValidateSQL<
+    "SELECT 1 AS num, 'test' AS str FROM users",
+    TestSchema
+>;
 type _L9 = RequireTrue<AssertEqual<V_LiteralValid, true>>;
 
 // ============================================================================
@@ -1138,39 +1160,67 @@ type _L9 = RequireTrue<AssertEqual<V_LiteralValid, true>>;
 // ============================================================================
 
 // Test: Parameter placeholder returns unknown
-type M_ParamPlaceholder = QueryResult<"SELECT $1 AS field_name FROM users", TestSchema>;
-type _PP1 = RequireTrue<AssertEqual<M_ParamPlaceholder, { field_name: unknown; }>>;
+type M_ParamPlaceholder = QueryResult<
+    "SELECT $1 AS field_name FROM users",
+    TestSchema
+>;
+type _PP1 = RequireTrue<
+    AssertEqual<M_ParamPlaceholder, { field_name: unknown; }>
+>;
 
 // Test: Named parameter returns unknown
-type M_NamedParam = QueryResult<"SELECT :user_id AS uid FROM users", TestSchema>;
+type M_NamedParam = QueryResult<
+    "SELECT :user_id AS uid FROM users",
+    TestSchema
+>;
 type _PP2 = RequireTrue<AssertEqual<M_NamedParam, { uid: unknown; }>>;
 
 // Test: Mix of parameters and columns
-type M_MixedParams = QueryResult<"SELECT id, $1 AS param FROM users", TestSchema>;
-type _PP3 = RequireTrue<AssertEqual<M_MixedParams, { id: number; param: unknown; }>>;
+type M_MixedParams = QueryResult<
+    "SELECT id, $1 AS param FROM users",
+    TestSchema
+>;
+type _PP3 = RequireTrue<
+    AssertEqual<M_MixedParams, { id: number; param: unknown; }>
+>;
 
 // ============================================================================
 // Function Call Type Inference Tests
 // ============================================================================
 
 // Test: now() returns unknown
-type M_FuncNow = QueryResult<"SELECT now ( ) AS created_at FROM users", TestSchema>;
+type M_FuncNow = QueryResult<
+    "SELECT now ( ) AS created_at FROM users",
+    TestSchema
+>;
 type _FN1 = RequireTrue<AssertEqual<M_FuncNow, { created_at: unknown; }>>;
 
 // Test: concat() returns unknown
-type M_FuncConcat2 = QueryResult<"SELECT concat ( 'a' , 'b' ) AS combined FROM users", TestSchema>;
+type M_FuncConcat2 = QueryResult<
+    "SELECT concat ( 'a' , 'b' ) AS combined FROM users",
+    TestSchema
+>;
 type _FN2 = RequireTrue<AssertEqual<M_FuncConcat2, { combined: unknown; }>>;
 
 // Test: Function with column argument validates the column
-type M_FuncWithCol = QueryResult<"SELECT upper ( name ) AS upper_name FROM users", TestSchema>;
+type M_FuncWithCol = QueryResult<
+    "SELECT upper ( name ) AS upper_name FROM users",
+    TestSchema
+>;
 type _FN3 = RequireTrue<AssertEqual<M_FuncWithCol, { upper_name: unknown; }>>;
 
 // Test: Function with type cast returns cast type
-type M_FuncCast = QueryResult<"SELECT now ( ) ::text AS ts FROM users", TestSchema>;
+type M_FuncCast = QueryResult<
+    "SELECT now ( ) ::text AS ts FROM users",
+    TestSchema
+>;
 type _FN4 = RequireTrue<AssertEqual<M_FuncCast, { ts: string; }>>;
 
 // Test: ValidateSQL catches invalid column in function
-type V_FuncInvalidCol2 = ValidateSQL<"SELECT upper ( invalid_col ) AS upper_name FROM users", TestSchema>;
+type V_FuncInvalidCol2 = ValidateSQL<
+    "SELECT upper ( invalid_col ) AS upper_name FROM users",
+    TestSchema
+>;
 type _FN5 = RequireTrue<AssertExtends<V_FuncInvalidCol2, string>>;
 
 // ============================================================================
@@ -1182,11 +1232,17 @@ type M_ArithLiteral = QueryResult<"SELECT 1 + 1 AS two FROM users", TestSchema>;
 type _AR1 = RequireTrue<AssertEqual<M_ArithLiteral, { two: unknown; }>>;
 
 // Test: Arithmetic with columns returns unknown
-type M_ArithCols = QueryResult<"SELECT views + 1 AS incremented FROM posts", TestSchema>;
+type M_ArithCols = QueryResult<
+    "SELECT views + 1 AS incremented FROM posts",
+    TestSchema
+>;
 type _AR2 = RequireTrue<AssertEqual<M_ArithCols, { incremented: unknown; }>>;
 
 // Test: Arithmetic with type cast returns cast type
-type M_ArithCast = QueryResult<"SELECT ( views + 1 ) ::int AS incremented FROM posts", TestSchema>;
+type M_ArithCast = QueryResult<
+    "SELECT ( views + 1 ) ::int AS incremented FROM posts",
+    TestSchema
+>;
 type _AR3 = RequireTrue<AssertEqual<M_ArithCast, { incremented: number; }>>;
 
 // ============================================================================
@@ -1194,15 +1250,24 @@ type _AR3 = RequireTrue<AssertEqual<M_ArithCast, { incremented: number; }>>;
 // ============================================================================
 
 // Test: CURRENT_DATE returns string (date type)
-type M_CurrentDate = QueryResult<"SELECT CURRENT_DATE AS dt FROM users", TestSchema>;
+type M_CurrentDate = QueryResult<
+    "SELECT CURRENT_DATE AS dt FROM users",
+    TestSchema
+>;
 type _SC1 = RequireTrue<AssertEqual<M_CurrentDate, { dt: string; }>>;
 
 // Test: CURRENT_TIMESTAMP returns string (timestamp type)
-type M_CurrentTimestamp = QueryResult<"SELECT CURRENT_TIMESTAMP AS ts FROM users", TestSchema>;
+type M_CurrentTimestamp = QueryResult<
+    "SELECT CURRENT_TIMESTAMP AS ts FROM users",
+    TestSchema
+>;
 type _SC2 = RequireTrue<AssertEqual<M_CurrentTimestamp, { ts: string; }>>;
 
 // Test: CURRENT_TIME returns string (time type)
-type M_CurrentTime = QueryResult<"SELECT CURRENT_TIME AS t FROM users", TestSchema>;
+type M_CurrentTime = QueryResult<
+    "SELECT CURRENT_TIME AS t FROM users",
+    TestSchema
+>;
 type _SC3 = RequireTrue<AssertEqual<M_CurrentTime, { t: string; }>>;
 
 // Test: LOCALTIME returns string (time type)
@@ -1210,40 +1275,209 @@ type M_LocalTime = QueryResult<"SELECT LOCALTIME AS lt FROM users", TestSchema>;
 type _SC4 = RequireTrue<AssertEqual<M_LocalTime, { lt: string; }>>;
 
 // Test: LOCALTIMESTAMP returns string (timestamp type)
-type M_LocalTimestamp = QueryResult<"SELECT LOCALTIMESTAMP AS lts FROM users", TestSchema>;
+type M_LocalTimestamp = QueryResult<
+    "SELECT LOCALTIMESTAMP AS lts FROM users",
+    TestSchema
+>;
 type _SC5 = RequireTrue<AssertEqual<M_LocalTimestamp, { lts: string; }>>;
 
 // Test: CURRENT_USER returns string
-type M_CurrentUser = QueryResult<"SELECT CURRENT_USER AS u FROM users", TestSchema>;
+type M_CurrentUser = QueryResult<
+    "SELECT CURRENT_USER AS u FROM users",
+    TestSchema
+>;
 type _SC6 = RequireTrue<AssertEqual<M_CurrentUser, { u: string; }>>;
 
 // Test: SESSION_USER returns string
-type M_SessionUser = QueryResult<"SELECT SESSION_USER AS su FROM users", TestSchema>;
+type M_SessionUser = QueryResult<
+    "SELECT SESSION_USER AS su FROM users",
+    TestSchema
+>;
 type _SC7 = RequireTrue<AssertEqual<M_SessionUser, { su: string; }>>;
 
 // Test: CURRENT_SCHEMA returns string
-type M_CurrentSchema = QueryResult<"SELECT CURRENT_SCHEMA AS schema FROM users", TestSchema>;
+type M_CurrentSchema = QueryResult<
+    "SELECT CURRENT_SCHEMA AS schema FROM users",
+    TestSchema
+>;
 type _SC8 = RequireTrue<AssertEqual<M_CurrentSchema, { schema: string; }>>;
 
 // Test: Mix of SQL constants and columns
-type M_MixedConstants = QueryResult<"SELECT id, CURRENT_DATE AS dt FROM users", TestSchema>;
-type _SC9 = RequireTrue<AssertEqual<M_MixedConstants, { id: number; dt: string; }>>;
+type M_MixedConstants = QueryResult<
+    "SELECT id, CURRENT_DATE AS dt FROM users",
+    TestSchema
+>;
+type _SC9 = RequireTrue<
+    AssertEqual<M_MixedConstants, { id: number; dt: string; }>
+>;
 
 // Test: SQL constant with alias
-type M_ConstantAlias = QueryResult<"SELECT CURRENT_DATE AS today FROM users", TestSchema>;
+type M_ConstantAlias = QueryResult<
+    "SELECT CURRENT_DATE AS today FROM users",
+    TestSchema
+>;
 type _SC10 = RequireTrue<AssertEqual<M_ConstantAlias, { today: string; }>>;
 
 // Test: Multiple SQL constants
-type M_MultiConstants = QueryResult<"SELECT CURRENT_DATE AS dt, CURRENT_TIME AS tm FROM users", TestSchema>;
-type _SC11 = RequireTrue<AssertEqual<M_MultiConstants, { dt: string; tm: string; }>>;
+type M_MultiConstants = QueryResult<
+    "SELECT CURRENT_DATE AS dt, CURRENT_TIME AS tm FROM users",
+    TestSchema
+>;
+type _SC11 = RequireTrue<
+    AssertEqual<M_MultiConstants, { dt: string; tm: string; }>
+>;
 
 // Test: SQL constants in function calls (concat, etc.) - lowercase should work too
-type M_ConstantInFunc = QueryResult<"SELECT concat ( '1' , '2' , current_date ) AS result FROM users", TestSchema>;
+type M_ConstantInFunc = QueryResult<
+    "SELECT concat ( '1' , '2' , current_date ) AS result FROM users",
+    TestSchema
+>;
 type _SC12 = RequireTrue<AssertEqual<M_ConstantInFunc, { result: unknown; }>>;
 
 // Test: SQL constants in function calls with uppercase
-type M_ConstantInFuncUpper = QueryResult<"SELECT concat ( 'test' , CURRENT_TIMESTAMP ) AS result FROM users", TestSchema>;
-type _SC13 = RequireTrue<AssertEqual<M_ConstantInFuncUpper, { result: unknown; }>>;
+type M_ConstantInFuncUpper = QueryResult<
+    "SELECT concat ( 'test' , CURRENT_TIMESTAMP ) AS result FROM users",
+    TestSchema
+>;
+type _SC13 = RequireTrue<
+    AssertEqual<M_ConstantInFuncUpper, { result: unknown; }>
+>;
+
+// ============================================================================
+// EXISTS and NOT EXISTS Tests
+// ============================================================================
+
+// Test: EXISTS returns boolean
+type M_Exists = QueryResult<
+    "SELECT EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id ) AS has_posts FROM users",
+    TestSchema
+>;
+type _EX1 = RequireTrue<AssertEqual<M_Exists, { has_posts: boolean; }>>;
+
+// Test: NOT EXISTS returns boolean
+type M_NotExists = QueryResult<
+    "SELECT NOT EXISTS ( SELECT 1 FROM comments WHERE user_id = users.id ) AS no_comments FROM users",
+    TestSchema
+>;
+type _EX2 = RequireTrue<AssertEqual<M_NotExists, { no_comments: boolean; }>>;
+
+// Test: EXISTS without alias defaults to "exists"
+type M_ExistsNoAlias = QueryResult<
+    "SELECT EXISTS ( SELECT 1 FROM posts ) FROM users",
+    TestSchema
+>;
+type _EX3 = RequireTrue<AssertEqual<M_ExistsNoAlias, { exists: boolean; }>>;
+
+// Test: EXISTS mixed with other columns
+type M_ExistsMixed = QueryResult<
+    "SELECT id, name, EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id ) AS has_posts FROM users",
+    TestSchema
+>;
+type _EX4 = RequireTrue<
+    AssertEqual<
+        M_ExistsMixed,
+        { id: number; name: string; has_posts: boolean; }
+    >
+>;
+
+// Test: Multiple EXISTS in same query
+type M_MultiExists = QueryResult<
+    "SELECT EXISTS ( SELECT 1 FROM posts ) AS has_posts, NOT EXISTS ( SELECT 1 FROM comments ) AS no_comments FROM users",
+    TestSchema
+>;
+type _EX5 = RequireTrue<
+    AssertEqual<M_MultiExists, { has_posts: boolean; no_comments: boolean; }>
+>;
+
+// Test: EXISTS with complex subquery
+type M_ExistsComplex = QueryResult<
+    "SELECT EXISTS ( SELECT id FROM posts WHERE status = 'published' AND author_id = users.id ) AS has_published FROM users",
+    TestSchema
+>;
+type _EX6 = RequireTrue<
+    AssertEqual<M_ExistsComplex, { has_published: boolean; }>
+>;
+
+// ============================================================================
+// EXISTS in WHERE Clause Tests
+// ============================================================================
+
+// Test: EXISTS in WHERE clause - should not cause validation errors
+type M_ExistsInWhere = QueryResult<
+    "SELECT id, name FROM users WHERE EXISTS ( SELECT 1 FROM posts WHERE posts.author_id = users.id )",
+    TestSchema
+>;
+type _EXW1 = RequireTrue<
+    AssertEqual<M_ExistsInWhere, { id: number; name: string; }>
+>;
+
+// Test: NOT EXISTS in WHERE clause
+type M_NotExistsInWhere = QueryResult<
+    "SELECT id, name FROM users WHERE NOT EXISTS ( SELECT 1 FROM comments WHERE comments.user_id = users.id )",
+    TestSchema
+>;
+type _EXW2 = RequireTrue<
+    AssertEqual<M_NotExistsInWhere, { id: number; name: string; }>
+>;
+
+// Test: EXISTS in WHERE with additional conditions
+type M_ExistsWithAnd = QueryResult<
+    "SELECT id, name FROM users WHERE is_active = TRUE AND EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id )",
+    TestSchema
+>;
+type _EXW3 = RequireTrue<
+    AssertEqual<M_ExistsWithAnd, { id: number; name: string; }>
+>;
+
+// Test: Multiple EXISTS in WHERE clause
+type M_MultiExistsWhere = QueryResult<
+    "SELECT id FROM users WHERE EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id ) AND NOT EXISTS ( SELECT 1 FROM comments WHERE user_id = users.id )",
+    TestSchema
+>;
+type _EXW4 = RequireTrue<AssertEqual<M_MultiExistsWhere, { id: number; }>>;
+
+// Test: EXISTS with nested subquery in WHERE
+type M_NestedExistsWhere = QueryResult<
+    "SELECT id FROM users WHERE EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id AND views > 100 )",
+    TestSchema
+>;
+type _EXW5 = RequireTrue<AssertEqual<M_NestedExistsWhere, { id: number; }>>;
+
+// ============================================================================
+// INTERVAL Expression Tests
+// ============================================================================
+
+// Test: INTERVAL expression returns string
+type M_Interval = QueryResult<"SELECT INTERVAL '1 day' AS duration FROM users", TestSchema>;
+type _INT1 = RequireTrue<AssertEqual<M_Interval, { duration: string; }>>;
+
+// Test: INTERVAL with unit keyword
+type M_IntervalUnit = QueryResult<"SELECT INTERVAL '1' DAY AS one_day FROM users", TestSchema>;
+type _INT2 = RequireTrue<AssertEqual<M_IntervalUnit, { one_day: string; }>>;
+
+// Test: INTERVAL with complex value
+type M_IntervalComplex = QueryResult<"SELECT INTERVAL '1 year 2 months' AS period FROM users", TestSchema>;
+type _INT3 = RequireTrue<AssertEqual<M_IntervalComplex, { period: string; }>>;
+
+// Test: INTERVAL without alias defaults to "interval"
+type M_IntervalNoAlias = QueryResult<"SELECT INTERVAL '1 hour' FROM users", TestSchema>;
+type _INT4 = RequireTrue<AssertEqual<M_IntervalNoAlias, { interval: string; }>>;
+
+// Test: INTERVAL mixed with other columns
+type M_IntervalMixed = QueryResult<"SELECT id, name, INTERVAL '30 days' AS month FROM users", TestSchema>;
+type _INT5 = RequireTrue<AssertEqual<M_IntervalMixed, { id: number; name: string; month: string; }>>;
+
+// Test: INTERVAL with TO keyword
+type M_IntervalTo = QueryResult<"SELECT INTERVAL '1-2' YEAR TO MONTH AS range FROM users", TestSchema>;
+type _INT6 = RequireTrue<AssertEqual<M_IntervalTo, { range: string; }>>;
+
+// Test: INTERVAL in WHERE clause - should not cause validation errors
+type M_IntervalWhere = QueryResult<"SELECT id, name FROM users WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'", TestSchema>;
+type _INT7 = RequireTrue<AssertEqual<M_IntervalWhere, { id: number; name: string; }>>;
+
+// Test: Multiple INTERVALs in same query
+type M_MultiInterval = QueryResult<"SELECT INTERVAL '1 day' AS day, INTERVAL '1 hour' AS hour FROM users", TestSchema>;
+type _INT8 = RequireTrue<AssertEqual<M_MultiInterval, { day: string; hour: string; }>>;
 
 // ============================================================================
 // Export for verification

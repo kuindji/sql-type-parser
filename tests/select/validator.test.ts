@@ -506,6 +506,105 @@ type V_ConstantWithJoin = ValidateSelectSQL<
 type _V53 = RequireTrue<AssertEqual<V_ConstantWithJoin, true>>
 
 // ============================================================================
+// EXISTS/NOT EXISTS Validation Tests
+// ============================================================================
+
+// Test: EXISTS in SELECT validates successfully
+type V_ExistsSelect = ValidateSelectSQL<
+  "SELECT EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id ) AS has_posts FROM users",
+  TestSchema
+>
+type _V54 = RequireTrue<AssertEqual<V_ExistsSelect, true>>
+
+// Test: NOT EXISTS in SELECT validates successfully
+type V_NotExistsSelect = ValidateSelectSQL<
+  "SELECT NOT EXISTS ( SELECT 1 FROM comments WHERE user_id = users.id ) AS no_comments FROM users",
+  TestSchema
+>
+type _V55 = RequireTrue<AssertEqual<V_NotExistsSelect, true>>
+
+// Test: EXISTS in WHERE clause validates successfully
+type V_ExistsWhere = ValidateSelectSQL<
+  "SELECT id, name FROM users WHERE EXISTS ( SELECT 1 FROM posts WHERE posts.author_id = users.id )",
+  TestSchema
+>
+type _V56 = RequireTrue<AssertEqual<V_ExistsWhere, true>>
+
+// Test: NOT EXISTS in WHERE clause validates successfully
+type V_NotExistsWhere = ValidateSelectSQL<
+  "SELECT id, name FROM users WHERE NOT EXISTS ( SELECT 1 FROM comments WHERE comments.user_id = users.id )",
+  TestSchema
+>
+type _V57 = RequireTrue<AssertEqual<V_NotExistsWhere, true>>
+
+// Test: EXISTS in WHERE with additional conditions validates successfully
+type V_ExistsWhereAnd = ValidateSelectSQL<
+  "SELECT id, name FROM users WHERE is_active = TRUE AND EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id )",
+  TestSchema
+>
+type _V58 = RequireTrue<AssertEqual<V_ExistsWhereAnd, true>>
+
+// Test: Multiple EXISTS in WHERE validates successfully
+type V_MultiExistsWhere = ValidateSelectSQL<
+  "SELECT id FROM users WHERE EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id ) AND NOT EXISTS ( SELECT 1 FROM comments WHERE user_id = users.id )",
+  TestSchema
+>
+type _V59 = RequireTrue<AssertEqual<V_MultiExistsWhere, true>>
+
+// Test: EXISTS mixed with regular columns validates successfully
+type V_ExistsMixed = ValidateSelectSQL<
+  "SELECT id, name, EXISTS ( SELECT 1 FROM posts WHERE author_id = users.id ) AS has_posts FROM users",
+  TestSchema
+>
+type _V60 = RequireTrue<AssertEqual<V_ExistsMixed, true>>
+
+// ============================================================================
+// INTERVAL Validation Tests
+// ============================================================================
+
+// Test: INTERVAL in SELECT validates successfully
+type V_IntervalSelect = ValidateSelectSQL<
+  "SELECT INTERVAL '1 day' AS duration FROM users",
+  TestSchema
+>
+type _V61 = RequireTrue<AssertEqual<V_IntervalSelect, true>>
+
+// Test: INTERVAL with unit validates successfully
+type V_IntervalUnit = ValidateSelectSQL<
+  "SELECT INTERVAL '1' DAY AS one_day FROM users",
+  TestSchema
+>
+type _V62 = RequireTrue<AssertEqual<V_IntervalUnit, true>>
+
+// Test: INTERVAL in WHERE clause validates successfully
+type V_IntervalWhere = ValidateSelectSQL<
+  "SELECT id, name FROM users WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'",
+  TestSchema
+>
+type _V63 = RequireTrue<AssertEqual<V_IntervalWhere, true>>
+
+// Test: INTERVAL mixed with columns validates successfully
+type V_IntervalMixed = ValidateSelectSQL<
+  "SELECT id, name, INTERVAL '30 days' AS month FROM users",
+  TestSchema
+>
+type _V64 = RequireTrue<AssertEqual<V_IntervalMixed, true>>
+
+// Test: Multiple INTERVALs validate successfully
+type V_MultiInterval = ValidateSelectSQL<
+  "SELECT INTERVAL '1 day' AS day, INTERVAL '1 hour' AS hour FROM users",
+  TestSchema
+>
+type _V65 = RequireTrue<AssertEqual<V_MultiInterval, true>>
+
+// Test: INTERVAL with complex duration validates successfully
+type V_IntervalComplex = ValidateSelectSQL<
+  "SELECT INTERVAL '1 year 2 months 3 days' AS period FROM users",
+  TestSchema
+>
+type _V66 = RequireTrue<AssertEqual<V_IntervalComplex, true>>
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 

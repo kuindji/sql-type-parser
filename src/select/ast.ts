@@ -90,10 +90,35 @@ export type SubqueryExpr<
 }
 
 /**
- * Extended column reference type that includes subqueries, literals, and SQL constants
+ * An EXISTS or NOT EXISTS expression with a subquery
+ * Always evaluates to boolean - true if subquery returns any rows (or false for NOT EXISTS)
+ */
+export type ExistsExpr<
+  Query extends SubquerySelectClause = SubquerySelectClause,
+  Negated extends boolean = boolean,
+> = {
+  readonly type: "ExistsExpr"
+  readonly query: Query
+  readonly negated: Negated
+}
+
+/**
+ * A PostgreSQL INTERVAL expression
+ * Examples: INTERVAL '1 day', INTERVAL '2 hours', INTERVAL '1' HOUR
+ * The result type is always string (interval values are represented as strings in JS)
+ */
+export type IntervalExpr<
+  Value extends string = string,
+> = {
+  readonly type: "IntervalExpr"
+  readonly value: Value
+}
+
+/**
+ * Extended column reference type that includes subqueries, literals, SQL constants, EXISTS, and INTERVAL expressions
  * Used only in parser output for SELECT columns
  */
-export type ExtendedColumnRefType = ColumnRefType | SubqueryExpr | LiteralExpr | SQLConstantExpr
+export type ExtendedColumnRefType = ColumnRefType | SubqueryExpr | LiteralExpr | SQLConstantExpr | ExistsExpr | IntervalExpr
 
 /**
  * A column reference with optional alias

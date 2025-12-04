@@ -12,6 +12,8 @@ import type {
   ColumnRef,
   LiteralExpr,
   SubqueryExpr,
+  ExistsExpr,
+  IntervalExpr,
   ExtendedColumnRefType,
   UnionClause,
   UnionClauseAny,
@@ -382,7 +384,7 @@ type ParseAggregateArg<T extends string> = Trim<T> extends "*"
 
 /**
  * Parse a simple column reference with optional alias
- * Handles PostgreSQL type casting syntax (::type), complex expressions, subqueries, and literals
+ * Handles PostgreSQL type casting syntax (::type), complex expressions, subqueries, EXISTS, INTERVAL, and literals
  */
 type ParseSimpleColumn<T extends string> =
   // Check for literal values first (number, string, null, boolean)
@@ -391,22 +393,28 @@ type ParseSimpleColumn<T extends string> =
     // Check for SQL constants (CURRENT_DATE, CURRENT_TIMESTAMP, etc.)
     : IsSQLConstantExpression<T> extends true
       ? ParseSQLConstantColumn<T>
-      // Check for table.* wildcard
-      : IsTableWildcard<T> extends true
-        ? ParseTableWildcard<T>
-        // Check for scalar subquery (parenthesized SELECT)
-        : IsSubqueryExpression<T> extends true
-          ? ParseSubqueryColumn<T>
-          // Check for CAST function (must be before general complex expression check)
-          : IsCastExpression<T> extends true
-            ? ParseCastColumn<T>
-            // Check for complex expression (contains JSON operators or parentheses with operators)
-            : IsComplexExpression<T> extends true
-              ? ParseComplexColumn<T>
-              // Simple column with optional alias
-              : T extends `${infer Col} AS ${infer Alias}`
-                ? ColumnRef<ParseColumnRefType<StripTypeCast<Trim<Col>>>, RemoveQuotes<Alias>>
-                : ColumnRef<ParseColumnRefType<StripTypeCast<T>>, ExtractColumnName<StripTypeCast<T>>>
+      // Check for INTERVAL expressions (INTERVAL '1 day', etc.)
+      : IsIntervalExpression<T> extends true
+        ? ParseIntervalColumn<T>
+        // Check for table.* wildcard
+        : IsTableWildcard<T> extends true
+          ? ParseTableWildcard<T>
+          // Check for EXISTS/NOT EXISTS (must be before scalar subquery)
+          : IsExistsExpression<T> extends true
+            ? ParseExistsColumn<T>
+            // Check for scalar subquery (parenthesized SELECT)
+            : IsSubqueryExpression<T> extends true
+              ? ParseSubqueryColumn<T>
+              // Check for CAST function (must be before general complex expression check)
+              : IsCastExpression<T> extends true
+                ? ParseCastColumn<T>
+                // Check for complex expression (contains JSON operators or parentheses with operators)
+                : IsComplexExpression<T> extends true
+                  ? ParseComplexColumn<T>
+                  // Simple column with optional alias
+                  : T extends `${infer Col} AS ${infer Alias}`
+                    ? ColumnRef<ParseColumnRefType<StripTypeCast<Trim<Col>>>, RemoveQuotes<Alias>>
+                    : ColumnRef<ParseColumnRefType<StripTypeCast<T>>, ExtractColumnName<StripTypeCast<T>>>
 
 /**
  * Check if the expression is a literal value (number, string, null, boolean)
@@ -492,6 +500,57 @@ type ExtractLiteralAlias<T extends string> =
   T extends `'${string}'` ? "text" :
   T extends `${number}` | `-${number}` ? "int4" :
   "literal"
+
+/**
+ * Check if the expression is a PostgreSQL INTERVAL expression
+ * Patterns: INTERVAL 'value', INTERVAL 'value' unit, INTERVAL 'value' unit TO unit
+ */
+type IsIntervalExpression<T extends string> =
+  Trim<T> extends `INTERVAL '${string}'${string}` ? true :
+  Trim<T> extends `INTERVAL '${string}'` ? true :
+  false
+
+/**
+ * Parse an INTERVAL column expression
+ * Creates an IntervalExpr with the interval value
+ */
+type ParseIntervalColumn<T extends string> =
+  ExtractIntervalWithAlias<Trim<T>> extends [infer IntervalResult extends ExtendedColumnRefType, infer Alias extends string]
+    ? ColumnRef<IntervalResult, Alias>
+    : ColumnRef<IntervalExpr<string>, "interval">
+
+/**
+ * Extract INTERVAL expression and optional alias
+ * Returns [IntervalExpr, alias]
+ */
+type ExtractIntervalWithAlias<T extends string> =
+  // Pattern: INTERVAL 'value' ... AS alias (with potential units before AS)
+  T extends `INTERVAL '${infer Value}' ${infer Rest}`
+    ? ExtractIntervalAliasFromRest<Rest> extends infer Alias extends string
+      ? [IntervalExpr<Value>, Alias]
+      : [IntervalExpr<Value>, "interval"]
+    // Pattern: INTERVAL 'value' (no unit, no alias)
+    : T extends `INTERVAL '${infer Value}'`
+      ? [IntervalExpr<Value>, "interval"]
+      : [IntervalExpr<string>, "interval"]
+
+/**
+ * Extract alias from remainder after INTERVAL value
+ * Handles: "DAY", "DAY AS alias", "DAY TO MONTH", "DAY TO MONTH AS alias", "AS alias"
+ */
+type ExtractIntervalAliasFromRest<T extends string> =
+  // Direct alias: AS alias
+  Trim<T> extends `AS ${infer AliasRest}`
+    ? NextToken<Trim<AliasRest>> extends [infer Alias extends string, infer _Rest extends string]
+      ? RemoveQuotes<Alias>
+      : "interval"
+    // Unit followed by AS alias: UNIT AS alias or UNIT TO UNIT AS alias
+    : Trim<T> extends `${string} AS ${infer AliasRest}`
+      ? NextToken<Trim<AliasRest>> extends [infer Alias extends string, infer _Rest extends string]
+        ? RemoveQuotes<Alias>
+        : "interval"
+      // No alias, just unit(s)
+      : "interval"
 
 /**
  * Parse a SQL constant column expression
@@ -606,6 +665,69 @@ type ExtractCastType<T extends string> =
         : T extends `${infer Type} )`
           ? [Trim<Type>, ""]
           : never
+
+/**
+ * Check if the expression is EXISTS or NOT EXISTS
+ * Patterns: EXISTS ( SELECT ..., NOT EXISTS ( SELECT ...
+ */
+type IsExistsExpression<T extends string> =
+  Trim<T> extends `EXISTS ( SELECT ${string}` ? true :
+  Trim<T> extends `NOT EXISTS ( SELECT ${string}` ? true :
+  false
+
+/**
+ * Parse an EXISTS/NOT EXISTS column expression
+ * Creates an ExistsExpr with the inner subquery
+ */
+type ParseExistsColumn<T extends string> =
+  ExtractExistsWithAlias<Trim<T>> extends [infer ExistsResult extends ExtendedColumnRefType, infer Alias extends string]
+    ? ColumnRef<ExistsResult, Alias>
+    : ColumnRef<ComplexExpr<[], undefined>, "exists">
+
+/**
+ * Extract EXISTS expression and optional alias
+ * Returns [ExistsExpr | ComplexExpr, alias]
+ */
+type ExtractExistsWithAlias<T extends string> =
+  // NOT EXISTS pattern with alias
+  Trim<T> extends `NOT EXISTS ( ${infer Rest}`
+    ? ExtractExistsInnerAndAlias<Rest, true>
+    // EXISTS pattern with alias  
+    : Trim<T> extends `EXISTS ( ${infer Rest}`
+      ? ExtractExistsInnerAndAlias<Rest, false>
+      : [ComplexExpr<[], undefined>, "exists"]
+
+/**
+ * Extract the inner SELECT and alias from EXISTS expression
+ * Input: Rest starts after "EXISTS ( " or "NOT EXISTS ( "
+ */
+type ExtractExistsInnerAndAlias<Rest extends string, Negated extends boolean> =
+  ExtractUntilClosingParen<Rest, 1, ""> extends [infer Inner extends string, infer Remainder extends string]
+    ? ParseExistsInnerQuery<Inner, Negated> extends infer Result
+      ? ExtractAliasFromRemainder<Remainder> extends infer Alias extends string
+        ? [Result, Alias]
+        : [Result, "exists"]
+      : [ComplexExpr<[], undefined>, "exists"]
+    : [ComplexExpr<[], undefined>, "exists"]
+
+/**
+ * Parse the inner SELECT query for EXISTS
+ */
+type ParseExistsInnerQuery<Inner extends string, Negated extends boolean> =
+  ParseSelectQuery<Inner> extends SQLSelectQuery<infer Query extends SelectClause>
+    ? ExistsExpr<Query, Negated>
+    : ComplexExpr<[], undefined>
+
+/**
+ * Extract alias from remainder after closing paren
+ * Remainder might be: "" or " AS alias" or " AS alias rest"
+ */
+type ExtractAliasFromRemainder<T extends string> =
+  Trim<T> extends `AS ${infer AliasRest}`
+    ? NextToken<AliasRest> extends [infer Alias extends string, infer _Rest extends string]
+      ? RemoveQuotes<Alias>
+      : "exists"
+    : "exists"
 
 /**
  * Check if the expression is a scalar subquery (starts with parenthesized SELECT)
@@ -769,6 +891,7 @@ type ExtractAllColumnRefs<T extends string> =
 /**
  * Scan tokens one by one looking for column reference patterns
  * Skips function names (tokens followed by opening parenthesis)
+ * Skips entire EXISTS/NOT EXISTS subqueries to avoid treating inner table names as column refs
  */
 type ScanTokensForColumnRefs<
   T extends string,
@@ -776,18 +899,80 @@ type ScanTokensForColumnRefs<
 > = Trim<T> extends ""
   ? Acc
   : NextToken<Trim<T>> extends [infer Token extends string, infer Rest extends string]
-    // Skip function names: if the next token is "(", this token is a function name, not a column
-    ? IsFunctionName<Token, Rest> extends true
-      ? ScanTokensForColumnRefs<Rest, Acc>
-      : ExtractColumnFromToken<Token> extends infer ColRef
-        // Must check [ColRef] extends [never] first because never extends everything
-        ? [ColRef] extends [never]
-          ? ScanTokensForColumnRefs<Rest, Acc>
-          : ColRef extends ValidatableColumnRef
-            ? ScanTokensForColumnRefs<Rest, [...Acc, ColRef]>
-            : ScanTokensForColumnRefs<Rest, Acc>
-        : ScanTokensForColumnRefs<Rest, Acc>
+    // Check for EXISTS/NOT EXISTS - skip entire subquery content
+    ? IsExistsToken<Token, Rest> extends true
+      ? SkipExistsAndContinue<Token, Rest, Acc>
+      // Skip function names: if the next token is "(", this token is a function name, not a column
+      : IsFunctionName<Token, Rest> extends true
+        ? ScanTokensForColumnRefs<Rest, Acc>
+        : ExtractColumnFromToken<Token> extends infer ColRef
+          // Must check [ColRef] extends [never] first because never extends everything
+          ? [ColRef] extends [never]
+            ? ScanTokensForColumnRefs<Rest, Acc>
+            : ColRef extends ValidatableColumnRef
+              ? ScanTokensForColumnRefs<Rest, [...Acc, ColRef]>
+              : ScanTokensForColumnRefs<Rest, Acc>
+          : ScanTokensForColumnRefs<Rest, Acc>
     : Acc
+
+/**
+ * Check if we're at an EXISTS or NOT EXISTS token
+ * EXISTS must be followed by (
+ * NOT must be followed by EXISTS (
+ */
+type IsExistsToken<Token extends string, Rest extends string> =
+  Token extends "EXISTS"
+    ? NextToken<Trim<Rest>> extends ["(", string]
+      ? true
+      : false
+    : Token extends "NOT"
+      ? NextToken<Trim<Rest>> extends ["EXISTS", infer AfterExists extends string]
+        ? NextToken<Trim<AfterExists>> extends ["(", string]
+          ? true
+          : false
+        : false
+      : false
+
+/**
+ * Skip EXISTS/NOT EXISTS subquery and continue scanning
+ * Finds the opening ( and skips until matching )
+ */
+type SkipExistsAndContinue<
+  Token extends string,
+  Rest extends string,
+  Acc extends ValidatableColumnRef[]
+> = Token extends "NOT"
+  // NOT EXISTS - skip NOT, EXISTS, then find and skip parenthesized content
+  ? NextToken<Trim<Rest>> extends ["EXISTS", infer AfterExists extends string]
+    ? NextToken<Trim<AfterExists>> extends ["(", infer AfterParen extends string]
+      ? SkipUntilClosingParen<AfterParen, 1> extends infer Remainder extends string
+        ? ScanTokensForColumnRefs<Remainder, Acc>
+        : Acc
+      : ScanTokensForColumnRefs<AfterExists, Acc>
+    : ScanTokensForColumnRefs<Rest, Acc>
+  // EXISTS - skip EXISTS, then find and skip parenthesized content
+  : NextToken<Trim<Rest>> extends ["(", infer AfterParen extends string]
+    ? SkipUntilClosingParen<AfterParen, 1> extends infer Remainder extends string
+      ? ScanTokensForColumnRefs<Remainder, Acc>
+      : Acc
+    : ScanTokensForColumnRefs<Rest, Acc>
+
+/**
+ * Skip tokens until we find the matching closing parenthesis
+ * Returns the string after the closing paren
+ */
+type SkipUntilClosingParen<
+  T extends string,
+  Depth extends number
+> = Depth extends 0
+  ? T
+  : NextToken<Trim<T>> extends [infer Token extends string, infer Rest extends string]
+    ? Token extends "("
+      ? SkipUntilClosingParen<Rest, Increment<Depth>>
+      : Token extends ")"
+        ? SkipUntilClosingParen<Rest, Decrement<Depth>>
+        : SkipUntilClosingParen<Rest, Depth>
+    : ""
 
 /**
  * Check if a token is a function name (followed by opening parenthesis)
@@ -993,6 +1178,10 @@ type IsKeywordOrOperator<T extends string> =
       | "LIMIT" | "OFFSET" | "UNION" | "INTERSECT" | "EXCEPT" | "ALL" | "DISTINCT"
       | "COUNT" | "SUM" | "AVG" | "MIN" | "MAX" | "COALESCE" | "NULLIF" | "CAST"
       | "FOR" | "USING" | "WITH" | "OVER" | "PARTITION" | "ROWS" | "RANGE" | "PRECEDING" | "FOLLOWING"
+      // INTERVAL and its unit keywords
+      | "INTERVAL" | "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND" | "MILLISECOND" | "MICROSECOND"
+      | "YEARS" | "MONTHS" | "DAYS" | "HOURS" | "MINUTES" | "SECONDS" | "MILLISECONDS" | "MICROSECONDS"
+      | "WEEK" | "WEEKS" | "TO"
       ? true
       // SQL constants (CURRENT_DATE, CURRENT_TIMESTAMP, etc.)
       : T extends SQLConstantName

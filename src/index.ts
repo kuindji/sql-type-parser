@@ -146,6 +146,8 @@ export type {
   ColumnRef,
   LiteralExpr,
   SubqueryExpr,
+  ExistsExpr,
+  IntervalExpr,
   ExtendedColumnRefType,
 
   // SQL constants

@@ -11,6 +11,8 @@ import type {
   ColumnRef,
   LiteralExpr,
   SubqueryExpr,
+  ExistsExpr,
+  IntervalExpr,
   UnionClause,
   UnionClauseAny,
   UnionOperatorType,
@@ -492,13 +494,17 @@ type ResolveColumnRef<
     ? ResolveSQLConstant<Name>
     : Ref extends SubqueryExpr<infer Query, infer CastType>
       ? ResolveSubqueryExpr<Query, CastType, Context, Schema>
-      : Ref extends ComplexExpr<infer ColumnRefs, infer CastType>
-        ? ResolveComplexExpr<ColumnRefs, CastType, Context, Schema>
-        : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
-          ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
-          : Ref extends UnboundColumnRef<infer Column>
-            ? ResolveUnboundColumn<Column, Context>
-            : MatchError<"Invalid column reference">
+      : Ref extends ExistsExpr<infer _Query, infer _Negated>
+        ? boolean  // EXISTS and NOT EXISTS always return boolean
+        : Ref extends IntervalExpr<infer _Value>
+          ? string  // INTERVAL expressions return string (interval values are strings in JS)
+          : Ref extends ComplexExpr<infer ColumnRefs, infer CastType>
+            ? ResolveComplexExpr<ColumnRefs, CastType, Context, Schema>
+            : Ref extends TableColumnRef<infer Table, infer Column, infer ColSchema>
+              ? ResolveTableColumn<Table, Column, ColSchema, Context, Schema>
+              : Ref extends UnboundColumnRef<infer Column>
+                ? ResolveUnboundColumn<Column, Context>
+                : MatchError<"Invalid column reference">
 
 /**
  * Resolve a literal expression to its TypeScript type
