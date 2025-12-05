@@ -8,6 +8,7 @@
 - src/select/parser.ts
 - src/select/validator.ts
 - src/select/matcher.ts
+- Example schemas can be found in `examples/schema.ts`
 
 ## 1. Common Architecture
 
@@ -18,7 +19,7 @@
   - **Type-Level:** Constructs a Type AST, verifies validity using the existing `Validator`, and infers the result type using the existing `Matcher` (for Select).
 - **Immutability:** The API is immutable. Every method call returns a new instance of the builder with updated state.
 - **Fragment-Based:** Unlike the monolithic `parser` which expects a full query, builders accept query fragments (e.g., `.join('LEFT JOIN users ...')`, `.where('id > 5')`).
-- **Schema-Driven:** Builders are initialized with a `DatabaseSchema`, which drives all type inference.
+- **Schema-Driven:** Builders are initialized with a `DatabaseSchema` type parameter, which drives all type inference. The schema exists only at the type level and is not passed or used at runtime.
 
 ### 1.2. Condition Tree
 
@@ -194,6 +195,8 @@ function createSelectQuery<Schema extends DatabaseSchema>(
 ): SelectQueryBuilder<Schema, EmptyState>;
 ```
 
+The `schema` parameter exists only for TypeScript type inference. At runtime, the schema is not passed to the query builder - all schema validation and type inference happens purely at the type level. The runtime implementation does not use or need the schema. The schema type is used to validate table and column references and to infer the result types of queries.
+
 #### Methods
 
 All methods accept an optional `id` as the last argument (except `from`, `limit`, `offset`, `distinct`). IDs are **user-provided only** - they are required for replacing and removing parts. If no ID is provided, the part cannot be replaced or removed later. IDs are string literal types at the type level (e.g., `"select_1"`, `"join_users"`) to enable type-safe ID tracking.
@@ -206,6 +209,8 @@ All methods accept an optional `id` as the last argument (except `from`, `limit`
 - Removals are clause-specific (e.g., `removeWhere()` only affects WHERE clauses; collisions with other clause types are not relevant).
 
 - **`select(columns: string | string[], id?: string)`**: Adds columns to select. Overwrites if ID exists.
+  - The method is designed to handle one field at a time, either as a single field (`string`) or as an array of fields (`string[]`).
+  - While passing comma-separated strings like `select("field1, field2")` is technically valid (the parser will handle it), this pattern is **not encouraged**. Prefer using an array: `select(["field1", "field2"])` or multiple calls: `select("field1").select("field2")`.
   - Parses columns using `ParseColumnList` fragment parser (validates SQL syntax).
   - **Validates input immediately:** Checks that column names exist in available tables (semantic validation).
   - If `from()` hasn't been called yet: Returns `ErrorState` (no table context available).
