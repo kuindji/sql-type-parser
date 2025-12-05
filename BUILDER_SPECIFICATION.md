@@ -80,7 +80,7 @@ All builders support a `.when()` method for conditional query construction.
 - **Select-specific behavior:**
   - Columns selected inside `.when()` are marked with `optional: true` in their `SelectItem` AST nodes.
   - The matcher (`MatchSelectQuery`) handles optional columns by unioning their types with `undefined` (e.g., `string` becomes `string | undefined`).
-  - Joins added inside `.when()` make ALL columns from those joined tables optional in the result type.
+  - Joins added inside `.when()` make ALL columns from those joined tables optional in the result type. When converting builder state to AST, columns from conditionally joined tables (marked with `optional: true` in join state) must have their corresponding `SelectItem` nodes marked with `optional: true` directly in the AST.
   - **Nested `.when()` calls are NOT supported** - this adds unnecessary complexity and is not needed.
   - Optional columns affect the result type shape: the column exists in the result type but its value type includes `undefined`.
   - From a type perspective, the result type represents a union of all possible query variants. Conditional selects making fields optional (`field?: type | undefined`) correctly represents "this query MAY return this field" and flattens the union logic.
@@ -290,9 +290,8 @@ All methods accept an optional `id` as the last argument (except `from`, `limit`
   - **Type Inference:** Converts state to `SelectClause` AST, then uses existing `MatchSelectClause<SelectClause, Schema>` matcher from `src/select/matcher.ts` to infer result type.
   - Return type: `string & { __type: MatchSelectClause<SelectClause, Schema> }`
   - The branded type allows extracting the result type via `type Result = (typeof builder.toString()).__type` or using `infer` in function parameters.
-  - Runtime: Returns the SQL string (can be used as a regular string).
-  - Type level: The `__type` property contains the inferred result type from the matcher.
-  - If builder is in `ErrorState`, `toString()` should return an error type (exact behavior to be specified during implementation).
+  - **Runtime behavior:** `toString()` always returns a SQL string at runtime, regardless of whether the builder is in `ErrorState`. The query may be incorrect - that is the user's responsibility.
+  - **Type-level behavior:** The branded return type may include `{ __error: true, message: string }` alongside `{ __type: MatchSelectClause<SelectClause, Schema> }` when the builder is in `ErrorState`. This allows type-level error detection while still allowing runtime SQL generation.
 
 ### 2.4. Type Inference Flow
 
@@ -452,6 +451,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
    - Export `ParseWhereClause` (needs export - currently internal)
    - Export `ParseOrderByItems` (needs export - currently only `ParseOrderByItem` singular is exported)
    - Export `ParseTableRef` (already exported)
+   - Export `ValidateSelectClause` (needs export - currently internal type in `src/select/validator.ts`)
 
 2. **Parser Modifications for Partial/Fragment Parsing:**
 
@@ -482,6 +482,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
    - **Direct modification approach:** Update existing AST types directly (not using a wrapper).
      - This avoids wrapper performance impact.
      - Other parts of the codebase may need updates to maintain compatibility, but this is preferred over wrapper approach.
+   - **Conditional joins handling:** When converting builder state to `SelectClause` AST, columns from conditionally joined tables (where the join has `optional: true` in state) must have their corresponding `SelectItem` nodes marked with `optional: true` directly in the AST. This ensures the matcher can correctly infer optionality by checking the AST directly, without needing to reference builder state.
 
 4. **Validator Modifications (if needed):**
    - The builder uses the existing `ValidateSelectSQL<SQL, Schema>` validator.
@@ -505,13 +506,13 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
            : MatchColumn<Item, Context, Schema>;
        ```
      - Check for `optional` property directly on `SelectItem` (direct AST modification approach).
-   - **Optional columns from conditional joins:** When a join is added conditionally (marked with `optional: true` in state), all columns from that table's context should be marked optional. The matcher should handle this by checking the join's `optional` flag in the state.
+   - **Optional columns from conditional joins:** When a join is added conditionally, all columns from that table's context are marked with `optional: true` directly in their `SelectItem` AST nodes during state-to-AST conversion. The matcher handles this by checking the `optional` flag directly on `SelectItem` nodes in the AST (not by checking join state). This ensures the matcher operates purely on AST structure without needing builder state context.
    - **Verify:** Run existing matcher tests to ensure no regressions after modifications.
 
 6. **SQL String Assembly Utility (Runtime):**
    - Implement a runtime utility that assembles SQL string from user-provided fragments.
    - **This is NOT an AST-to-SQL converter** - it's a simple string assembly utility.
-   - Uses string fragments provided by user as-is (no AST conversion needed).
+   - **No runtime parsing:** Uses string fragments provided by user exactly as-is. AST and parsers exist only at the type level - no parsing happens at runtime. The utility performs pure string concatenation/templating using the exact strings the user provided.
    - Assembles parts in correct SQL order:
      - CTEs (WITH clause) if present
      - SELECT columns (or `SELECT *` if none)
