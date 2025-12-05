@@ -53,7 +53,7 @@
   - **Type-Level:** Constructs a Type AST, verifies validity using the existing `Validator`, and infers the result type using the existing `Matcher` (for Select).
 - **Immutability:** The API is immutable. Every method call returns a new instance of the builder with updated state.
 - **Fragment-Based:** Unlike the monolithic `parser` which expects a full query, builders accept query fragments (e.g., `.join('LEFT JOIN users ...')`, `.where('id > 5')`).
-- **Schema-Driven:** Builders are initialized with a `DatabaseSchema` type parameter, which drives all type inference. The schema exists only at the type level and is not passed or used at runtime.
+- **Schema-Driven:** Builders are initialized with a `DatabaseSchema` type parameter, which drives all type inference. The schema exists only at the type level and is not passed or used at runtime. The `schema` parameter in `createSelectQuery(schema)` exists solely for TypeScript type inference - the runtime implementation must NOT use or access the schema parameter value.
 
 ### 1.2. Condition Tree
 
@@ -241,7 +241,16 @@ function createSelectQuery<Schema extends DatabaseSchema>(
 ): SelectQueryBuilder<Schema, EmptyState>;
 ```
 
-The `schema` parameter exists only for TypeScript type inference. At runtime, the schema is not passed to the query builder - all schema validation and type inference happens purely at the type level. The runtime implementation does not use or need the schema. The schema type is used to validate table and column references and to infer the result types of queries.
+**CRITICAL:** The `schema` parameter is **ONLY** provided as a generic type parameter for TypeScript type inference. The `schema` parameter in the function signature exists solely to enable TypeScript to infer the `Schema` type - it is **NOT** used at runtime by the query builder implementation.
+
+**Implementation Requirements:**
+
+- The runtime implementation of `createSelectQuery()` must **NOT** access, store, or use the `schema` parameter value at runtime.
+- All schema validation and type inference happens purely at the type level using the `Schema` generic type parameter.
+- The schema type (not the runtime value) is used to validate table and column references and to infer the result types of queries.
+- The `schema` parameter may be `undefined`, `null`, or any value at runtime - the implementation must not depend on it.
+
+**Why this matters:** This is a type-only pattern. The schema exists only in TypeScript's type system, not at runtime. The builder uses the schema type to validate queries and infer types, but never accesses the actual schema object.
 
 #### Methods
 
@@ -711,82 +720,316 @@ The context tracks:
 
 **Important:** On each step of implementation, if any changes are made to `ast.ts`, `parser.ts`, `validator.ts`, or `matcher.ts` files, verify that existing tests still pass. These files are core to the sql-type-parser library and changes must not break backward compatibility.
 
-1. **Phase 1: AST & Parser Updates**
-   - **Implementation Note:** Parser exports should be added to `src/select/parser.ts`. AST modifications should be made in `src/select/ast.ts` and `src/common/ast.ts` as appropriate. Validator modifications should be made in `src/select/validator.ts`. Matcher modifications should be made in `src/select/matcher.ts`.
-   - Export missing parser fragments (`ParseWhereClause`, `ParseOrderByItems`).
-   - **Verify fragment parsers work standalone:**
-     - Fragment parsers already work without full query structure (no modifications needed).
-     - Fragment parsers create `UnboundColumnRef` for unqualified columns (no context needed).
-     - Test each fragment parser independently to confirm.
-     - **Verify:** Run existing parser tests to ensure no regressions.
-   - Add `optional?: boolean` flag directly to `SelectItem` AST types (direct modification approach).
-     - Update other parts of codebase if needed to maintain compatibility.
-     - **Verify:** Run existing AST tests to ensure no regressions.
-   - **Review and update validator (if needed):**
-     - Check if `ValidateSelectClause` is exported (if not, export it or create AST-level validator wrapper).
-     - Validation happens on AST level only - do NOT convert to SQL string for validation.
-     - Update validator to handle optional columns if needed (optional columns still validated, but marked as potentially undefined).
-     - Ensure validator error types (`MatchError`/`ValidationError`) are consistent with builder's `ErrorState`.
-     - **Verify:** Run existing validator tests to ensure no regressions.
-   - **Review error type consistency:**
-     - Ensure builder's `ErrorState` uses `MatchError` structure from `src/common/utils.ts`.
-     - If error types need updates (e.g., additional fields), update `MatchError`/`ParseError` in `src/common/utils.ts` for project-wide consistency.
-     - Ensure parser errors (`ParseError`) are converted to builder format consistently.
-     - **Verify:** Run existing tests to ensure error type changes don't break existing code.
-   - **Review and update matcher:**
-     - Update `MatchSingleColumn` in `matcher.ts` to handle optional columns (from conditional selects).
-     - Ensure matcher can handle optional flag on `SelectItem` (or wrapper type).
-     - Test that optional columns are unionized with `undefined` in result types.
-     - **Verify:** Run existing matcher tests to ensure no regressions.
-   - Verify fragment parsers work independently (no context needed).
+### Phase 1: Foundation - AST & Parser Updates
 
-2. **Phase 2: Type-Level State Management**
-   - **Implementation Note:** All state type definitions and type-level state management utilities should be implemented in `src/select/builder.ts`.
-   - Define `EmptyState`, `ErrorState` (using `MatchError` from `src/common/utils.ts`), and `SelectBuilderState` types.
-   - Add `optional: boolean` flag to joins array items for conditional join tracking.
-   - Add `union: UnionClause | undefined` field to state for union queries.
-   - Implement `JoinStrictness` type and replacement validation logic.
-   - Implement state transition types for each builder method.
-   - Implement state-to-AST conversion utilities.
-   - Implement table context tracking and propagation (following `BuildTableContext` pattern from matcher).
-   - **Verify:** If validator is modified for state validation, run existing validator tests.
+**Step 1.1: Export Parser Fragments**
 
-3. **Phase 3: Runtime Implementation**
-   - **Implementation Note:** `ConditionTreeBuilder` runtime implementation should be in `src/common/builder.ts`. `SelectQueryBuilder` runtime implementation should be in `src/select/builder.ts`.
-   - Implement `ConditionTreeBuilder` with internal AST structure.
-   - Implement `SelectQueryBuilder` runtime class.
-   - Implement ID tracking (user-provided IDs only, no automatic generation).
-   - **Implement SQL string assembly utility (runtime):**
-     - Create runtime utility that assembles SQL string from user-provided fragments.
-     - This is NOT an AST-to-SQL converter - it's simple string assembly.
-     - Assembles parts in correct SQL order, adds keywords where needed, skips empty clauses.
-     - Handle edge cases: empty arrays, undefined values, subqueries (call their `toString()` methods).
-   - Implement SQL string generation from state using string assembly utility.
-   - Handle default `SELECT *` when `select()` is never called (returns all columns from FROM table per SQL spec).
+- **File:** `src/select/parser.ts`
+- Export `ParseWhereClause` (currently internal)
+- Export `ParseOrderByItems` (currently only `ParseOrderByItem` singular is exported)
+- **Verify:** Run existing parser tests to ensure no regressions.
 
-4. **Phase 4: Conditional Logic & Validation**
-   - **Implementation Note:** Base `.when()` runtime logic should be in `src/common/builder.ts`. SELECT-specific `.when()` type-level logic should be in `src/select/builder.ts`. Validation logic should be in `src/select/builder.ts`.
-   - Implement `.when()` logic types:
-     - Type-level: Always execute callback, add all parts to AST (mark conditional selects as optional).
-     - Runtime: Respect conditions, only include parts in SQL when condition is true.
-     - **Nested `.when()` calls are NOT supported** - adds unnecessary complexity.
-   - Implement per-method validation using AST-level validator:
-     - Convert builder state to `SelectClause` AST.
-     - Call `ValidateSelectClause` (AST-level validator) directly - do NOT convert to SQL string.
-     - Resolve `UnboundColumnRef` columns against current table context during validation.
-     - Extract validation errors and return `ErrorState` if invalid.
-     - **Verify:** If validator is modified, run existing validator tests.
-   - Implement result type inference using existing `MatchSelectClause`:
-     - Convert builder state to `SelectClause` AST.
-     - Call `MatchSelectClause<SelectClause, Schema>` from `src/select/matcher.ts` to get result type.
-     - Use result type in `toString()` branded return type.
-     - **Verify:** If matcher is modified, run existing matcher tests.
-   - Implement error state handling and error message generation.
-   - Add support for `distinct()`, `union()`, `removeLimit()`, `removeOffset()` methods.
-   - Test complex scenarios: conditionals (no nested), CTEs, subqueries, unions.
-   - **Builder needs its own comprehensive test suite** - tests must be written as part of implementation.
-   - **Test Location:** All builder tests should be added to `tests/common/builder.test.ts` (for common components) and `tests/select/builder.test.ts` (for SELECT-specific functionality).
-   - **Final Verification:** Run full test suite to ensure all existing functionality still works.
+**Step 1.2: Add Optional Flag to SelectItem AST**
+
+- **File:** `src/select/ast.ts`
+- Add `optional?: boolean` flag directly to `SelectItem` union variants (direct modification approach)
+- Update other parts of codebase if needed to maintain compatibility
+- **Verify:** Run existing AST tests to ensure no regressions
+
+**Step 1.3: Review Error Type Consistency**
+
+- **Files:** `src/common/utils.ts`, `src/select/builder.ts` (when created)
+- Ensure builder's `ErrorState` uses `MatchError` structure from `src/common/utils.ts`
+- If error types need updates (e.g., additional fields), update `MatchError`/`ParseError` in `src/common/utils.ts` for project-wide consistency
+- Ensure parser errors (`ParseError`) are converted to builder format consistently
+- **Verify:** Run existing tests to ensure error type changes don't break existing code
+
+**Step 1.4: Review and Update Validator**
+
+- **File:** `src/select/validator.ts`
+- Check if `ValidateSelectClause` is exported (if not, export it or create AST-level validator wrapper)
+- Validation happens on AST level only - do NOT convert to SQL string for validation
+- Update validator to handle optional columns if needed (optional columns still validated, but marked as potentially undefined)
+- Ensure validator error types (`MatchError`/`ValidationError`) are consistent with builder's `ErrorState`
+- **Verify:** Run existing validator tests to ensure no regressions
+
+**Step 1.5: Update Matcher for Optional Columns**
+
+- **File:** `src/select/matcher.ts`
+- Update `MatchSingleColumn` to handle optional columns (from conditional selects)
+- Ensure matcher checks for `optional` flag directly on `SelectItem` AST nodes
+- Test that optional columns are unionized with `undefined` in result types
+- **Verify:** Run existing matcher tests to ensure no regressions
+
+**Step 1.6: Verify Fragment Parsers Work Standalone**
+
+- Verify fragment parsers work without full query structure (should already work)
+- Verify fragment parsers create `UnboundColumnRef` for unqualified columns (no context needed)
+- Test each fragment parser independently to confirm
+- **Verify:** Run existing parser tests to ensure no regressions
+
+### Phase 2: Type-Level State Management
+
+**Step 2.1: Define Core State Types**
+
+- **File:** `src/select/builder.ts`
+- Define `EmptyState` type (matches specification)
+- Define `ErrorState` type using `MatchError` from `src/common/utils.ts`
+- Define `SelectBuilderState` interface (matches specification)
+- Add `optional: boolean` flag to joins array items for conditional join tracking
+- Add `union: UnionClause | undefined` field to state for union queries
+
+**Step 2.2: Implement JoinStrictness Type**
+
+- **File:** `src/select/builder.ts`
+- Implement `JoinStrictness` type (`"INNER" | "LEFT" | "RIGHT" | "FULL" | "CROSS"`)
+- Implement type-level logic for join replacement validation (`CanReplaceJoin` type)
+- Map `JoinType` from AST to `JoinStrictness` for state tracking
+
+**Step 2.3: Implement State Transition Types**
+
+- **File:** `src/select/builder.ts`
+- Implement state transition types for each builder method:
+  - `select()` transition
+  - `from()` transition
+  - `join()` transition (with strictness checks)
+  - `where()`, `groupBy()`, `having()`, `orderBy()` transitions
+  - `limit()`, `offset()`, `distinct()` transitions
+  - `with()` transition
+  - `union()` transition
+  - Remove methods transitions
+
+**Step 2.4: Implement State-to-AST Conversion Utilities**
+
+- **File:** `src/select/builder.ts`
+- Implement utilities to convert `SelectBuilderState` to `SelectClause` AST:
+  - Convert SELECT columns (flatten all entries, handle default `"*"`)
+  - Convert FROM clause
+  - Convert JOINs (preserve order, handle optional flag)
+  - Convert WHERE/HAVING (combine with AND)
+  - Convert GROUP BY/ORDER BY (flatten entries)
+  - Convert CTEs (preserve order)
+  - Convert UNION if present
+- Handle optional columns: mark `SelectItem` nodes with `optional: true` for conditional selects and conditional joins
+
+**Step 2.5: Implement Table Context Tracking**
+
+- **File:** `src/select/builder.ts`
+- Implement table context building utilities (following `BuildTableContext` pattern from matcher)
+- Context tracks available tables from FROM + JOINs + CTEs
+- Context is used for column resolution during validation
+- Context is built incrementally as methods are called
+
+### Phase 3: Runtime Implementation - Core Builder
+
+**Step 3.1: Implement ConditionTreeBuilder**
+
+- **File:** `src/common/builder.ts`
+- Implement `ConditionTreeBuilder` class with internal AST structure
+- Implement `add()`, `remove()`, `when()`, `toString()` methods
+- Internal state uses `WhereExpr` types for condition parts
+- **Test Location:** `tests/common/builder.test.ts`
+- Write basic tests for ConditionTreeBuilder functionality
+
+**Step 3.2: Create SelectQueryBuilder Class Skeleton**
+
+- **File:** `src/select/builder.ts`
+- Create `SelectQueryBuilder` class with generic type parameters `<Schema, State>`
+- Implement `createSelectQuery()` factory function (schema parameter for type inference only)
+- Class stores runtime state matching `SelectBuilderState` type
+- Implement basic constructor and state management
+
+**Step 3.3: Implement ID Tracking**
+
+- **File:** `src/select/builder.ts`
+- Implement ID tracking system (user-provided IDs only, no automatic generation)
+- IDs stored in state maps/arrays as specified
+- Support ID-based lookup and replacement
+- Handle duplicate IDs across different clause types (allowed)
+
+**Step 3.4: Implement SQL String Assembly Utility**
+
+- **File:** `src/select/builder.ts`
+- Create runtime utility function that assembles SQL string from user-provided fragments
+- This is NOT an AST-to-SQL converter - it's simple string assembly
+- Assembles parts in correct SQL order:
+  - CTEs (WITH clause) if present
+  - SELECT columns (or `SELECT *` if none)
+  - FROM clause
+  - JOINs (in order)
+  - WHERE clause (if any WHERE parts exist)
+  - GROUP BY clause (if any GROUP BY parts exist)
+  - HAVING clause (if any HAVING parts exist)
+  - ORDER BY clause (if any ORDER BY parts exist)
+  - LIMIT clause (if set)
+  - OFFSET clause (if set)
+  - UNION/INTERSECT/EXCEPT (if set)
+- Adds keywords like "WHERE", "HAVING", "GROUP BY", etc. where needed
+- Skips clauses if they're empty
+- Handles edge cases: empty arrays, undefined values, subqueries (call their `toString()` methods)
+- Handles default `SELECT *` when `select()` is never called
+
+**Step 3.5: Implement Basic Methods - Part 1 (select, from, join)**
+
+- **File:** `src/select/builder.ts`
+- Implement `select()` method:
+  - Parse columns using `ParseColumnList` fragment parser
+  - Store in state with optional ID
+  - Return new builder instance with updated state
+- Implement `from()` method:
+  - Parse table reference using `ParseTableRef` fragment parser
+  - Handle subquery builders (convert to `DerivedTableRef`)
+  - Store in state
+  - Return new builder instance
+- Implement `join()` method:
+  - Parse join using `ParseSingleJoin` fragment parser
+  - Check join strictness for replacement validation
+  - Store in state with optional ID and strictness
+  - Return new builder instance
+- Implement `removeSelect()` and `removeJoin()` methods
+- **Test Location:** `tests/select/builder.test.ts`
+- Write tests for basic method functionality and SQL string generation
+
+**Step 3.6: Implement Basic Methods - Part 2 (where, groupBy, having, orderBy)**
+
+- **File:** `src/select/builder.ts`
+- Implement `where()` method:
+  - Parse condition using `ParseWhereClause` fragment parser
+  - Handle `ConditionTree` objects
+  - Store in state with optional ID
+- Implement `groupBy()` method:
+  - Parse columns using column reference parser
+  - Store in state with optional ID
+- Implement `having()` method (same as `where()`)
+- Implement `orderBy()` method:
+  - Parse using `ParseOrderByItems` fragment parser
+  - Store in state with optional ID
+- Implement corresponding `remove*()` methods
+- **Test Location:** `tests/select/builder.test.ts`
+- Write tests for these methods and SQL string generation
+
+**Step 3.7: Implement Basic Methods - Part 3 (limit, offset, distinct, with, union)**
+
+- **File:** `src/select/builder.ts`
+- Implement `limit()` and `offset()` methods (no ID support)
+- Implement `removeLimit()` and `removeOffset()` methods
+- Implement `distinct()` method (no ID support)
+- Implement `with()` method:
+  - Parse CTE definition
+  - Store in state with optional ID
+  - Handle CTE validation order
+- Implement `removeWith()` method
+- Implement `union()` method:
+  - Handle subquery builders
+  - Store union information in state
+- **Test Location:** `tests/select/builder.test.ts`
+- Write tests for these methods and SQL string generation
+
+### Phase 4: Validation & Type Inference
+
+**Step 4.1: Implement Per-Method Validation**
+
+- **File:** `src/select/builder.ts`
+- Implement validation logic that runs on each method call:
+  - Convert current builder state to `SelectClause` AST
+  - Call `ValidateSelectClause` (AST-level validator) directly - do NOT convert to SQL string
+  - Resolve `UnboundColumnRef` columns against current table context during validation
+  - Extract validation errors and return `ErrorState` if invalid
+- Handle early exit: once in `ErrorState`, subsequent methods return same `ErrorState`
+- **Test Location:** `tests/select/builder.test.ts`
+- Write tests for validation errors and error state handling
+
+**Step 4.2: Implement Result Type Inference**
+
+- **File:** `src/select/builder.ts`
+- Implement `toString()` method:
+  - Convert builder state to `SelectClause` AST
+  - Call `MatchSelectClause<SelectClause, Schema>` from `src/select/matcher.ts` to get result type
+  - Generate SQL string using string assembly utility
+  - Return branded string type: `string & { __type: MatchSelectClause<SelectClause, Schema> }`
+  - Handle error states: branded type may include `{ __error: true, message: string }`
+- **Test Location:** `tests/select/builder.test.ts`
+- Write type-level tests to verify return type correctness
+
+**Step 4.3: Implement Error State Handling**
+
+- **File:** `src/select/builder.ts`
+- Implement error message generation and embedding in types
+- Ensure error details are accessible via type utilities
+- Handle parser errors: convert `ParseError` to builder's `ErrorState` format
+- Handle validator errors: use `MatchError` structure consistently
+- **Test Location:** `tests/select/builder.test.ts`
+- Write tests for error state handling and error message extraction
+
+### Phase 5: Conditional Logic
+
+**Step 5.1: Implement Base .when() Runtime Logic**
+
+- **File:** `src/common/builder.ts`
+- Implement base `.when()` runtime behavior:
+  - If condition is `true`: execute callback and include modifications in SQL
+  - If condition is `false`: skip callback execution, state unchanged for SQL generation
+- This is shared logic for all builder types
+
+**Step 5.2: Implement SELECT-Specific .when() Type-Level Logic**
+
+- **File:** `src/select/builder.ts`
+- Implement SELECT-specific `.when()` type-level behavior:
+  - Callback is **always** executed at type level (regardless of runtime condition)
+  - All parts from callback are added to AST state (or replace existing parts if ID matches)
+  - Conditional selects are marked with `optional: true` in `SelectItem` AST nodes
+  - Conditional joins make ALL columns from those tables optional
+- **Nested `.when()` calls are NOT supported**
+- **Test Location:** `tests/select/builder.test.ts`
+- Write tests for conditional logic (runtime and type-level behavior)
+
+### Phase 6: Comprehensive Testing
+
+**Step 6.1: Write Basic Functionality Tests**
+
+- **Test Location:** `tests/select/builder.test.ts`
+- Test all basic methods (`select`, `from`, `join`, `where`, etc.)
+- Verify SQL string assembly for each method
+- Verify return type correctness for each method
+- Test ID-based replacement and removal
+- Test edge cases (empty clauses, defaults, etc.)
+
+**Step 6.2: Write Conditional Logic Tests**
+
+- **Test Location:** `tests/select/builder.test.ts`
+- Test `.when()` runtime behavior (SQL string includes/excludes based on condition)
+- Test `.when()` type-level behavior (optional columns in result type)
+- Test conditional joins (make columns optional)
+- Test ID replacement within conditional callbacks
+- Verify nested `.when()` is not supported (if applicable)
+
+**Step 6.3: Write Complex Scenario Tests**
+
+- **Test Location:** `tests/select/builder.test.ts`
+- Test CTEs (WITH clauses)
+- Test subqueries (builder as FROM source)
+- Test unions (UNION/INTERSECT/EXCEPT)
+- Test complex JOIN scenarios
+- Test multiple WHERE/HAVING clauses with IDs
+- Test error state propagation
+
+**Step 6.4: Write Type-Level Tests**
+
+- **Test Location:** `tests/select/builder.test.ts`
+- Use TypeScript type testing utilities (e.g., `expectTypeOf()` or similar)
+- Verify result types match schema column types
+- Verify optional columns have `undefined` in their union types
+- Verify joined table columns are correctly included/excluded
+- Verify error states produce appropriate error types
+- Test branded return type extraction
+
+**Step 6.5: Final Verification**
+
+- Run full test suite to ensure all existing functionality still works
+- Verify no regressions in parser, validator, matcher, or AST tests
+- Ensure all test requirements from specification are met:
+  - SQL Query Assembly: String equality checks verify correct assembly
+  - Return Type Correctness: Type-level tests verify correct type inference
 
 ## 6. Examples
 
