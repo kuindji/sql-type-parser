@@ -10,6 +10,40 @@
 - src/select/matcher.ts
 - Example schemas can be found in `examples/schema.ts`
 
+## 0.1. Implementation File Structure
+
+**Implementation Note:** The builder implementation is split across two main files:
+
+- **`src/common/builder.ts`**: Contains common/shared components that will be reused across all query builders (SELECT, INSERT, UPDATE, DELETE):
+  - `ConditionTreeBuilder` and related types
+  - Base `.when()` conditional logic (runtime behavior)
+  - Shared utilities for state management
+  - Common error handling utilities
+
+- **`src/select/builder.ts`**: Contains SELECT-specific implementation:
+  - `SelectQueryBuilder` class and related types
+  - `SelectBuilderState`, `EmptyState`, `ErrorState` type definitions
+  - SELECT-specific methods (`.select()`, `.from()`, `.join()`, etc.)
+  - SELECT-specific `.when()` type-level behavior (optional columns handling)
+  - State-to-AST conversion utilities for SELECT queries
+  - SQL string assembly utility (runtime)
+  - Type-level state transition logic for SELECT methods
+
+**Test Location:** Tests are organized to match the implementation structure:
+
+- **`tests/common/builder.test.ts`**: Tests for common components:
+  - `ConditionTreeBuilder` functionality
+  - Base conditional logic (`.when()` runtime behavior)
+  - Shared utilities
+
+- **`tests/select/builder.test.ts`**: Tests for SELECT builder:
+  - `SelectQueryBuilder` API methods
+  - SELECT-specific conditional logic
+  - State management and transitions
+  - SQL string generation
+  - Type inference and validation
+  - Complex scenarios (CTEs, subqueries, unions)
+
 ## 1. Common Architecture
 
 ### 1.1. Design Philosophy
@@ -24,6 +58,10 @@
 ### 1.2. Condition Tree
 
 A `ConditionTree` allows constructing complex nested conditions (AND/OR groups). It is designed to be reusable across `SELECT`, `UPDATE`, and `DELETE` builders (when implemented in the future), but is part of the SELECT builder implementation.
+
+**Implementation Note:** `ConditionTreeBuilder` and all related types should be implemented in `src/common/builder.ts` since it's designed to be reusable across all query builders.
+
+**Test Location:** Tests for `ConditionTreeBuilder` should be added to `tests/common/builder.test.ts`.
 
 #### Internal Structure
 
@@ -65,6 +103,10 @@ function createConditionTree(operator: "and" | "or"): ConditionTreeBuilder;
 ### 1.3. Conditional Logic (`.when()`)
 
 All builders support a `.when()` method for conditional query construction.
+
+**Implementation Note:** The base `.when()` runtime behavior (conditional execution logic) should be implemented in `src/common/builder.ts` as it's shared across all builders. SELECT-specific type-level behavior (optional columns handling) should be implemented in `src/select/builder.ts`.
+
+**Test Location:** Base conditional logic tests should be added to `tests/common/builder.test.ts`. SELECT-specific conditional logic tests should be added to `tests/select/builder.test.ts`.
 
 #### Runtime Behavior
 
@@ -110,6 +152,10 @@ const builder = createSelectQuery(schema)
 ### 2.1. Overview
 
 The `SelectQueryBuilder` constructs `SELECT` statements. It utilizes the Common Architecture and adds specific state and methods for `SELECT` queries.
+
+**Implementation Note:** The `SelectQueryBuilder` class, all SELECT-specific types (`SelectBuilderState`, `EmptyState`, `ErrorState`, `JoinStrictness`), and all SELECT-specific methods should be implemented in `src/select/builder.ts`.
+
+**Test Location:** All tests for `SelectQueryBuilder` should be added to `tests/select/builder.test.ts`.
 
 ### 2.2. Builder State
 
@@ -338,6 +384,8 @@ All methods accept an optional `id` as the last argument (except `from`, `limit`
 
 #### State-to-AST Conversion
 
+**Implementation Note:** State-to-AST conversion utilities should be implemented in `src/select/builder.ts` as they are SELECT-specific.
+
 The builder state is converted to a `SelectClause` AST when needed for validation or type inference:
 
 1. **SELECT columns**: All `select` entries are flattened into a single `SelectItem[]` array. If no `select()` was called, defaults to `"*"`.
@@ -450,6 +498,8 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
 
 ### 4.1. Required Changes to `sql-type-parser`
 
+**Implementation Note:** Changes to parser, validator, matcher, and AST files should be made in their respective existing files (`src/select/parser.ts`, `src/select/validator.ts`, `src/select/matcher.ts`, `src/select/ast.ts`, `src/common/ast.ts`). These are modifications to existing code, not new builder files.
+
 1. **Parser Exports:**
    - Export `ParseColumnList` (already exported)
    - Export `ParseSingleJoin` (already exported)
@@ -515,6 +565,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
    - **Verify:** Run existing matcher tests to ensure no regressions after modifications.
 
 6. **SQL String Assembly Utility (Runtime):**
+   - **Implementation Note:** This utility should be implemented in `src/select/builder.ts` as it's SELECT-specific. It's a runtime-only utility function (not a type-level utility).
    - Implement a runtime utility that assembles SQL string from user-provided fragments.
    - **This is NOT an AST-to-SQL converter** - it's a simple string assembly utility.
    - **No runtime parsing:** Uses string fragments provided by user exactly as-is. AST and parsers exist only at the type level - no parsing happens at runtime. The utility performs pure string concatenation/templating using the exact strings the user provided.
@@ -536,6 +587,8 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
    - Simple string concatenation/formatting logic - no AST involved.
 
 ### 4.2. ID & Join Replacement Logic
+
+**Implementation Note:** `JoinStrictness` type and join replacement logic should be implemented in `src/select/builder.ts` as they are SELECT-specific.
 
 - Implement `JoinStrictness` type as defined in Section 2.2.
 - Implement type-level logic to allow replacing a join with same or higher strictness under the same ID:
@@ -559,6 +612,8 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
   - If replacement would violate strictness rules: no error, just no-op (join not replaced).
 
 ### 4.3. Validation
+
+**Implementation Note:** Validation logic that uses the existing validator should be implemented in `src/select/builder.ts`. The builder calls the existing validator from `src/select/validator.ts` - no changes needed to the validator file itself unless specifically mentioned in Section 4.1.
 
 - **Using Existing Validator:**
   - The builder uses the existing `ValidateSelectSQL` validator from `src/select/validator.ts`.
@@ -616,6 +671,8 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
 
 ### 4.4. Fragment Parsing Context
 
+**Implementation Note:** Context building and tracking utilities should be implemented in `src/select/builder.ts` as they are SELECT-specific and depend on `SelectBuilderState`.
+
 **Context is AST-based** - it's built from the builder's AST state, not a separate structure.
 
 **Context Structure:**
@@ -655,6 +712,7 @@ The context tracks:
 **Important:** On each step of implementation, if any changes are made to `ast.ts`, `parser.ts`, `validator.ts`, or `matcher.ts` files, verify that existing tests still pass. These files are core to the sql-type-parser library and changes must not break backward compatibility.
 
 1. **Phase 1: AST & Parser Updates**
+   - **Implementation Note:** Parser exports should be added to `src/select/parser.ts`. AST modifications should be made in `src/select/ast.ts` and `src/common/ast.ts` as appropriate. Validator modifications should be made in `src/select/validator.ts`. Matcher modifications should be made in `src/select/matcher.ts`.
    - Export missing parser fragments (`ParseWhereClause`, `ParseOrderByItems`).
    - **Verify fragment parsers work standalone:**
      - Fragment parsers already work without full query structure (no modifications needed).
@@ -683,6 +741,7 @@ The context tracks:
    - Verify fragment parsers work independently (no context needed).
 
 2. **Phase 2: Type-Level State Management**
+   - **Implementation Note:** All state type definitions and type-level state management utilities should be implemented in `src/select/builder.ts`.
    - Define `EmptyState`, `ErrorState` (using `MatchError` from `src/common/utils.ts`), and `SelectBuilderState` types.
    - Add `optional: boolean` flag to joins array items for conditional join tracking.
    - Add `union: UnionClause | undefined` field to state for union queries.
@@ -693,6 +752,7 @@ The context tracks:
    - **Verify:** If validator is modified for state validation, run existing validator tests.
 
 3. **Phase 3: Runtime Implementation**
+   - **Implementation Note:** `ConditionTreeBuilder` runtime implementation should be in `src/common/builder.ts`. `SelectQueryBuilder` runtime implementation should be in `src/select/builder.ts`.
    - Implement `ConditionTreeBuilder` with internal AST structure.
    - Implement `SelectQueryBuilder` runtime class.
    - Implement ID tracking (user-provided IDs only, no automatic generation).
@@ -705,6 +765,7 @@ The context tracks:
    - Handle default `SELECT *` when `select()` is never called (returns all columns from FROM table per SQL spec).
 
 4. **Phase 4: Conditional Logic & Validation**
+   - **Implementation Note:** Base `.when()` runtime logic should be in `src/common/builder.ts`. SELECT-specific `.when()` type-level logic should be in `src/select/builder.ts`. Validation logic should be in `src/select/builder.ts`.
    - Implement `.when()` logic types:
      - Type-level: Always execute callback, add all parts to AST (mark conditional selects as optional).
      - Runtime: Respect conditions, only include parts in SQL when condition is true.
@@ -724,6 +785,7 @@ The context tracks:
    - Add support for `distinct()`, `union()`, `removeLimit()`, `removeOffset()` methods.
    - Test complex scenarios: conditionals (no nested), CTEs, subqueries, unions.
    - **Builder needs its own comprehensive test suite** - tests must be written as part of implementation.
+   - **Test Location:** All builder tests should be added to `tests/common/builder.test.ts` (for common components) and `tests/select/builder.test.ts` (for SELECT-specific functionality).
    - **Final Verification:** Run full test suite to ensure all existing functionality still works.
 
 ## 6. Examples
