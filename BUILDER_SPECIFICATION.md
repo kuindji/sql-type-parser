@@ -391,6 +391,37 @@ All methods accept an optional `id` as the last argument (except `from`, `limit`
    - Optional columns (from conditional selects) have their types unionized with `undefined` by the matcher.
    - Result type can be extracted via `typeof builder.toString().__type`
 
+### 2.5. Dynamic Query Handling
+
+The builder must check for `${string}` template literal holes in all string inputs (fragments passed to methods like `select()`, `from()`, `join()`, `where()`, etc.) using the existing `HasTemplateHoles` type from `src/common/utils.ts`.
+
+**Requirements:**
+
+- All builder methods that accept string inputs must check for `HasTemplateHoles` before parsing
+- If a string contains `${string}` patterns, the builder must **strip them out** and continue processing the remaining string
+- The `${string}` patterns are removed/ignored as if they didn't exist - we don't know what's in them, so we shouldn't assume they break the query
+- The check and stripping must happen **before** fragment parsing to ensure it's not bypassed
+- This applies to all string inputs: `select()`, `from()`, `join()`, `where()`, `groupBy()`, `having()`, `orderBy()`, `with()`, and any other methods accepting string fragments
+- The builder should **NOT** enter `ErrorState` for dynamic queries - they should be handled gracefully by stripping
+
+**Implementation Note:**
+
+- Use `HasTemplateHoles<T>` from `src/common/utils.ts` to detect template literal holes
+- Implement a type-level utility to strip `${string}` patterns from strings (similar to how the parser handles them)
+- The stripping should happen at the type level before calling fragment parsers
+- After stripping, the remaining string is parsed and validated normally
+
+**Example:**
+
+```typescript
+// Input with ${string} should have the dynamic part stripped
+const builder = createSelectQuery(schema)
+    .select("id")
+    .from(`users ${someDynamicValue}`); // Contains ${string}
+// The "${someDynamicValue}" part is stripped, leaving "users" to be parsed
+// Result: FROM users (as if the dynamic part never existed)
+```
+
 #### State-to-AST Conversion
 
 **Implementation Note:** State-to-AST conversion utilities should be implemented in `src/select/builder.ts` as they are SELECT-specific.
@@ -535,7 +566,14 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
 
    - **Testing:** Verify each fragment parser works independently without full query context (should already work).
 
-3. **AST Modifications:**
+3. **Dynamic Query Detection and Stripping:**
+   - The builder must use `HasTemplateHoles` from `src/common/utils.ts` to detect template literal holes in all string inputs
+   - Detection happens before fragment parsing to ensure the check is not bypassed
+   - If `${string}` patterns are detected, they must be stripped out and ignored before parsing
+   - The remaining string (after stripping) is then parsed and validated normally
+   - This ensures the builder respects the same dynamic query handling as the parser/validator, but handles it by stripping rather than bypassing validation
+
+4. **AST Modifications:**
    - Add `optional?: boolean` flag directly to `SelectItem` union variants:
      ```typescript
      type SelectItem =
@@ -548,7 +586,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
      - Other parts of the codebase may need updates to maintain compatibility, but this is preferred over wrapper approach.
    - **Conditional joins handling:** When converting builder state to `SelectClause` AST, columns from conditionally joined tables (where the join has `optional: true` in state) must have their corresponding `SelectItem` nodes marked with `optional: true` directly in the AST. This ensures the matcher can correctly infer optionality by checking the AST directly, without needing to reference builder state.
 
-4. **Validator Modifications (if needed):**
+5. **Validator Modifications (if needed):**
    - The builder uses the existing `ValidateSelectSQL<SQL, Schema>` validator.
    - **Check if `ValidateSelectClause` is exported:** If the internal `ValidateSelectClause` type (that works with AST directly) is not exported, consider:
      - Exporting it for direct AST validation (more efficient than SQL conversion)
@@ -559,7 +597,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
      - This depends on validation requirements - document decision during implementation
    - **Per-method validation mode:** Consider adding a validation option that validates only specific clauses rather than the full query (for performance optimization).
 
-5. **Matcher Modifications:**
+6. **Matcher Modifications:**
    - The builder uses the existing `MatchSelectClause<SelectClause, Schema>` matcher from `src/select/matcher.ts`.
    - **Optional columns support:** The matcher needs to handle optional columns from conditional selects:
      - Modify `MatchSingleColumn` in `matcher.ts` to check for optional flag on `SelectItem`.
@@ -573,7 +611,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
    - **Optional columns from conditional joins:** When a join is added conditionally, all columns from that table's context are marked with `optional: true` directly in their `SelectItem` AST nodes during state-to-AST conversion. The matcher handles this by checking the `optional` flag directly on `SelectItem` nodes in the AST (not by checking join state). This ensures the matcher operates purely on AST structure without needing builder state context.
    - **Verify:** Run existing matcher tests to ensure no regressions after modifications.
 
-6. **SQL String Assembly Utility (Runtime):**
+7. **SQL String Assembly Utility (Runtime):**
    - **Implementation Note:** This utility should be implemented in `src/select/builder.ts` as it's SELECT-specific. It's a runtime-only utility function (not a type-level utility).
    - Implement a runtime utility that assembles SQL string from user-provided fragments.
    - **This is NOT an AST-to-SQL converter** - it's a simple string assembly utility.
@@ -667,6 +705,12 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
     - Table references (check against schema)
     - JOIN table references
     - Basic column existence in WHERE/HAVING/ORDER BY clauses
+  - **Dynamic Query Handling:**
+    - Before parsing any string input, check for `HasTemplateHoles`
+    - If `${string}` patterns are detected, strip them out before parsing
+    - The stripped string is then parsed and validated normally
+    - This ensures the builder respects the same dynamic query handling as the parser/validator, but handles it by stripping rather than bypassing validation
+    - The builder should NOT bypass this check - it must implement the stripping logic itself
   - **Validation Errors:**
     - If `select()` is called before `from()`: Error (no table context available).
     - If `where()` references columns not in available tables: Error (validation not deferred).
@@ -926,6 +970,16 @@ The context tracks:
 - Write tests for these methods and SQL string generation
 
 ### Phase 4: Validation & Type Inference
+
+**Step 4.0: Implement Dynamic Query Stripping**
+
+- **File:** `src/select/builder.ts`
+- Implement checks for `HasTemplateHoles` in all string input methods
+- Implement type-level utility to strip `${string}` patterns from strings
+- Stripping happens before fragment parsing
+- After stripping, continue with normal parsing and validation
+- **Test Location:** `tests/select/builder.test.ts`
+- Write tests to verify `${string}` patterns are stripped and remaining string is processed correctly
 
 **Step 4.1: Implement Per-Method Validation**
 
