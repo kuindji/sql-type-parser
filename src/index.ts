@@ -1,17 +1,17 @@
 /**
  * @kuindji/sql-type-parser
- * 
+ *
  * Type-level SQL Parser
  *
  * This module provides a type-level parser that transforms SQL query
  * string literals into their corresponding AST types at compile time.
- * 
+ *
  * Architecture:
  * ------------
  * The parser is organized into modules by query type:
  * - common/    - Shared utilities (tokenizer, AST nodes, utils)
  * - select/    - SELECT query parser
- * 
+ *
  * Each query type has its own execution tree in the type system
  * to avoid TypeScript performance issues.
  *
@@ -23,7 +23,7 @@
  * type AST = ParseSQL<"SELECT id, name FROM users">
  * // Returns SQLSelectQuery<SelectClause<...>>
  * ```
- * 
+ *
  * @packageDocumentation
  */
 
@@ -33,18 +33,18 @@
 
 // Re-export the main router entry point
 export type {
-  ParseSQL,
-  DetectQueryType,
-  ParseSelectSQL,
-  ParseInsertSQL,
-  ParseUpdateSQL,
-  ParseDeleteSQL,
-  IsSelectQuery,
-  IsInsertQuery,
-  IsUpdateQuery,
-  IsDeleteQuery,
-  AnySQLQuery,
-} from "./router.js"
+    AnySQLQuery,
+    DetectQueryType,
+    IsDeleteQuery,
+    IsInsertQuery,
+    IsSelectQuery,
+    IsUpdateQuery,
+    ParseDeleteSQL,
+    ParseInsertSQL,
+    ParseSelectSQL,
+    ParseSQL,
+    ParseUpdateSQL,
+} from "./router.js";
 
 // ============================================================================
 // Common Types (shared across all query types)
@@ -52,86 +52,82 @@ export type {
 
 // Re-export common utility types
 export type {
-  // Tokenizer
-  NormalizeSQL,
-  NextToken,
-  ExtractUntil,
-  SplitByComma,
-  FromTerminators,
-  WhereTerminators,
-  OrderByTerminators,
-  StartsWith,
-  CountOpen,
-  CountClose,
-  ParensBalanced,
-
-  // Utils
-  Trim,
-  RemoveQuotes,
-  Flatten,
-  ParseError,
-  IsParseError,
-  MatchError,
-  IsMatchError,
-  Increment,
-  Decrement,
-
-  // Dynamic query support
-  IsStringLiteral,
-  HasTemplateHoles,
-  DynamicQuery,
-  IsDynamicQuery,
-  DynamicQueryResult,
-
-  // Schema types
-  DatabaseSchema,
-  TableDefinition,
-  SchemaDefinition,
-  RelationType,
-  ColumnReference,
-  Relation,
-  Relations,
-  GetDefaultSchema,
-  GetTableNames,
-  GetColumnNames,
-  GetColumnType,
-  HasRelations,
-  GetRelationNames,
-  GetRelation,
-  FindRelationsFrom,
-  FindRelationsTo,
-
-  // Common AST types
-  QueryType,
-  UnboundColumnRef,
-  TableColumnRef,
-  ValidatableColumnRef,
-  TableWildcard,
-  SimpleColumnRefType,
-  ComplexExpr,
-  ColumnRefType,
-  TableRef,
-  SubquerySelectClause,
-  DerivedTableRef,
-  CTEDefinition,
-  TableSource,
-  ComparisonOp,
-  LogicalOp,
-  LiteralValue,
-  BinaryExpr,
-  UnparsedExpr,
-  ParsedCondition,
-  LogicalExprAny,
-  WhereExpr,
-  LogicalExpr,
-  JoinType,
-  JoinClause,
-  SortDirection,
-  OrderByItem,
-  AggregateFunc,
-  AggregateExpr,
-  MapSQLTypeToTS,
-} from "./common/index.js"
+    AggregateExpr,
+    AggregateFunc,
+    BinaryExpr,
+    ColumnReference,
+    ColumnRefType,
+    ComparisonOp,
+    ComplexExpr,
+    CountClose,
+    CountOpen,
+    CTEDefinition,
+    // Schema types
+    DatabaseSchema,
+    Decrement,
+    DerivedTableRef,
+    DynamicQuery,
+    DynamicQueryResult,
+    ExtractUntil,
+    FindRelationsFrom,
+    FindRelationsTo,
+    Flatten,
+    FromTerminators,
+    GetColumnNames,
+    GetColumnType,
+    GetDefaultSchema,
+    GetRelation,
+    GetRelationNames,
+    GetTableNames,
+    HasRelations,
+    HasTemplateHoles,
+    Increment,
+    IsDynamicQuery,
+    IsMatchError,
+    IsParseError,
+    // Dynamic query support
+    IsStringLiteral,
+    JoinClause,
+    JoinType,
+    LiteralValue,
+    LogicalExpr,
+    LogicalExprAny,
+    LogicalOp,
+    MapSQLTypeToTS,
+    MatchError,
+    NextToken,
+    // Tokenizer
+    NormalizeSQL,
+    OrderByItem,
+    OrderByTerminators,
+    ParensBalanced,
+    ParsedCondition,
+    ParseError,
+    // Common AST types
+    QueryType,
+    Relation,
+    Relations,
+    RelationType,
+    RemoveQuotes,
+    SchemaDefinition,
+    SimpleColumnRefType,
+    SortDirection,
+    SplitByComma,
+    StartsWith,
+    SubquerySelectClause,
+    TableColumnRef,
+    TableDefinition,
+    TableRef,
+    TableSource,
+    TableWildcard,
+    // Utils
+    Trim,
+    UnboundColumnRef,
+    UnparsedExpr,
+    ValidatableColumnRef,
+    WhereExpr,
+    WhereTerminators,
+} from "./common/index.js";
 
 // ============================================================================
 // SELECT Query Types
@@ -139,41 +135,35 @@ export type {
 
 // Re-export SELECT-specific types
 export type {
-  // Query wrapper types
-  SQLSelectQuery,
-
-  // Column types
-  ColumnRef,
-  LiteralExpr,
-  SubqueryExpr,
-  ExistsExpr,
-  IntervalExpr,
-  ExtendedColumnRefType,
-
-  // SQL constants
-  SQLConstantExpr,
-  SQLConstantName,
-
-  // Select types
-  SelectClause,
-  SelectItem,
-  SelectColumns,
-
-  // Union types
-  UnionClause,
-  UnionClauseAny,
-  UnionOperatorType,
-
-  // Matcher types
-  MatchSelectQuery,
-  QueryResult,
-  ValidateQuery,
-  ValidateSQL,
-
-  // Validator types
-  ValidateSelectSQL,
-  ValidateSelectOptions,
-} from "./select/index.js"
+    // Column types
+    ColumnRef,
+    ExistsExpr,
+    ExtendedColumnRefType,
+    IntervalExpr,
+    LiteralExpr,
+    // Matcher types
+    MatchSelectQuery,
+    QueryResult,
+    // Select types
+    SelectClause,
+    SelectColumns,
+    SelectItem,
+    // SQL constants
+    SQLConstantExpr,
+    SQLConstantName,
+    // Query wrapper types
+    SQLSelectQuery,
+    SubqueryExpr,
+    // Union types
+    UnionClause,
+    UnionClauseAny,
+    UnionOperatorType,
+    ValidateQuery,
+    ValidateSelectOptions,
+    // Validator types
+    ValidateSelectSQL,
+    ValidateSQL,
+} from "./select/index.js";
 
 // ============================================================================
 // INSERT Query Types
@@ -181,44 +171,37 @@ export type {
 
 // Re-export INSERT-specific types
 export type {
-  // Query wrapper types
-  SQLInsertQuery,
-
-  // Main clause
-  InsertClause,
-
-  // Column types
-  InsertColumnList,
-  InsertColumnRef,
-
-  // Value types
-  InsertValue,
-  InsertValueRow,
-  InsertValuesClause,
-  InsertSelectClause,
-  InsertSource,
-
-  // RETURNING clause
-  ReturningClause,
-
-  // ON CONFLICT types
-  OnConflictClause,
-  ConflictTarget,
-  ConflictAction,
-  ConflictUpdateSet,
-
-  // Matcher types
-  MatchInsertQuery,
-  InsertResult,
-  InsertInput,
-  ValidateInsertResult,
-
-  // Validator types
-  ValidateInsertSQL,
-  ValidateInsertOptions,
-  IsValidInsert,
-  GetInsertTableColumns,
-} from "./insert/index.js"
+    ConflictAction,
+    ConflictTarget,
+    ConflictUpdateSet,
+    GetInsertTableColumns,
+    // Main clause
+    InsertClause,
+    // Column types
+    InsertColumnList,
+    InsertColumnRef,
+    InsertInput,
+    InsertResult,
+    InsertSelectClause,
+    InsertSource,
+    // Value types
+    InsertValue,
+    InsertValueRow,
+    InsertValuesClause,
+    IsValidInsert,
+    // Matcher types
+    MatchInsertQuery,
+    // ON CONFLICT types
+    OnConflictClause,
+    // RETURNING clause
+    ReturningClause,
+    // Query wrapper types
+    SQLInsertQuery,
+    ValidateInsertOptions,
+    ValidateInsertResult,
+    // Validator types
+    ValidateInsertSQL,
+} from "./insert/index.js";
 
 // ============================================================================
 // UPDATE Query Types
@@ -226,38 +209,32 @@ export type {
 
 // Re-export UPDATE-specific types
 export type {
-  // Query wrapper types
-  SQLUpdateQuery,
-
-  // Main clause
-  UpdateClause,
-
-  // SET clause types
-  SetClause,
-  SetAssignment,
-  SetValue,
-
-  // FROM clause
-  UpdateFromClause,
-
-  // RETURNING clause (PostgreSQL 17+ OLD/NEW support)
-  UpdateReturningClause,
-  ReturningItem,
-  QualifiedColumnRef,
-  QualifiedWildcard,
-  ReturningQualifier,
-
-  // Matcher types
-  MatchUpdateQuery,
-  UpdateResult,
-  ValidateUpdateResult,
-
-  // Validator types
-  ValidateUpdateSQL,
-  ValidateUpdateOptions,
-  IsValidUpdate,
-  GetUpdateTableColumns,
-} from "./update/index.js"
+    GetUpdateTableColumns,
+    IsValidUpdate,
+    // Matcher types
+    MatchUpdateQuery,
+    QualifiedColumnRef,
+    QualifiedWildcard,
+    ReturningItem,
+    ReturningQualifier,
+    SetAssignment,
+    // SET clause types
+    SetClause,
+    SetValue,
+    // Query wrapper types
+    SQLUpdateQuery,
+    // Main clause
+    UpdateClause,
+    // FROM clause
+    UpdateFromClause,
+    UpdateResult,
+    // RETURNING clause (PostgreSQL 17+ OLD/NEW support)
+    UpdateReturningClause,
+    ValidateUpdateOptions,
+    ValidateUpdateResult,
+    // Validator types
+    ValidateUpdateSQL,
+} from "./update/index.js";
 
 // ============================================================================
 // DELETE Query Types
@@ -265,38 +242,33 @@ export type {
 
 // Re-export DELETE-specific types
 export type {
-  // Query wrapper types
-  SQLDeleteQuery,
-
-  // Main clause
-  DeleteClause,
-
-  // USING clause
-  UsingClause,
-
-  // RETURNING clause
-  DeleteReturningClause,
-
-  // Matcher types
-  MatchDeleteQuery,
-  DeleteResult,
-  ValidateDeleteResult,
-
-  // Validator types
-  ValidateDeleteSQL,
-  ValidateDeleteOptions,
-  IsValidDelete,
-  GetDeleteTableColumns,
-} from "./delete/index.js"
+    // Main clause
+    DeleteClause,
+    DeleteResult,
+    // RETURNING clause
+    DeleteReturningClause,
+    GetDeleteTableColumns,
+    IsValidDelete,
+    // Matcher types
+    MatchDeleteQuery,
+    // Query wrapper types
+    SQLDeleteQuery,
+    // USING clause
+    UsingClause,
+    ValidateDeleteOptions,
+    ValidateDeleteResult,
+    // Validator types
+    ValidateDeleteSQL,
+} from "./delete/index.js";
 
 // ============================================================================
 // Runtime API helpers
 // ============================================================================
 
-export { createSelectFn } from "./db.js"
+export { createSelectFn } from "./db.js";
 export type {
-  ValidQuery,
-  SelectResult,
-  SelectResultArray,
-  IsValidSelect
-} from "./db.js"
+    IsValidSelect,
+    SelectResult,
+    SelectResultArray,
+    ValidQuery,
+} from "./db.js";

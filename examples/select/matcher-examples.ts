@@ -351,6 +351,7 @@ type OrderWithCustomer = QueryResult<
   SELECT 
     o.order_number,
     o.total_amount,
+    o.status as "orderStatus",
     u.email AS customer_email,
     u.first_name,
     u.last_name,

@@ -6,11 +6,10 @@
  */
 
 // Parser examples - demonstrating SQL parsing capabilities
-export * from "./parser-examples.js"
+export * from "./parser-examples.js";
 
 // Matcher examples - demonstrating type inference and schema matching
-export * from "./matcher-examples.js"
+export * from "./matcher-examples.js";
 
 // Database integration examples - showing real-world usage patterns
-export * from "./db-integration-examples.js"
-
+export * from "./db-integration-examples.js";
