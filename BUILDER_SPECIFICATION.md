@@ -21,7 +21,7 @@
   - Common error handling utilities
 
 - **`src/select/builder.ts`**: Contains SELECT-specific implementation:
-  - `SelectQueryBuilder` class and related types
+  - `SelectQueryBuilder` type/implementation and related types
   - `SelectBuilderState`, `EmptyState`, `ErrorState` type definitions
   - SELECT-specific methods (`.select()`, `.from()`, `.join()`, etc.)
   - SELECT-specific `.when()` type-level behavior (optional columns handling)
@@ -68,14 +68,19 @@ A `ConditionTree` allows constructing complex nested conditions (AND/OR groups).
 `ConditionTreeBuilder` maintains an internal AST structure that mirrors `WhereExpr` from the common AST:
 
 ```typescript
+// Type alias to avoid recursive reference issues
+type ConditionTreePart = WhereExpr | ConditionTreeState;
+
 interface ConditionTreeState {
     operator: "and" | "or";
     parts: Array<{
         id: string;
-        condition: WhereExpr | ConditionTreeBuilder; // Nested trees supported
+        condition: WhereExpr | ConditionTreeState; // Nested trees supported via state, not builder reference
     }>;
 }
 ```
+
+**Implementation Note:** To avoid recursive type references (see Section 1.4), nested condition trees are represented using `ConditionTreeState` rather than `ConditionTreeBuilder` in the type definition. The builder implementation handles conversion between builder instances and state internally.
 
 The AST uses `ParsedCondition` or `UnparsedExpr` from `WhereExpr` to store condition fragments. When converted to SQL, parts are combined with the specified operator (AND/OR).
 
@@ -147,13 +152,23 @@ const builder = createSelectQuery(schema)
 // Result type: { id: number; email?: string | undefined }[]
 ```
 
+### 1.4. Implementation Constraints
+
+The builder implementation must adhere to the following constraints:
+
+- **Functional Paradigm:** The implementation must use functional programming patterns instead of JavaScript classes. Builders should be implemented as functions that return objects with methods, not as class instances. Factory functions (e.g., `createSelectQuery()`, `createConditionTree()`) return objects with methods that return new builder objects, maintaining immutability without class syntax.
+
+- **Avoid Recursive Referencing:** TypeScript has limitations with recursive type references that can cause performance issues and type inference problems. The implementation must avoid patterns where types reference themselves recursively. For example, `ConditionTreeBuilder` should not contain itself directly in its type definition. Instead, use type aliases, flattened structures, or non-recursive patterns to represent nested structures.
+
+- **Minimize "any" Usage:** The implementation should avoid using the `any` type where possible. Use proper type inference, generics, and type utilities instead. When type information is not fully known, prefer `unknown` over `any`, or use conditional types and type guards to narrow types appropriately.
+
 ## 2. Select Query Builder
 
 ### 2.1. Overview
 
 The `SelectQueryBuilder` constructs `SELECT` statements. It utilizes the Common Architecture and adds specific state and methods for `SELECT` queries.
 
-**Implementation Note:** The `SelectQueryBuilder` class, all SELECT-specific types (`SelectBuilderState`, `EmptyState`, `ErrorState`, `JoinStrictness`), and all SELECT-specific methods should be implemented in `src/select/builder.ts`.
+**Implementation Note:** The `SelectQueryBuilder` implementation, all SELECT-specific types (`SelectBuilderState`, `EmptyState`, `ErrorState`, `JoinStrictness`), and all SELECT-specific methods should be implemented in `src/select/builder.ts`.
 
 **Test Location:** All tests for `SelectQueryBuilder` should be added to `tests/select/builder.test.ts`.
 
@@ -812,6 +827,17 @@ The context tracks:
 - Test each fragment parser independently to confirm
 - **Verify:** Run existing parser tests to ensure no regressions
 
+**Step 1.7: Write and Run Phase 1 Tests**
+
+- **Test Location:** Create/update test files as needed for parser, validator, matcher, and AST tests
+- Write tests for parser fragment exports (`ParseWhereClause`, `ParseOrderByItems`)
+- Write tests for optional flag on `SelectItem` AST nodes
+- Write tests for error type consistency (`MatchError` structure)
+- Write tests for validator updates (optional columns handling)
+- Write tests for matcher updates (optional columns unionized with `undefined`)
+- Write tests for fragment parser standalone functionality
+- Run all Phase 1 tests and verify no regressions in existing parser/validator/matcher/AST tests
+
 ### Phase 2: Type-Level State Management
 
 **Step 2.1: Define Core State Types**
@@ -864,24 +890,32 @@ The context tracks:
 - Context is used for column resolution during validation
 - Context is built incrementally as methods are called
 
+**Step 2.6: Write and Run Phase 2 Tests**
+
+- **Test Location:** `tests/select/builder.test.ts` (type-level tests)
+- Write type-level tests for state type definitions (`EmptyState`, `ErrorState`, `SelectBuilderState`)
+- Write type-level tests for `JoinStrictness` type and `CanReplaceJoin` logic
+- Write type-level tests for state transition types (all builder methods)
+- Write type-level tests for state-to-AST conversion utilities
+- Write type-level tests for table context tracking utilities
+- Run all Phase 2 tests and verify type inference correctness
+
 ### Phase 3: Runtime Implementation - Core Builder
 
 **Step 3.1: Implement ConditionTreeBuilder**
 
 - **File:** `src/common/builder.ts`
-- Implement `ConditionTreeBuilder` class with internal AST structure
+- Implement `ConditionTreeBuilder` as a functional implementation (factory function returning object with methods)
 - Implement `add()`, `remove()`, `when()`, `toString()` methods
 - Internal state uses `WhereExpr` types for condition parts
-- **Test Location:** `tests/common/builder.test.ts`
-- Write basic tests for ConditionTreeBuilder functionality
 
-**Step 3.2: Create SelectQueryBuilder Class Skeleton**
+**Step 3.2: Create SelectQueryBuilder Implementation Skeleton**
 
 - **File:** `src/select/builder.ts`
-- Create `SelectQueryBuilder` class with generic type parameters `<Schema, State>`
+- Create `SelectQueryBuilder` type with generic type parameters `<Schema, State>`
 - Implement `createSelectQuery()` factory function (schema parameter for type inference only)
-- Class stores runtime state matching `SelectBuilderState` type
-- Implement basic constructor and state management
+- Factory function returns object with methods that maintain runtime state matching `SelectBuilderState` type
+- Implement basic state management (functional approach, no class constructor)
 
 **Step 3.3: Implement ID Tracking**
 
@@ -931,8 +965,6 @@ The context tracks:
   - Store in state with optional ID and strictness
   - Return new builder instance
 - Implement `removeSelect()` and `removeJoin()` methods
-- **Test Location:** `tests/select/builder.test.ts`
-- Write tests for basic method functionality and SQL string generation
 
 **Step 3.6: Implement Basic Methods - Part 2 (where, groupBy, having, orderBy)**
 
@@ -949,8 +981,6 @@ The context tracks:
   - Parse using `ParseOrderByItems` fragment parser
   - Store in state with optional ID
 - Implement corresponding `remove*()` methods
-- **Test Location:** `tests/select/builder.test.ts`
-- Write tests for these methods and SQL string generation
 
 **Step 3.7: Implement Basic Methods - Part 3 (limit, offset, distinct, with, union)**
 
@@ -966,8 +996,19 @@ The context tracks:
 - Implement `union()` method:
   - Handle subquery builders
   - Store union information in state
-- **Test Location:** `tests/select/builder.test.ts`
-- Write tests for these methods and SQL string generation
+
+**Step 3.8: Write and Run Phase 3 Tests**
+
+- **Test Location:** `tests/common/builder.test.ts` and `tests/select/builder.test.ts`
+- Write tests for `ConditionTreeBuilder` functionality (`tests/common/builder.test.ts`)
+- Write tests for `SelectQueryBuilder` initialization and basic state management
+- Write tests for ID tracking system (lookup, replacement, duplicate IDs across clause types)
+- Write tests for SQL string assembly utility (all SQL clause ordering, edge cases)
+- Write tests for basic methods: `select()`, `from()`, `join()`, `removeSelect()`, `removeJoin()`
+- Write tests for basic methods: `where()`, `groupBy()`, `having()`, `orderBy()`, and their `remove*()` methods
+- Write tests for basic methods: `limit()`, `offset()`, `distinct()`, `with()`, `union()`, and their `remove*()` methods
+- Verify SQL string generation correctness for all implemented methods
+- Run all Phase 3 tests
 
 ### Phase 4: Validation & Type Inference
 
@@ -978,8 +1019,6 @@ The context tracks:
 - Implement type-level utility to strip `${string}` patterns from strings
 - Stripping happens before fragment parsing
 - After stripping, continue with normal parsing and validation
-- **Test Location:** `tests/select/builder.test.ts`
-- Write tests to verify `${string}` patterns are stripped and remaining string is processed correctly
 
 **Step 4.1: Implement Per-Method Validation**
 
@@ -987,11 +1026,9 @@ The context tracks:
 - Implement validation logic that runs on each method call:
   - Convert current builder state to `SelectClause` AST
   - Call `ValidateSelectClause` (AST-level validator) directly - do NOT convert to SQL string
-  - Resolve `UnboundColumnRef` columns against current table context during validation
-  - Extract validation errors and return `ErrorState` if invalid
+- Resolve `UnboundColumnRef` columns against current table context during validation
+- Extract validation errors and return `ErrorState` if invalid
 - Handle early exit: once in `ErrorState`, subsequent methods return same `ErrorState`
-- **Test Location:** `tests/select/builder.test.ts`
-- Write tests for validation errors and error state handling
 
 **Step 4.2: Implement Result Type Inference**
 
@@ -999,11 +1036,9 @@ The context tracks:
 - Implement `toString()` method:
   - Convert builder state to `SelectClause` AST
   - Call `MatchSelectClause<SelectClause, Schema>` from `src/select/matcher.ts` to get result type
-  - Generate SQL string using string assembly utility
-  - Return branded string type: `string & { __type: MatchSelectClause<SelectClause, Schema> }`
-  - Handle error states: branded type may include `{ __error: true, message: string }`
-- **Test Location:** `tests/select/builder.test.ts`
-- Write type-level tests to verify return type correctness
+- Generate SQL string using string assembly utility
+- Return branded string type: `string & { __type: MatchSelectClause<SelectClause, Schema> }`
+- Handle error states: branded type may include `{ __error: true, message: string }`
 
 **Step 4.3: Implement Error State Handling**
 
@@ -1012,8 +1047,17 @@ The context tracks:
 - Ensure error details are accessible via type utilities
 - Handle parser errors: convert `ParseError` to builder's `ErrorState` format
 - Handle validator errors: use `MatchError` structure consistently
+
+**Step 4.4: Write and Run Phase 4 Tests**
+
 - **Test Location:** `tests/select/builder.test.ts`
-- Write tests for error state handling and error message extraction
+- Write tests for dynamic query stripping (`${string}` pattern handling)
+- Write tests for per-method validation (immediate validation, error state on invalid input)
+- Write tests for early exit optimization (subsequent methods return `ErrorState` after first error)
+- Write tests for result type inference (`toString()` branded return type)
+- Write type-level tests to verify result types match schema column types
+- Write tests for error state handling (parser errors, validator errors, error message extraction)
+- Run all Phase 4 tests and verify validation correctness
 
 ### Phase 5: Conditional Logic
 
@@ -1031,59 +1075,60 @@ The context tracks:
 - Implement SELECT-specific `.when()` type-level behavior:
   - Callback is **always** executed at type level (regardless of runtime condition)
   - All parts from callback are added to AST state (or replace existing parts if ID matches)
-  - Conditional selects are marked with `optional: true` in `SelectItem` AST nodes
-  - Conditional joins make ALL columns from those tables optional
+- Conditional selects are marked with `optional: true` in `SelectItem` AST nodes
+- Conditional joins make ALL columns from those tables optional
 - **Nested `.when()` calls are NOT supported**
-- **Test Location:** `tests/select/builder.test.ts`
-- Write tests for conditional logic (runtime and type-level behavior)
 
-### Phase 6: Comprehensive Testing
+**Step 5.3: Write and Run Phase 5 Tests**
 
-**Step 6.1: Write Basic Functionality Tests**
+- **Test Location:** `tests/common/builder.test.ts` and `tests/select/builder.test.ts`
+- Write tests for base `.when()` runtime logic (`tests/common/builder.test.ts`)
+- Write tests for SELECT-specific `.when()` type-level behavior (optional columns in AST)
+- Write tests for conditional selects (columns marked `optional: true`, types unionized with `undefined`)
+- Write tests for conditional joins (all columns from joined tables marked optional)
+- Write tests for ID replacement within conditional callbacks
+- Write tests verifying nested `.when()` is not supported
+- Write type-level tests to verify optional columns have `undefined` in union types
+- Run all Phase 5 tests and verify conditional logic correctness (runtime and type-level)
 
-- **Test Location:** `tests/select/builder.test.ts`
-- Test all basic methods (`select`, `from`, `join`, `where`, etc.)
-- Verify SQL string assembly for each method
-- Verify return type correctness for each method
-- Test ID-based replacement and removal
-- Test edge cases (empty clauses, defaults, etc.)
+### Phase 6: Comprehensive Testing & Integration
 
-**Step 6.2: Write Conditional Logic Tests**
-
-- **Test Location:** `tests/select/builder.test.ts`
-- Test `.when()` runtime behavior (SQL string includes/excludes based on condition)
-- Test `.when()` type-level behavior (optional columns in result type)
-- Test conditional joins (make columns optional)
-- Test ID replacement within conditional callbacks
-- Verify nested `.when()` is not supported (if applicable)
-
-**Step 6.3: Write Complex Scenario Tests**
+**Step 6.1: Write Integration Tests**
 
 - **Test Location:** `tests/select/builder.test.ts`
-- Test CTEs (WITH clauses)
-- Test subqueries (builder as FROM source)
-- Test unions (UNION/INTERSECT/EXCEPT)
-- Test complex JOIN scenarios
-- Test multiple WHERE/HAVING clauses with IDs
-- Test error state propagation
+- Test complex scenarios: CTEs with multiple definitions, nested CTEs
+- Test subqueries: builder as FROM source, subquery validation, subquery error propagation
+- Test unions: UNION/INTERSECT/EXCEPT combinations, type compatibility
+- Test complex JOIN scenarios: multiple joins, join replacement with strictness checks
+- Test multiple WHERE/HAVING clauses with IDs, condition combination
+- Test error state propagation through subqueries and unions
 
-**Step 6.4: Write Type-Level Tests**
+**Step 6.2: Write Edge Case Tests**
+
+- **Test Location:** `tests/select/builder.test.ts`
+- Test empty clauses (no WHERE, no GROUP BY, etc.)
+- Test default `SELECT *` behavior when `select()` is never called
+- Test ID-based replacement edge cases (non-existent IDs, duplicate IDs across clause types)
+- Test join strictness replacement edge cases (invalid replacements are no-ops)
+- Test dynamic query handling edge cases (multiple `${string}` patterns, empty strings after stripping)
+
+**Step 6.3: Write Type-Level Integration Tests**
 
 - **Test Location:** `tests/select/builder.test.ts`
 - Use TypeScript type testing utilities (e.g., `expectTypeOf()` or similar)
-- Verify result types match schema column types
-- Verify optional columns have `undefined` in their union types
-- Verify joined table columns are correctly included/excluded
-- Verify error states produce appropriate error types
-- Test branded return type extraction
+- Test branded return type extraction (`typeof builder.toString().__type`)
+- Test error state type inference (`{ __error: true, message: string }`)
+- Test optional columns in complex queries (multiple conditional selects, conditional joins)
+- Test result type correctness for all query types (simple, CTEs, subqueries, unions)
 
-**Step 6.5: Final Verification**
+**Step 6.4: Final Verification**
 
-- Run full test suite to ensure all existing functionality still works
-- Verify no regressions in parser, validator, matcher, or AST tests
+- Run full test suite (all phases) to ensure all functionality works together
+- Verify no regressions in existing parser, validator, matcher, or AST tests
 - Ensure all test requirements from specification are met:
   - SQL Query Assembly: String equality checks verify correct assembly
   - Return Type Correctness: Type-level tests verify correct type inference
+- Verify test coverage is comprehensive across all builder functionality
 
 ## 6. Examples
 
