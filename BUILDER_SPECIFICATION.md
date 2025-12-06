@@ -1130,12 +1130,66 @@ The context tracks:
   - Return Type Correctness: Type-level tests verify correct type inference
 - Verify test coverage is comprehensive across all builder functionality
 
-## 6. Examples
+## 6. Final result examples
+
+### Schema
+
+```typescript
+interface UserTable {
+    id: number;
+    uuid: UUID;
+    email: string;
+    username: string;
+    password_hash: string;
+    first_name: string | null;
+    last_name: string | null;
+    role: "admin" | "moderator" | "customer";
+    status: "active" | "suspended" | "deleted";
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    active: boolean;
+}
+export type Schema = {
+    defaultSchema: "public";
+    schemas: {
+        public: {
+            users: UserTable;
+            /** Orders */
+            orders: {
+                id: number;
+                order_number: string;
+                user_id: number;
+                status:
+                    | "pending"
+                    | "processing"
+                    | "shipped"
+                    | "delivered"
+                    | "cancelled"
+                    | "refunded";
+                payment_status: "pending" | "paid" | "failed" | "refunded";
+                subtotal: number;
+                tax_amount: number;
+                shipping_amount: number;
+                discount_amount: number;
+                total_amount: number;
+                currency: string;
+                shipping_address_id: number;
+                billing_address_id: number;
+                notes: string | null;
+                created_at: Timestamp;
+                updated_at: Timestamp;
+                shipped_at: Timestamp | null;
+                delivered_at: Timestamp | null;
+            };
+        };
+    };
+};
+```
 
 ### Basic Usage
 
 ```typescript
-const builder = createSelectQuery(schema)
+const builder = createSelectQuery<Schema>()
     .select("id", "name")
     .from("users")
     .where("active = true", "active_filter")
@@ -1161,45 +1215,59 @@ function processQuery<T extends string & { __type: unknown }>(sql: T) {
 const includeEmail = false; // Runtime condition
 const joinOrders = true; // Runtime condition
 
-const builder = createSelectQuery(schema)
-    .select("id")
+const builder = createSelectQuery<Schema>()
+    .select("users.id")
     .from("users")
     .when(includeEmail, b => b.select("email"))
     .when(
         joinOrders,
         b => b.join("LEFT JOIN orders ON orders.user_id = users.id"),
+    )
+    .when(
+        joinOrders,
+        b => b.select(`orders.id as "orderId"`)
     );
 
+const sql = builder.toString();
+// sql === "SELECT users.id, orders.id as "orderId" FROM users LEFT JOIN orders ON orders.user_id = users.id"
+
 // Runtime SQL (includeEmail=false, joinOrders=true):
-// "SELECT id FROM users LEFT JOIN orders ON orders.user_id = users.id"
 // Note: email is NOT in SQL because includeEmail=false
+
+type Result = (typeof sql).__type;
+// Result === { id: number; email: string | undefined; orderId: number | null | undefined; };
 
 // Type level AST: Includes ALL parts regardless of runtime conditions
 // - "id" column (always selected)
 // - "email" column (from conditional, marked optional)
 // - orders join (from conditional, makes orders columns optional)
+// - orders join (left join, makes orders columns nullable)
 
-// Result type: { id: number; email?: string | undefined; orders.*?: ... }[]
 // Note: email is optional (undefined union) even though it's not in runtime SQL
 ```
 
 ### CTEs and Subqueries
 
 ```typescript
-const builder = createSelectQuery(schema)
+const builder = createSelectQuery<Schema>()
     .with("active_users AS (SELECT * FROM users WHERE active = true)", "cte1")
     .select("au.id", "au.name")
     .from("active_users AS au")
     .where("au.created_at > NOW() - INTERVAL '30 days'");
 
 // CTE is validated independently, then its columns become available in outer query
+const sql = builder.toString();
+// query === "WITH active_users AS (SELECT * FROM users WHERE active = true) SELECT au.id, au.name FROM active_users AS au WHERE au.created_at > NOW() - INTERVAL '30 days'";
+type Result = (typeof sql).__type;
+// Result === { id: number; name: string; }
 ```
 
 ### ID-based Replacement
 
 ```typescript
-let builder = createSelectQuery(schema)
+let builder = createSelectQuery<Schema>()
     .select("id", "name")
+    .from("users")
     .join("INNER JOIN orders ON orders.user_id = users.id", "orders_join");
 
 // Later, replace the join (must be same or stricter join type)
@@ -1207,8 +1275,16 @@ builder = builder.join(
     "LEFT JOIN orders ON orders.user_id = users.id",
     "orders_join",
 );
-// Type error: Cannot replace INNER join with LEFT join (looser strictness)
+// Type doesn't change: Cannot replace INNER join with LEFT join (looser strictness)
 // Runtime: If replacement violates strictness rules, it's a no-op (join not replaced)
+
+builder = builder.join(
+    "INNER JOIN orders ON orders.user_id = users.id and orders.id > 10",
+    "orders_join",
+);
+// Type and runtime are updated.
+const sql = builder.toString();
+// sql === "select id, name from users INNER JOIN orders ON orders.user_id = users.id and orders.id > 10"
 ```
 
 ### ConditionTree
@@ -1218,10 +1294,13 @@ const conditions = createConditionTree("and")
     .add("age > 18", "age_check")
     .add("status = 'active'", "status_check");
 
-const builder = createSelectQuery(schema)
+const builder = createSelectQuery<Schema>()
     .select("*")
     .from("users")
     .where(conditions);
 
-// Note: ConditionTree does not support nested `.when()` calls
+const sql = builder.toString();
+// sql === "select * from users where age > 18 and status = 'active'"
+type Result = (typeof sql).__type;
+// Result === UserTable
 ```
