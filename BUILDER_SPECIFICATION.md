@@ -4,11 +4,9 @@
 
 ## 0. Relevant code to examine in sql-type-parser
 
-- src/select/ast.ts
-- src/select/parser.ts
-- src/select/validator.ts
-- src/select/matcher.ts
-- Example schemas can be found in `examples/schema.ts`
+- src/common/*.ts
+- src/select/*.ts
+- examples/schema.ts //Example schemas
 
 ## 0.1. Implementation File Structure
 
@@ -57,7 +55,7 @@
 
 ### 1.2. Condition Tree
 
-A `ConditionTree` allows constructing complex nested conditions (AND/OR groups). It is designed to be reusable across `SELECT`, `UPDATE`, and `DELETE` builders (when implemented in the future), but is part of the SELECT builder implementation.
+`ConditionTreeBuilder` allows constructing complex nested conditions (AND/OR groups). It is designed to be reusable across `SELECT`, `UPDATE`, and `DELETE` builders (when implemented in the future), but is part of the SELECT builder implementation. The builder exposes a public, immutable API; its internal state shape is represented by the `ConditionTreeState` type described below.
 
 **Implementation Note:** `ConditionTreeBuilder` and all related types should be implemented in `src/common/builder.ts` since it's designed to be reusable across all query builders.
 
@@ -80,7 +78,7 @@ interface ConditionTreeState {
 }
 ```
 
-**Implementation Note:** To avoid recursive type references (see Section 1.4), nested condition trees are represented using `ConditionTreeState` rather than `ConditionTreeBuilder` in the type definition. The builder implementation handles conversion between builder instances and state internally.
+**Implementation Note:** To avoid recursive type references (see Section 1.4), nested condition trees are represented using `ConditionTreeState` rather than `ConditionTreeBuilder` in the type definition. The builder implementation handles conversion between builder instances and state internally. `ConditionTreeState` is an internal implementation detail; the public API always works with `ConditionTreeBuilder` instances.
 
 The AST uses `ParsedCondition` or `UnparsedExpr` from `WhereExpr` to store condition fragments. When converted to SQL, parts are combined with the specified operator (AND/OR).
 
@@ -95,15 +93,15 @@ function createConditionTree(operator: "and" | "or"): ConditionTreeBuilder;
 - **`add(part: string | ConditionTreeBuilder, id?: string)`**: Adds a condition part. String parts are parsed into `ParsedCondition` AST nodes.
 - **`remove(id: string)`**: Removes a condition part by ID.
 - **`when(condition: boolean, callback: (b: ConditionTreeBuilder) => ConditionTreeBuilder)`**: Conditional logic.
-- **`toString()`**: Returns the compiled condition string (e.g., `"(id > 5 AND name = 'test')"`).
+- **`toString()`**: Returns the compiled, normalized condition string. The entire expression is always wrapped in parentheses, and logical operators between parts are always rendered as uppercase `AND` / `OR`, regardless of the original user input (for example: `"(id > 5 AND name = 'test')"` or `"(age > 18 AND (status = 'active' OR status = 'pending'))"`).
 
 #### Integration
 
 - `ConditionTreeBuilder` maintains an internal AST of condition parts using `WhereExpr` types.
 - It is validated only when added to a main query builder (e.g., via `.where()` or `.having()`). The validation context (available tables/columns) comes from the main query builder at that point.
 - Validation occurs by extracting column references from `ParsedCondition` nodes and checking them against the builder's current table context.
-- If a `ConditionTree` references tables not yet in the query builder, validation fails immediately with an error (validation is not deferred).
-- `ConditionTree` can be reused across multiple builders (it's independent until added to a builder).
+- If a `ConditionTreeBuilder` references tables not yet in the query builder, validation fails immediately with an error (validation is not deferred).
+- A `ConditionTreeBuilder` instance can be reused across multiple builders (it is independent until added to a builder).
 
 ### 1.3. Conditional Logic (`.when()`)
 
@@ -276,9 +274,7 @@ The strictness is derived from the `JoinType` in the `JoinClause` AST:
 #### Initialization
 
 ```typescript
-function createSelectQuery<Schema extends DatabaseSchema>(
-    schema: Schema,
-): SelectQueryBuilder<Schema, EmptyState>;
+function createSelectQuery<Schema extends DatabaseSchema>();
 ```
 
 **CRITICAL:** The `schema` parameter is **ONLY** provided as a generic type parameter for TypeScript type inference. The `schema` parameter in the function signature exists solely to enable TypeScript to infer the `Schema` type - it is **NOT** used at runtime by the query builder implementation.
@@ -330,7 +326,7 @@ All methods accept an optional `id` as the last argument (except `from`, `limit`
   - If invalid, returns `ErrorState` and IDE highlights the error at this call site.
   - Supports ID-based replacement (with strictness checks - can replace with same or higher strictness, invalid replacement is no-op).
 - **`removeJoin(id: string)`**: Removes join by ID.
-- **`where(condition: string | ConditionTree, id?: string)`**: Adds a WHERE condition (ANDed).
+- **`where(condition: string | ConditionTreeBuilder, id?: string)`**: Adds a WHERE condition (ANDed).
   - String conditions parsed using `ParseWhereClause` fragment parser (validates SQL syntax, extracts column refs as `ParsedCondition`).
   - **Validates input immediately:** Checks that column references in condition exist in available tables (semantic validation).
   - If invalid, returns `ErrorState` and IDE highlights the error at this call site.
@@ -342,7 +338,7 @@ All methods accept an optional `id` as the last argument (except `from`, `limit`
   - **Validates input immediately:** Checks that column references exist in available tables (semantic validation).
   - If invalid, returns `ErrorState` and IDE highlights the error at this call site.
 - **`removeGroupBy(id: string)`**: Removes group by clause.
-- **`having(condition: string | ConditionTree, id?: string)`**: Adds HAVING condition.
+- **`having(condition: string | ConditionTreeBuilder, id?: string)`**: Adds HAVING condition.
   - Same parsing and validation as WHERE.
 - **`removeHaving(id: string)`**: Removes having clause.
 - **`orderBy(ordering: string, id?: string)`**: Adds ORDER BY items.
@@ -540,7 +536,7 @@ This ensures consistency with matcher and validator error types while adding bui
 
 When INSERT/UPDATE/DELETE builders are implemented in the future, they should follow the **Common Architecture** established by the SELECT builder:
 
-- They will use `ConditionTree` for `WHERE` clauses (shared with SELECT).
+- They will use `ConditionTreeBuilder` for `WHERE` clauses (shared with SELECT).
 - They will use the fragment-based approach with IDs for managing clauses (e.g., `SET` clauses in `UPDATE`).
 - They will rely on shared parser fragments (`ParseTableRef`, `ParseWhereClause`, etc.).
 - **Return Types:** All builders will have return types because queries can include `RETURNING` clauses:
@@ -561,7 +557,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
 
 **Architectural Impact:** When designing the SELECT builder, ensure that:
 
-- Common components (like `ConditionTree`) are reusable and not SELECT-specific.
+- Common components (like `ConditionTreeBuilder`) are reusable and not SELECT-specific.
 - Parser fragments are designed to work standalone (not just for SELECT).
 - State management patterns can be extended to other query types.
 - Validation and matching patterns can be applied to other query types.
@@ -601,6 +597,12 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
      - `ParseSingleJoin` parses `"LEFT JOIN users ON users.id = orders.user_id"` without FROM clause
      - `ParseWhereClause` parses `"id > 5 AND active = true"` (handles WITH or WITHOUT WHERE keyword)
      - `ParseOrderByItems` parses `"id ASC, name DESC"` without ORDER BY keyword
+
+   - **Keyword Normalization:** All full-query and fragment parsers operate on **normalized** SQL strings using the existing `NormalizeSQL<T>` type from `src/common/tokenizer.ts`. `NormalizeSQL<T>`:
+     - Removes SQL comments (block and line),
+     - Normalizes whitespace and special characters,
+     - Uppercases SQL keywords only (such as `SELECT`, `FROM`, `WHERE`, `JOIN`, `AND`, `OR`, `AS`), while preserving identifiers and aliases (especially words that follow `AS`).
+     Builder methods that rely on fragment parsers (for `select()`, `from()`, `join()`, `where()`, `groupBy()`, `having()`, `orderBy()`, `with()`, etc.) must respect this behavior at the type level so that validation always sees normalized input consistent with the existing parser and validator.
 
    - **Error Handling:** Fragment parsers return `ParseError` if syntax is invalid. Builder converts `ParseError` to `ErrorState` format (using `MatchError` structure for consistency). Error messages should include fragment context.
 
@@ -996,7 +998,7 @@ The context tracks:
 - **File:** `src/select/builder.ts`
 - Implement `where()` method:
   - Parse condition using `ParseWhereClause` fragment parser
-  - Handle `ConditionTree` objects
+  - Handle `ConditionTreeBuilder` objects
   - Store in state with optional ID
 - Implement `groupBy()` method:
   - Parse columns using column reference parser
@@ -1162,17 +1164,19 @@ The context tracks:
 ```typescript
 interface UserTable {
     id: number;
-    uuid: UUID;
+    uuid: string;
     email: string;
     username: string;
     password_hash: string;
+    name: string;
     first_name: string | null;
     last_name: string | null;
     role: "admin" | "moderator" | "customer";
     status: "active" | "suspended" | "deleted";
-    created_at: Timestamp;
-    updated_at: Timestamp;
+    created_at: string;
+    updated_at: string;
     active: boolean;
+    age: number;
 }
 export type Schema = {
     defaultSchema: "public";
@@ -1307,7 +1311,7 @@ type Result = (typeof sql).__type;
 
 ```typescript
 let builder = createSelectQuery<Schema>()
-    .select("id", "name")
+    .select([ "id", "name" ])
     .from("users")
     .join("INNER JOIN orders ON orders.user_id = users.id", "orders_join");
 
@@ -1346,7 +1350,7 @@ const builder = createSelectQuery<Schema>()
 
 const sql = builder.toString();
 // Runtime assertion (test), e.g.:
-// expect(sql).toBe("select * from users where age > 18 and status = 'active'");
+// expect(sql).toBe("SELECT * FROM users WHERE (age > 18 AND status = 'active')");
 type Result = (typeof sql).__type;
 // Type-level assertion (test, must fail to compile if incorrect), e.g.:
 // type _check = Expect<Equal<Result, UserTable>>;
