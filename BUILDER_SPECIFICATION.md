@@ -51,7 +51,7 @@
   - **Type-Level:** Constructs a Type AST, verifies validity using the existing `Validator`, and infers the result type using the existing `Matcher` (for Select).
 - **Immutability:** The API is immutable. Every method call returns a new instance of the builder with updated state.
 - **Fragment-Based:** Unlike the monolithic `parser` which expects a full query, builders accept query fragments (e.g., `.join('LEFT JOIN users ...')`, `.where('id > 5')`).
-- **Schema-Driven:** Builders are initialized with a `DatabaseSchema` type parameter, which drives all type inference. The schema exists only at the type level and is not passed or used at runtime. The `schema` parameter in `createSelectQuery(schema)` exists solely for TypeScript type inference - the runtime implementation must NOT use or access the schema parameter value.
+- **Schema-Driven:** Builders are initialized with a `DatabaseSchema` **type parameter**, which drives all type inference. The schema exists only at the type level and is not passed or used at runtime. There is **no runtime schema parameter** – `Schema` is provided purely as a generic type argument (for example, `createSelectQuery<Schema>()`).
 
 ### 1.2. Condition Tree
 
@@ -140,14 +140,14 @@ All builders support a `.when()` method for conditional query construction.
 ```typescript
 const includeEmail = false; // Runtime condition
 
-const builder = createSelectQuery(schema)
-    .select("id")
+const builder = createSelectQuery<Schema>()
     .from("users")
-    .when(includeEmail, b => b.select("email", "email_select"));
+    .select("id")
+    .when(includeEmail, b => b.select("email"));
 
 // Runtime: SQL string is "SELECT id FROM users" (email not included)
 // Type level: AST includes both "id" and "email" columns
-// Result type: { id: number; email?: string | undefined }[]
+// Result type: { id: number; email?: string | undefined }
 ```
 
 ### 1.4. Implementation Constraints
@@ -257,8 +257,9 @@ interface SelectBuilderState {
 type JoinStrictness = "INNER" | "LEFT" | "RIGHT" | "FULL" | "CROSS";
 
 // Strictness hierarchy: INNER > LEFT = RIGHT > FULL > CROSS
-// When replacing a join with the same ID, the new join must have equal or greater strictness
-// Example: Can replace INNER with INNER or LEFT WITH INNER, but cannot replace INNER with LEFT
+// When replacing a join with the same ID, the new join must have equal or stricter strictness:
+// you may tighten a weaker join to a stricter one, but must not loosen a stricter join to a weaker one.
+// Example: Can replace LEFT with INNER, but cannot replace INNER with LEFT.
 ```
 
 The strictness is derived from the `JoinType` in the `JoinClause` AST:
@@ -277,14 +278,12 @@ The strictness is derived from the `JoinType` in the `JoinClause` AST:
 function createSelectQuery<Schema extends DatabaseSchema>();
 ```
 
-**CRITICAL:** The `schema` parameter is **ONLY** provided as a generic type parameter for TypeScript type inference. The `schema` parameter in the function signature exists solely to enable TypeScript to infer the `Schema` type - it is **NOT** used at runtime by the query builder implementation.
+**CRITICAL:** The `Schema` type is provided **only** as a generic type parameter for TypeScript type inference. There is **no runtime `schema` parameter** – the builder implementation must **not** depend on any schema value at runtime.
 
 **Implementation Requirements:**
 
-- The runtime implementation of `createSelectQuery()` must **NOT** access, store, or use the `schema` parameter value at runtime.
 - All schema validation and type inference happens purely at the type level using the `Schema` generic type parameter.
-- The schema type (not the runtime value) is used to validate table and column references and to infer the result types of queries.
-- The `schema` parameter may be `undefined`, `null`, or any value at runtime - the implementation must not depend on it.
+- The schema type (not a runtime value) is used to validate table and column references and to infer the result types of queries.
 
 **Why this matters:** This is a type-only pattern. The schema exists only in TypeScript's type system, not at runtime. The builder uses the schema type to validate queries and infer types, but never accesses the actual schema object.
 
@@ -375,7 +374,7 @@ All methods accept an optional `id` as the last argument (except `from`, `limit`
   - If callback provides an ID that already exists, it replaces the existing part (same as non-conditional replacement).
 - **`toString()`**: Returns the compiled SQL string as a branded type that includes the result type.
   - **SQL Generation:** Assembles SQL string from builder state parts (runtime string assembly utility - see Section 4.1.6):
-    - If no `select()` called: defaults to `SELECT *` (returns all columns from FROM table per SQL specification).
+    - If no `select()` called: defaults to `SELECT *` (returns all columns from all tables in the `FROM`/`JOIN` context, following standard SQL semantics).
     - Uses string fragments provided by user as-is (no AST conversion needed).
     - Assembles parts in correct SQL order.
     - Adds keywords like "WHERE", "HAVING", "GROUP BY", etc. where needed.
@@ -451,9 +450,9 @@ The builder must check for `${string}` template literal holes in all string inpu
 
 ```typescript
 // Input with ${string} should have the dynamic part stripped
-const builder = createSelectQuery(schema)
-    .select("id")
-    .from(`users ${someDynamicValue}`); // Contains ${string}
+const builder = createSelectQuery<Schema>()
+    .from(`users ${someDynamicValue}`) // Contains ${string}
+    .select("id");
 // The "${someDynamicValue}" part is stripped, leaving "users" to be parsed
 // Result: FROM users (as if the dynamic part never existed)
 ```
@@ -602,7 +601,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
      - Removes SQL comments (block and line),
      - Normalizes whitespace and special characters,
      - Uppercases SQL keywords only (such as `SELECT`, `FROM`, `WHERE`, `JOIN`, `AND`, `OR`, `AS`), while preserving identifiers and aliases (especially words that follow `AS`).
-     Builder methods that rely on fragment parsers (for `select()`, `from()`, `join()`, `where()`, `groupBy()`, `having()`, `orderBy()`, `with()`, etc.) must respect this behavior at the type level so that validation always sees normalized input consistent with the existing parser and validator.
+       Builder methods that rely on fragment parsers (for `select()`, `from()`, `join()`, `where()`, `groupBy()`, `having()`, `orderBy()`, `with()`, etc.) must respect this behavior at the type level so that validation always sees normalized input consistent with the existing parser and validator.
 
    - **Error Handling:** Fragment parsers return `ParseError` if syntax is invalid. Builder converts `ParseError` to `ErrorState` format (using `MatchError` structure for consistency). Error messages should include fragment context.
 
@@ -670,7 +669,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
      - LIMIT clause (if set)
      - OFFSET clause (if set)
      - UNION/INTERSECT/EXCEPT (if set)
-   - Adds keywords like "WHERE", "HAVING", "GROUP BY", etc. where needed.
+   - Adds SQL keywords like `SELECT`, `FROM`, `WHERE`, `JOIN`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `OFFSET`, `WITH`, and union operators as needed, and **always renders these builder-inserted keywords in uppercase**. User-provided fragments (table names, column lists, raw conditions, etc.) are used exactly as provided and are not re-cased.
    - Skips clauses if they're empty (e.g., no WHERE parts = no WHERE clause).
    - Handles edge cases: empty arrays, undefined values, subqueries (calls their `toString()` methods).
    - Simple string concatenation/formatting logic - no AST involved.
@@ -696,9 +695,9 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
       : true;
   ```
 - **Replacement Behavior:**
-  - Join can be replaced with same level of strictness OR higher level (stricter).
-  - Same behavior on runtime level.
-  - If replacement would violate strictness rules: no error, just no-op (join not replaced).
+  - A join can be replaced with the **same or a stricter** join type under the same ID. Intuitively: a weaker join (for example, `LEFT`) may be “tightened” to a stricter one (for example, `INNER`), but a stricter join must **not** be loosened to a weaker one (for example, `INNER` must not become `LEFT`).
+  - The same rule applies at runtime: attempts to loosen join strictness are treated as no-ops.
+  - If a replacement would violate these strictness rules, there is no error – the existing join is simply left unchanged.
 
 ### 4.3. Validation
 
@@ -750,7 +749,9 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
   - **Dynamic Query Handling:**
     - Before parsing any string input, check for `HasTemplateHoles`
     - If `${string}` patterns are detected, strip them out before parsing
-    - The stripped string is then parsed and validated normally
+    - If stripping results in an **empty string** at the type level, the fragment is **skipped entirely** for parsing, validation, and type inference (we cannot know what the dynamic content is, so we treat it as “no fragment provided” in the type system)
+    - For non-empty strings after stripping, the remaining string is parsed and validated normally
+    - **Runtime behavior:** If a builder method receives an empty string fragment at runtime (whether passed directly or after interpolation), it must treat this as invalid input and fail fast (for example, by throwing an error) rather than silently generating malformed or partial SQL
     - This ensures the builder respects the same dynamic query handling as the parser/validator, but handles it by stripping rather than bypassing validation
     - The builder should NOT bypass this check - it must implement the stripping logic itself
   - **Validation Errors:**
@@ -759,7 +760,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
     - If required context is missing: Error (validation is immediate, not deferred).
     - All validation errors are immediate - they cause the builder to enter `ErrorState` right away.
   - **Default Behavior:**
-    - If `select()` is never called: Defaults to `SELECT *` when generating SQL in `toString()`. Per SQL specification, `SELECT *` returns all columns from the FROM table only (not joined tables). Conditional joins do not affect this behavior.
+    - If `select()` is never called: Defaults to `SELECT *` when generating SQL in `toString()`. Per SQL standard, `SELECT *` returns all columns from all tables in the `FROM`/`JOIN` context. Conditional joins do not affect this behavior – they simply contribute their tables (and thus columns) when present.
     - If `select()` is called before `from()`: Error (cannot validate columns without table context).
   - **IDE Integration:** Invalid inputs cause TypeScript type errors that IDEs highlight at the call site.
   - **Performance:** Per-method validation provides immediate feedback while avoiding full query validation on each call.
@@ -940,7 +941,7 @@ The context tracks:
 
 - **File:** `src/select/builder.ts`
 - Create `SelectQueryBuilder` type with generic type parameters `<Schema, State>`
-- Implement `createSelectQuery()` factory function (schema parameter for type inference only); this factory may construct a class-based builder or a plain object-based builder internally
+- Implement `createSelectQuery()` factory function that is **generic-only** (no runtime schema parameter); this factory may construct a class-based builder or a plain object-based builder internally
 - Ensure the returned builder instance exposes methods that maintain runtime state matching the `SelectBuilderState` type
 - Implement basic state management so that methods never mutate an existing builder instance in place, but instead return a new builder instance that reflects the updated state and type-level `State` parameter
 
@@ -1219,14 +1220,14 @@ export type Schema = {
 
 ```typescript
 const builder = createSelectQuery<Schema>()
-    .select(["id", "name"])
     .from("users")
+    .select(["id", "name"])
     .where("active = true", "active_filter")
     .limit(10);
 
 const sql = builder.toString();
 // Runtime assertion (test), e.g.:
-// expect(sql).toBe("select id, name from users where active = true limit 10");
+// expect(sql).toBe("SELECT id, name FROM users WHERE active = true LIMIT 10");
 
 // Extract result type using branded string type
 type Result = (typeof sql).__type;
@@ -1247,8 +1248,8 @@ const includeEmail = false; // Runtime condition
 const joinOrders = true; // Runtime condition
 
 const builder = createSelectQuery<Schema>()
-    .select("users.id")
     .from("users")
+    .select("users.id")
     .when(includeEmail, b => b.select("email"))
     .when(
         joinOrders,
@@ -1291,8 +1292,8 @@ type Result = (typeof sql).__type;
 ```typescript
 const builder = createSelectQuery<Schema>()
     .with("active_users AS (SELECT * FROM users WHERE active = true)", "cte1")
-    .select("au.id", "au.name")
     .from("active_users AS au")
+    .select(["au.id", "au.name"])
     .where("au.created_at > NOW() - INTERVAL '30 days'");
 
 const sql = builder.toString();
@@ -1311,8 +1312,8 @@ type Result = (typeof sql).__type;
 
 ```typescript
 let builder = createSelectQuery<Schema>()
-    .select([ "id", "name" ])
     .from("users")
+    .select([ "id", "name" ])
     .join("INNER JOIN orders ON orders.user_id = users.id", "orders_join");
 
 // Later, replace the join (must be same or stricter join type)
@@ -1331,7 +1332,7 @@ builder = builder.join(
 const sql = builder.toString();
 // Runtime assertion (test), e.g.:
 // expect(sql).toBe(
-//   "select id, name from users INNER JOIN orders ON " +
+//   "SELECT id, name FROM users INNER JOIN orders ON " +
 //   "orders.user_id = users.id and orders.id > 10",
 // );
 ```
@@ -1344,8 +1345,8 @@ const conditions = createConditionTree("and")
     .add("status = 'active'", "status_check");
 
 const builder = createSelectQuery<Schema>()
-    .select("*")
     .from("users")
+    .select("*")
     .where(conditions);
 
 const sql = builder.toString();
