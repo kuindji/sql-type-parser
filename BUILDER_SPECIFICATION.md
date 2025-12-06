@@ -156,11 +156,36 @@ const builder = createSelectQuery(schema)
 
 The builder implementation must adhere to the following constraints:
 
-- **Functional Paradigm:** The implementation must use functional programming patterns instead of JavaScript classes. Builders should be implemented as functions that return objects with methods, not as class instances. Factory functions (e.g., `createSelectQuery()`, `createConditionTree()`) return objects with methods that return new builder objects, maintaining immutability without class syntax.
-
+- **Implementation Style:** The public builder API must be **immutable and chainable** – every method call returns a new builder instance with updated runtime and type-level state. The internal implementation may use factory functions or classes (for example, a class with generic parameters like `<Schema, State>` whose methods return `new Builder<Schema, NewState>(...)`), as long as it preserves the specified behavior and type-level state transitions.
 - **Avoid Recursive Referencing:** TypeScript has limitations with recursive type references that can cause performance issues and type inference problems. The implementation must avoid patterns where types reference themselves recursively. For example, `ConditionTreeBuilder` should not contain itself directly in its type definition. Instead, use type aliases, flattened structures, or non-recursive patterns to represent nested structures.
-
 - **Minimize "any" Usage:** The implementation should avoid using the `any` type where possible. Use proper type inference, generics, and type utilities instead. When type information is not fully known, prefer `unknown` over `any`, or use conditional types and type guards to narrow types appropriately.
+
+#### 1.4.1. Implementation Example: Class-Based, Type-Progressive Builder
+
+One valid implementation strategy is a **class-based builder** whose generic parameters encode the current builder state:
+
+```typescript
+class SelectQueryBuilderImpl<
+    Schema extends DatabaseSchema,
+    State extends SelectBuilderState,
+> implements SelectQueryBuilder<Schema, State> {
+    constructor(private readonly state: State) {}
+
+    select<NewState extends SelectBuilderState>(
+        columns: string | string[],
+        id?: string,
+    ): SelectQueryBuilderImpl<Schema, NewState> {
+        // build newState from this.state + columns...
+        const newState = {} as NewState;
+        return new SelectQueryBuilderImpl<Schema, NewState>(newState);
+    }
+
+    // ...other methods (`from`, `join`, etc.) follow the same pattern,
+    // always returning a new instance with updated generic `State`.
+}
+```
+
+This pattern is similar to the generic `ApiConstructor<TableName, V, IsSingle, IsNullable>` builder used in the GraphQL API layer: each method call returns a new instance with updated generic parameters that represent the progressed state, while keeping the runtime API immutable and chainable.
 
 ## 2. Select Query Builder
 
@@ -543,7 +568,7 @@ When INSERT/UPDATE/DELETE builders are implemented in the future, they should fo
 
 ## 4. Detailed Implementation Requirements (Select)
 
-**Testing Requirement:** Whenever changes are made to core files (`ast.ts`, `parser.ts`, `validator.ts`, `matcher.ts`), run the existing test suite to verify no regressions. These files are foundational to sql-type-parser and must maintain backward compatibility.
+**Testing Requirement:** Whenever changes are made to core files (`ast.ts`, `parser.ts`, `validator.ts`, `matcher.ts`), run the existing test suite to verify no regressions. These files are foundational to sql-type-parser and must maintain backward compatibility. Tests for the builder MUST cover both **runtime behavior** (exact SQL strings produced, clause ordering, conditional inclusion, etc.) and **type-level behavior** (the branded `__type` result, error-state typing, optional-column inference). **Type-level assertions must be written so that a mismatch causes a compile-time error** (for example, using helpers like `Expect<Equal<Actual, Expected>>` or `expectTypeOf<Actual>().toEqualTypeOf<Expected>()`, not just computing a boolean alias). The final examples in Section 6 are normative and should be mirrored as test cases (or close equivalents) in `tests/select/builder.test.ts` as soon as the corresponding implementation exists.
 
 **Validator Usage:** The builder must use the existing `ValidateSelectSQL` validator from `src/select/validator.ts`. Any updates needed to the validator to support builder use cases should be documented below and implemented as part of Phase 1.
 
@@ -905,7 +930,7 @@ The context tracks:
 **Step 3.1: Implement ConditionTreeBuilder**
 
 - **File:** `src/common/builder.ts`
-- Implement `ConditionTreeBuilder` as a functional implementation (factory function returning object with methods)
+- Implement `ConditionTreeBuilder` as an immutable builder (either a class or a factory function) whose methods return new builder instances rather than mutating existing ones
 - Implement `add()`, `remove()`, `when()`, `toString()` methods
 - Internal state uses `WhereExpr` types for condition parts
 
@@ -913,9 +938,9 @@ The context tracks:
 
 - **File:** `src/select/builder.ts`
 - Create `SelectQueryBuilder` type with generic type parameters `<Schema, State>`
-- Implement `createSelectQuery()` factory function (schema parameter for type inference only)
-- Factory function returns object with methods that maintain runtime state matching `SelectBuilderState` type
-- Implement basic state management (functional approach, no class constructor)
+- Implement `createSelectQuery()` factory function (schema parameter for type inference only); this factory may construct a class-based builder or a plain object-based builder internally
+- Ensure the returned builder instance exposes methods that maintain runtime state matching the `SelectBuilderState` type
+- Implement basic state management so that methods never mutate an existing builder instance in place, but instead return a new builder instance that reflects the updated state and type-level `State` parameter
 
 **Step 3.3: Implement ID Tracking**
 
@@ -1190,17 +1215,19 @@ export type Schema = {
 
 ```typescript
 const builder = createSelectQuery<Schema>()
-    .select("id", "name")
+    .select(["id", "name"])
     .from("users")
     .where("active = true", "active_filter")
     .limit(10);
 
 const sql = builder.toString();
-// sql is: string & { __type: { id: number; name: string }[] }
+// Runtime assertion (test), e.g.:
+// expect(sql).toBe("select id, name from users where active = true limit 10");
 
 // Extract result type using branded string type
 type Result = (typeof sql).__type;
-// Result: { id: number; name: string }[]
+// Type-level assertion (test, must fail to compile if incorrect), e.g.:
+// type _check = Expect<Equal<Result, { id: number; name: string }>>;
 
 // Or use 'infer' when passing to a function:
 function processQuery<T extends string & { __type: unknown }>(sql: T) {
@@ -1229,13 +1256,22 @@ const builder = createSelectQuery<Schema>()
     );
 
 const sql = builder.toString();
-// sql === "SELECT users.id, orders.id as "orderId" FROM users LEFT JOIN orders ON orders.user_id = users.id"
+// Runtime assertion (test), e.g.:
+// expect(sql).toBe(
+//   `SELECT users.id, orders.id as "orderId" FROM users LEFT JOIN orders ON orders.user_id = users.id`,
+// );
 
 // Runtime SQL (includeEmail=false, joinOrders=true):
 // Note: email is NOT in SQL because includeEmail=false
 
 type Result = (typeof sql).__type;
-// Result === { id: number; email: string | undefined; orderId: number | null | undefined; };
+// Type-level assertion (test, must fail to compile if incorrect), e.g.:
+// type _check = Expect<
+//   Equal<
+//     Result,
+//     { id: number; email: string | undefined; orderId: number | null | undefined }
+//   >
+// >;
 
 // Type level AST: Includes ALL parts regardless of runtime conditions
 // - "id" column (always selected)
@@ -1255,11 +1291,16 @@ const builder = createSelectQuery<Schema>()
     .from("active_users AS au")
     .where("au.created_at > NOW() - INTERVAL '30 days'");
 
-// CTE is validated independently, then its columns become available in outer query
 const sql = builder.toString();
-// query === "WITH active_users AS (SELECT * FROM users WHERE active = true) SELECT au.id, au.name FROM active_users AS au WHERE au.created_at > NOW() - INTERVAL '30 days'";
+// Runtime assertion (test), e.g.:
+// expect(sql).toBe(
+//   "WITH active_users AS (SELECT * FROM users WHERE active = true) " +
+//   "SELECT au.id, au.name FROM active_users AS au " +
+//   "WHERE au.created_at > NOW() - INTERVAL '30 days'",
+// );
 type Result = (typeof sql).__type;
-// Result === { id: number; name: string; }
+// Type-level assertion (test, must fail to compile if incorrect), e.g.:
+// type _check = Expect<Equal<Result, { id: number; name: string }>>;
 ```
 
 ### ID-based Replacement
@@ -1284,7 +1325,11 @@ builder = builder.join(
 );
 // Type and runtime are updated.
 const sql = builder.toString();
-// sql === "select id, name from users INNER JOIN orders ON orders.user_id = users.id and orders.id > 10"
+// Runtime assertion (test), e.g.:
+// expect(sql).toBe(
+//   "select id, name from users INNER JOIN orders ON " +
+//   "orders.user_id = users.id and orders.id > 10",
+// );
 ```
 
 ### ConditionTree
@@ -1300,7 +1345,9 @@ const builder = createSelectQuery<Schema>()
     .where(conditions);
 
 const sql = builder.toString();
-// sql === "select * from users where age > 18 and status = 'active'"
+// Runtime assertion (test), e.g.:
+// expect(sql).toBe("select * from users where age > 18 and status = 'active'");
 type Result = (typeof sql).__type;
-// Result === UserTable
+// Type-level assertion (test, must fail to compile if incorrect), e.g.:
+// type _check = Expect<Equal<Result, UserTable>>;
 ```
