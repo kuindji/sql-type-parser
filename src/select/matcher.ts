@@ -192,8 +192,7 @@ type BuildCTEContext<
     ? First extends CTEDefinition<infer Name, infer Query>
         ? ResolveCTEQuery<Query, Schema, Acc> extends infer CTEColumns
             ? CTEColumns extends MatchError<string> ? CTEColumns
-            : Rest extends CTEDefinition[]
-                ? BuildCTEContext<
+            : Rest extends CTEDefinition[] ? BuildCTEContext<
                     Rest,
                     Schema,
                     Acc & { [K in Name]: CTEColumns; }
@@ -210,12 +209,11 @@ type ResolveCTEQuery<
     Query extends SubquerySelectClause,
     Schema extends DatabaseSchema,
     CTEContext,
-> = Query extends
-    {
-        columns: infer Columns;
-        from: infer From extends TableSource;
-        joins: infer Joins;
-    }
+> = Query extends {
+    columns: infer Columns;
+    from: infer From extends TableSource;
+    joins: infer Joins;
+}
     ? BuildTableContext<From, Joins, Schema, CTEContext> extends
         infer InnerContext
         ? InnerContext extends MatchError<string> ? InnerContext
@@ -280,8 +278,7 @@ type BuildTableContext<
     CTEContext = {},
 > = ResolveTableSource<From, Schema, CTEContext> extends infer FromContext
     ? FromContext extends MatchError<string> ? FromContext
-    : Joins extends JoinClause[]
-        ? FlattenContext<
+    : Joins extends JoinClause[] ? FlattenContext<
             MergeJoinContexts<FromContext, Joins, Schema, CTEContext>
         >
     : FromContext
@@ -359,12 +356,11 @@ type ResolveDerivedTable<
     Alias extends string,
     Schema extends DatabaseSchema,
     CTEContext,
-> = Query extends
-    {
-        columns: infer Columns;
-        from: infer From extends TableSource;
-        joins: infer Joins;
-    }
+> = Query extends {
+    columns: infer Columns;
+    from: infer From extends TableSource;
+    joins: infer Joins;
+}
     ? BuildTableContext<From, Joins, Schema, CTEContext> extends
         infer InnerContext
         ? InnerContext extends MatchError<string> ? InnerContext
@@ -389,8 +385,7 @@ type MergeJoinContexts<
         ? ResolveTableSource<JoinTable, Schema, CTEContext> extends
             infer JoinContext
             ? JoinContext extends MatchError<string> ? JoinContext
-            : Rest extends JoinClause[]
-                ? MergeJoinContexts<
+            : Rest extends JoinClause[] ? MergeJoinContexts<
                     Context & JoinContext,
                     Rest,
                     Schema,
@@ -447,7 +442,7 @@ type MatchColumnList<
 /**
  * Helper: check if a SelectItem has been marked as optional
  */
-type IsOptionalSelectItem<Col> = Col extends { readonly optional: true } ? true
+type IsOptionalSelectItem<Col> = Col extends { readonly optional: true; } ? true
     : false;
 
 /**
@@ -465,28 +460,29 @@ type MatchSingleColumn<
             ? { [K in Alias]: ColType; }
         : IsOptionalSelectItem<Col> extends true
             ? { [K in Alias]: ColType | undefined; }
-            : { [K in Alias]: ColType; }
+        : { [K in Alias]: ColType; }
     : never
     : Col extends TableWildcard<infer TableOrAlias, infer WildcardSchema>
         ? ResolveTableWildcard<TableOrAlias, WildcardSchema, Context, Schema>
     : Col extends AggregateExpr<infer Func, infer Arg, infer Alias>
-        ? IsOptionalSelectItem<Col> extends true
-            ? {
-                [K in Alias]: GetAggregateResultType<
-                    Func,
-                    Arg,
-                    Context,
-                    Schema
-                > | undefined;
+        ? IsOptionalSelectItem<Col> extends true ? {
+                [K in Alias]:
+                    | GetAggregateResultType<
+                        Func,
+                        Arg,
+                        Context,
+                        Schema
+                    >
+                    | undefined;
             }
-            : {
-                [K in Alias]: GetAggregateResultType<
-                    Func,
-                    Arg,
-                    Context,
-                    Schema
-                >;
-            }
+        : {
+            [K in Alias]: GetAggregateResultType<
+                Func,
+                Arg,
+                Context,
+                Schema
+            >;
+        }
     : MatchError<"Unknown column type">;
 
 /**
@@ -500,7 +496,8 @@ type ResolveTableWildcard<
     Schema extends DatabaseSchema = DatabaseSchema,
 > = WildcardSchema extends undefined
     // No schema specified - use context
-    ? TableOrAlias extends keyof Context ? Context[TableOrAlias]
+    ? TableOrAlias extends "*" ? ExpandAllColumns<Context>
+    : TableOrAlias extends keyof Context ? Context[TableOrAlias]
     : MatchError<`Table or alias '${TableOrAlias}' not found`>
     // Schema-qualified: schema.table.* - look up directly in schema
     : WildcardSchema extends string
@@ -562,8 +559,8 @@ type ResolveSQLConstant<Name extends SQLConstantName> =
         : Name extends "CURRENT_TIMESTAMP" ? string // TIMESTAMP type maps to string
         : Name extends "LOCALTIME" ? string // TIME type maps to string
         : Name extends "LOCALTIMESTAMP" ? string // TIMESTAMP type maps to string
-        : // User/Session constants
-        Name extends "CURRENT_USER" ? string
+        // User/Session constants
+        : Name extends "CURRENT_USER" ? string
         : Name extends "SESSION_USER" ? string
         : Name extends "CURRENT_CATALOG" ? string
         : Name extends "CURRENT_SCHEMA" ? string

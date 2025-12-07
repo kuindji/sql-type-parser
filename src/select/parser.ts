@@ -450,8 +450,10 @@ type ParseAggregateArg<T extends string> = Trim<T> extends "*" ? "*"
  * Handles PostgreSQL type casting syntax (::type), complex expressions, subqueries, EXISTS, INTERVAL, and literals
  */
 type ParseSimpleColumn<T extends string> =
-    // Check for literal values first (number, string, null, boolean)
-    IsLiteralExpression<T> extends true ? ParseLiteralColumn<T>
+    // Global wildcard within a column list (SELECT *, col)
+    Trim<T> extends "*" ? TableWildcard<"*", undefined>
+        // Check for literal values first (number, string, null, boolean)
+        : IsLiteralExpression<T> extends true ? ParseLiteralColumn<T>
         // Check for SQL constants (CURRENT_DATE, CURRENT_TIMESTAMP, etc.)
         : IsSQLConstantExpression<T> extends true ? ParseSQLConstantColumn<T>
         // Check for INTERVAL expressions (INTERVAL '1 day', etc.)

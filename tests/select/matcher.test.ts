@@ -1138,6 +1138,26 @@ type M_NullLiteral = QueryResult<
 >;
 type _L3 = RequireTrue<AssertEqual<M_NullLiteral, { nothing: null; }>>;
 
+type M_NullLiteral_1 = QueryResult<
+    "SELECT *, NULL AS nothing FROM users",
+    TestSchema
+>;
+type _L3_1 = RequireTrue<
+    AssertExtends<
+        M_NullLiteral_1,
+        {
+            id: number;
+            name: string;
+            email: string;
+            role: "admin" | "user" | "guest";
+            is_active: boolean;
+            created_at: string;
+            deleted_at: string | null;
+            nothing: null;
+        }
+    >
+>;
+
 // Test: TRUE literal returns true type
 type M_TrueLiteral = QueryResult<"SELECT TRUE AS flag FROM users", TestSchema>;
 type _L4 = RequireTrue<AssertEqual<M_TrueLiteral, { flag: true; }>>;
