@@ -26,7 +26,13 @@ import type {
     WhereExpr,
 } from "../common/ast.js";
 
-import type { Decrement, Flatten, MatchError } from "../common/utils.js";
+import type {
+    Decrement,
+    Flatten,
+    MatchError,
+    RemoveQuotes,
+    Trim,
+} from "../common/utils.js";
 
 import type {
     ColumnRef,
@@ -1185,6 +1191,31 @@ export interface SelectQueryBuilder<
     >;
 
     /**
+     * Apply a reusable builder function to this builder.
+     *
+     * Allows composing the builder with external functions that encapsulate
+     * reusable logic (e.g. common filters, joins, or selections).
+     */
+    apply<
+        NewState extends BuilderStateTag<any, any, any>,
+        NewSql extends BuilderSqlTag<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
+    >(
+        fn: (
+            b: SelectQueryBuilder<Schema, State, Sql>,
+        ) => SelectQueryBuilder<Schema, NewState, NewSql>,
+    ): SelectQueryBuilder<Schema, NewState, NewSql>;
+
+    /**
      * Generate the SQL string from the internal runtime state.
      * Branded return type exposes the inferred result type.
      */
@@ -1676,6 +1707,27 @@ class SelectQueryBuilderImpl<
         >;
     }
 
+    apply<
+        NewState extends BuilderStateTag<any, any, any>,
+        NewSql extends BuilderSqlTag<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
+    >(
+        fn: (
+            b: SelectQueryBuilder<Schema, State, Sql>,
+        ) => SelectQueryBuilder<Schema, NewState, NewSql>,
+    ): SelectQueryBuilder<Schema, NewState, NewSql> {
+        return fn(this as unknown as SelectQueryBuilder<Schema, State, Sql>);
+    }
+
     getParams(): ReadonlyArray<QueryParamValue> {
         return this._state.params;
     }
@@ -2081,19 +2133,38 @@ type ExtractJoinTables<S extends string> = S extends
     : Rest
     : never;
 
+type NormalizeTableSpec<
+    TableSpec extends string,
+> = Trim<TableSpec> extends `"${string}"`
+    ? [ undefined, RemoveQuotes<TableSpec> ]
+    : Trim<TableSpec> extends `\`${string}\``
+        ? [ undefined, RemoveQuotes<TableSpec> ]
+    : Trim<TableSpec> extends `'${string}'`
+        ? [ undefined, RemoveQuotes<TableSpec> ]
+    : Trim<TableSpec> extends `${infer Schema}.${infer Table}` ? [
+            RemoveQuotes<Schema>,
+            RemoveQuotes<Table>,
+        ]
+    : [ undefined, RemoveQuotes<TableSpec> ];
+
 type BuilderCheckTable<
     Schema extends DatabaseSchema,
     TableSpec extends string,
 > = IsLiteralString<TableSpec> extends false ? true
-    : TableSpec extends `${infer SchemaName}.${infer TableName}`
-        ? SchemaName extends keyof Schema["schemas"]
-            ? TableName extends keyof Schema["schemas"][SchemaName] ? true
-            : `Table '${TableName}' not found in schema '${SchemaName}'`
-        : `Schema '${SchemaName}' not found`
-    : TableSpec extends keyof SchemaTables<Schema> ? true
-    : `Table '${TableSpec}' not found in default schema '${DefaultSchemaName<
-        Schema
-    >}'`;
+    : NormalizeTableSpec<TableSpec> extends [
+        infer SchemaName extends string | undefined,
+        infer TableName extends string,
+    ]
+        ? SchemaName extends string
+            ? SchemaName extends keyof Schema["schemas"]
+                ? TableName extends keyof Schema["schemas"][SchemaName] ? true
+                : `Table '${TableName}' not found in schema '${SchemaName}'`
+            : `Schema '${SchemaName}' not found`
+        : TableName extends keyof SchemaTables<Schema> ? true
+        : `Table '${TableName}' not found in default schema '${DefaultSchemaName<
+            Schema
+        >}'`
+    : true;
 
 type BuilderCheckTables<
     Schema extends DatabaseSchema,

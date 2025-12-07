@@ -31,6 +31,8 @@ import type {
 import type {
     BuilderReturnType,
     BuilderSQL,
+    BuilderSqlTag,
+    BuilderStateTag,
     CanReplaceJoin,
     EmptyState,
     ErrorState,
@@ -39,6 +41,7 @@ import type {
     SelectBuilderAnyState,
     SelectBuilderState,
     SelectItemsFromState,
+    SelectQueryBuilder,
     StateToSelectClause,
     StateToSelectQueryClause,
     ValidateBuilder,
@@ -57,6 +60,8 @@ import {
     createConditionTree,
     createSelectQuery,
 } from "../../src/index.js";
+
+import type { DatabaseSchema } from "../../src/common/schema.js";
 
 // ============================================================================
 // Core State Shape Tests
@@ -697,7 +702,7 @@ describe("clause assembly and typing", () => {
             defaultSchema: "public";
             schemas: {
                 public: {
-                    orders: {
+                    Orders_Table: {
                         id: number;
                         user_id: number;
                         status: string;
@@ -713,7 +718,7 @@ describe("clause assembly and typing", () => {
         );
 
         const grouped = createSelectQuery<B_GroupSchema>()
-            .from("orders o")
+            .from(`"Orders_Table" o`)
             .select([ "o.user_id", "o.status" ])
             .groupBy([ "o.user_id", "o.status" ])
             .having(havingTree)
@@ -722,14 +727,14 @@ describe("clause assembly and typing", () => {
         const groupedSql = grouped.toString();
 
         expect(groupedSql).toBe(
-            "SELECT o.user_id, o.status FROM orders o GROUP BY o.user_id, o.status HAVING (COUNT(o.id) > 1) ORDER BY o.user_id ASC nulls first, o.status DESC",
+            `SELECT o.user_id, o.status FROM "Orders_Table" o GROUP BY o.user_id, o.status HAVING (COUNT(o.id) > 1) ORDER BY o.user_id ASC nulls first, o.status DESC`,
         );
 
         type GroupedSql = BuilderSQL<typeof grouped>;
         type _GroupedSqlMatches = RequireTrue<
             AssertEqual<
                 GroupedSql,
-                "SELECT o.user_id, o.status FROM orders o GROUP BY o.user_id, o.status HAVING (COUNT(o.id) > 1) ORDER BY o.user_id ASC nulls first, o.status DESC"
+                `SELECT o.user_id, o.status FROM "Orders_Table" o GROUP BY o.user_id, o.status HAVING (COUNT(o.id) > 1) ORDER BY o.user_id ASC nulls first, o.status DESC`
             >
         >;
 
@@ -1076,6 +1081,62 @@ describe("assembleSelectSQL utility coverage", () => {
         expect(assembled).toBe(
             "WITH active_users AS (SELECT id FROM users WHERE active = TRUE) SELECT DISTINCT users.id, o.total FROM users LEFT JOIN orders o ON o.user_id = users.id WHERE (users.active = TRUE) AND (o.total > 0) GROUP BY users.id, o.total HAVING o.total > 0 ORDER BY o.total DESC LIMIT 10 OFFSET 5 UNION SELECT * FROM archived_users",
         );
+    });
+});
+
+describe("reusable parts", () => {
+    type B_ReuseSchema = {
+        defaultSchema: "public";
+        schemas: {
+            public: {
+                users: {
+                    id: number;
+                    name: string;
+                    active: boolean;
+                };
+            };
+        };
+    };
+
+    // Reusable part: adds WHERE clause
+    const addActiveFilter = <
+        Schema extends DatabaseSchema,
+        State extends BuilderStateTag<any, any, any>,
+        Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    >(
+        b: SelectQueryBuilder<Schema, State, Sql>,
+    ) => b.where("active = TRUE");
+
+    // Reusable part: adds SELECT
+    const selectName = <
+        Schema extends DatabaseSchema,
+        State extends BuilderStateTag<any, any, any>,
+        Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    >(
+        b: SelectQueryBuilder<Schema, State, Sql>,
+    ) => b.select("name");
+
+    it("applies reusable parts using .apply()", () => {
+        const builder = createSelectQuery<B_ReuseSchema>()
+            .from("users")
+            .apply(addActiveFilter)
+            .apply(selectName);
+
+        const sql = builder.toString();
+        expect(sql).toBe("SELECT name FROM users WHERE active = TRUE");
+
+        type ReuseSql = BuilderSQL<typeof builder>;
+        type _ReuseSqlMatches = RequireTrue<
+            AssertEqual<
+                ReuseSql,
+                "SELECT name FROM users WHERE active = TRUE"
+            >
+        >;
+
+        type ReuseRow = BuilderReturnType<typeof builder>;
+        type _ReuseRowMatches = RequireTrue<
+            AssertEqual<ReuseRow, { name: string; }>
+        >;
     });
 });
 
