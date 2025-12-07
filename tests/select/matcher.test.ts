@@ -685,11 +685,11 @@ type _M48_1 = RequireTrue<
 
 // Test: JSON field accessor with type cast returns casted type
 type M_JsonFieldWithCast = QueryResult<
-    "SELECT (config)->>'settings'::text FROM items",
+    `SELECT (config)->>'settings'::text as "userSettings" FROM items`,
     JsonFieldSchema
 >;
 type _M48_2 = RequireTrue<
-    AssertEqual<M_JsonFieldWithCast, { settings: string; }>
+    AssertEqual<M_JsonFieldWithCast, { userSettings: string; }>
 >;
 
 // Test: Query with nullable object field

@@ -939,7 +939,7 @@ type HasTypeCast<T extends string> = T extends `${string}::${string}` ? true
  */
 type ComplexLastAlias<T extends string> = Trim<T> extends
     `${infer _Head} AS ${infer Rest}` ? ComplexLastAlias<Rest>
-    : Trim<T>;
+    : RemoveQuotes<Trim<T>>;
 
 type ComplexExprWithoutAlias<T extends string> = Trim<T> extends
     `${infer Expr} AS ${infer Rest}`
@@ -997,8 +997,7 @@ type ScanTokensForColumnRefs<
             // Must check [ColRef] extends [never] first because never extends everything
             ? [ ColRef ] extends [ never ]
                 ? ScanTokensForColumnRefs<Rest, Acc, Decrement<Depth>>
-            : ColRef extends ValidatableColumnRef
-                ? ScanTokensForColumnRefs<
+            : ColRef extends ValidatableColumnRef ? ScanTokensForColumnRefs<
                     Rest,
                     [ ...Acc, ColRef ],
                     Decrement<Depth>
