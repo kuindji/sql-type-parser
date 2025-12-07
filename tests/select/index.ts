@@ -6,6 +6,7 @@
  */
 
 export type { ASTTestsPass } from "./ast.test.js";
+export type { BuilderPhase2TestsPass } from "./builder.test.js";
 export type { DynamicTestsPass } from "./dynamic.test.js";
 export type { MatcherTestsPass } from "./matcher.test.js";
 export type { ParserTestsPass } from "./parser.test.js";

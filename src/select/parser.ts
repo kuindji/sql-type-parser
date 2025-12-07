@@ -102,8 +102,14 @@ export type { IsComplexExpression };
 /** Scan tokens and extract all column references from a condition */
 export type { ScanTokensForColumnRefs };
 
+/** Parse a WHERE clause into ParsedCondition AST fragment */
+export type { ParseWhereClause };
+
 /** Parse ORDER BY item into OrderByItem AST */
 export type { ParseOrderByItem };
+
+/** Parse ORDER BY list into OrderByItem[] AST */
+export type { ParseOrderByItems };
 
 /** Extract join type from JOIN clause */
 export type { ExtractJoinType };
@@ -931,10 +937,22 @@ type HasTypeCast<T extends string> = T extends `${string}::${string}` ? true
  * Parse a complex column expression
  * Extracts base column for validation and final cast type for result type
  */
-type ParseComplexColumn<T extends string> = T extends
-    `${infer Expr} AS ${infer Alias}`
-    ? ColumnRef<ParseComplexExpr<Trim<Expr>>, RemoveQuotes<Alias>>
-    : ColumnRef<ParseComplexExpr<T>, ExtractComplexColumnName<T>>;
+type ComplexLastAlias<T extends string> = Trim<T> extends
+    `${infer _Head} AS ${infer Rest}` ? ComplexLastAlias<Rest>
+    : Trim<T>;
+
+type ComplexExprWithoutAlias<T extends string> = Trim<T> extends
+    `${infer Expr} AS ${infer Rest}`
+    ? Rest extends `${infer _Inner} AS ${infer _RestTail}`
+        ? ComplexExprWithoutAlias<`${Expr} AS ${Rest}`>
+    : Trim<Expr>
+    : Trim<T>;
+
+type ParseComplexColumn<T extends string> = ColumnRef<
+    ParseComplexExpr<ComplexExprWithoutAlias<T>>,
+    Trim<T> extends `${string} AS ${string}` ? ComplexLastAlias<T>
+        : ExtractComplexColumnName<T>
+>;
 
 /**
  * Parse a complex expression into ComplexExpr AST
@@ -964,22 +982,29 @@ type ExtractAllColumnRefs<T extends string> = ScanTokensForColumnRefs<
 type ScanTokensForColumnRefs<
     T extends string,
     Acc extends ValidatableColumnRef[],
-> = Trim<T> extends "" ? Acc
+    Depth extends number = 20,
+> = Depth extends 0 ? Acc
+    : Trim<T> extends "" ? Acc
     : NextToken<Trim<T>> extends
         [ infer Token extends string, infer Rest extends string ]
     // Check for EXISTS/NOT EXISTS - skip entire subquery content
         ? IsExistsToken<Token, Rest> extends true
-            ? SkipExistsAndContinue<Token, Rest, Acc>
+            ? SkipExistsAndContinue<Token, Rest, Acc, Decrement<Depth>>
             // Skip function names: if the next token is "(", this token is a function name, not a column
         : IsFunctionName<Token, Rest> extends true
-            ? ScanTokensForColumnRefs<Rest, Acc>
+            ? ScanTokensForColumnRefs<Rest, Acc, Decrement<Depth>>
         : ExtractColumnFromToken<Token> extends infer ColRef
             // Must check [ColRef] extends [never] first because never extends everything
-            ? [ ColRef ] extends [ never ] ? ScanTokensForColumnRefs<Rest, Acc>
+            ? [ ColRef ] extends [ never ]
+                ? ScanTokensForColumnRefs<Rest, Acc, Decrement<Depth>>
             : ColRef extends ValidatableColumnRef
-                ? ScanTokensForColumnRefs<Rest, [ ...Acc, ColRef ]>
-            : ScanTokensForColumnRefs<Rest, Acc>
-        : ScanTokensForColumnRefs<Rest, Acc>
+                ? ScanTokensForColumnRefs<
+                    Rest,
+                    [ ...Acc, ColRef ],
+                    Decrement<Depth>
+                >
+            : ScanTokensForColumnRefs<Rest, Acc, Decrement<Depth>>
+        : ScanTokensForColumnRefs<Rest, Acc, Decrement<Depth>>
     : Acc;
 
 /**
@@ -1006,6 +1031,7 @@ type SkipExistsAndContinue<
     Token extends string,
     Rest extends string,
     Acc extends ValidatableColumnRef[],
+    Depth extends number,
 > = Token extends "NOT"
     // NOT EXISTS - skip NOT, EXISTS, then find and skip parenthesized content
     ? NextToken<Trim<Rest>> extends
@@ -1014,17 +1040,17 @@ type SkipExistsAndContinue<
             [ "(", infer AfterParen extends string ]
             ? SkipUntilClosingParen<AfterParen, 1> extends
                 infer Remainder extends string
-                ? ScanTokensForColumnRefs<Remainder, Acc>
+                ? ScanTokensForColumnRefs<Remainder, Acc, Depth>
             : Acc
-        : ScanTokensForColumnRefs<AfterExists, Acc>
-    : ScanTokensForColumnRefs<Rest, Acc>
+        : ScanTokensForColumnRefs<AfterExists, Acc, Depth>
+    : ScanTokensForColumnRefs<Rest, Acc, Depth>
     // EXISTS - skip EXISTS, then find and skip parenthesized content
     : NextToken<Trim<Rest>> extends [ "(", infer AfterParen extends string ]
         ? SkipUntilClosingParen<AfterParen, 1> extends
             infer Remainder extends string
-            ? ScanTokensForColumnRefs<Remainder, Acc>
+            ? ScanTokensForColumnRefs<Remainder, Acc, Depth>
         : Acc
-    : ScanTokensForColumnRefs<Rest, Acc>;
+    : ScanTokensForColumnRefs<Rest, Acc, Depth>;
 
 /**
  * Skip tokens until we find the matching closing parenthesis

@@ -21,9 +21,13 @@
  * ```
  */
 
-import type { DatabaseSchema, QueryResult } from "./select/matcher.js"
-import type { ValidateSelectSQL } from "./select/validator.js"
-
+import type {
+    BuilderResultType,
+    SelectQueryBuilder,
+    ValidateBuilder,
+} from "./select/builder.js";
+import type { DatabaseSchema, QueryResult } from "./select/matcher.js";
+import type { ValidateSelectSQL } from "./select/validator.js";
 
 // ============================================================================
 // Core Types
@@ -33,7 +37,7 @@ import type { ValidateSelectSQL } from "./select/validator.js"
  * Validates a query at compile time.
  * If valid, returns the query string type.
  * If invalid, returns an error message type that will be shown in IDE tooltips.
- * 
+ *
  * Uses the comprehensive validator (ValidateSelectSQL) which performs
  * all validation checks. This is separate from QueryResult which only
  * extracts the result type.
@@ -41,11 +45,21 @@ import type { ValidateSelectSQL } from "./select/validator.js"
 export type ValidQuery<
     Q extends string,
     Schema extends DatabaseSchema,
-> = ValidateSelectSQL<Q, Schema> extends infer V
-    ? V extends true
-    ? Q
+> = ValidateSelectSQL<Q, Schema> extends infer V ? V extends true ? Q
     : `[SQL Error] ${V & string}`
-    : never
+    : never;
+
+/**
+ * Validates a SELECT query builder at compile time.
+ * If valid, returns the builder type.
+ * If invalid, returns an error message type that will be shown in IDE tooltips.
+ */
+export type ValidQueryBuilder<
+    Schema extends DatabaseSchema,
+    B extends SelectQueryBuilder<Schema, any, any>,
+> = ValidateBuilder<B> extends infer V ? V extends true ? B
+    : `[SQL Error] ${V & string}`
+    : never;
 
 /**
  * Result type for a SELECT query (flattened for better IDE display)
@@ -53,7 +67,7 @@ export type ValidQuery<
 export type SelectResult<
     SQL extends string,
     Schema extends DatabaseSchema,
-> = Prettify<QueryResult<SQL, Schema>>
+> = Prettify<QueryResult<SQL, Schema>>;
 
 /**
  * Array of result rows (flattened for better IDE display)
@@ -61,16 +75,36 @@ export type SelectResult<
 export type SelectResultArray<
     SQL extends string,
     Schema extends DatabaseSchema,
-> = Prettify<QueryResult<SQL, Schema>>[]
+> = Prettify<QueryResult<SQL, Schema>>[];
 
 /**
  * Force TypeScript to expand a type for better IDE display
  * This makes hover tooltips show the actual shape instead of type aliases
  */
-type Prettify<T> = {
-    [K in keyof T]: T[K]
-} & {}
+type Prettify<T> =
+    & {
+        [K in keyof T]: T[K];
+    }
+    & {};
 
+/**
+ * Result type for a SELECT query builder (flattened for better IDE display)
+ */
+export type SelectBuilderResult<
+    B extends SelectQueryBuilder<any, any, any>,
+> = B extends SelectQueryBuilder<
+    infer Schema extends DatabaseSchema,
+    infer State,
+    infer Sql
+> ? Prettify<BuilderResultType<Schema, State, Sql>>
+    : never;
+
+/**
+ * Array of result rows for a query builder (flattened for better IDE display)
+ */
+export type SelectBuilderResultArray<
+    B extends SelectQueryBuilder<any, any, any>,
+> = SelectBuilderResult<B>[];
 
 // ============================================================================
 // Query Handler Types
@@ -112,7 +146,7 @@ export type QueryHandler = (query: string, params?: unknown[]) => unknown;
  *   db.query(sql, params)  // Your actual database call
  * )
  *
- * // Use it 
+ * // Use it
  * const users = await select("SELECT id, name FROM users WHERE active = $1", [true])
  * // users: Array<{ id: number; name: string }>
  *
@@ -121,17 +155,36 @@ export type QueryHandler = (query: string, params?: unknown[]) => unknown;
  * // Error: Argument of type '"SELECT unknown FROM users"' is not assignable...
  * ```
  */
-export function createSelectFn<Schema extends DatabaseSchema>(handler: QueryHandler) {
-    return function select<Q extends string>(
+export function createSelectFn<Schema extends DatabaseSchema>(
+    handler: QueryHandler,
+) {
+    function select<Q extends string>(
         query: ValidQuery<Q, Schema>,
-        params?: unknown[]
+        params?: unknown[],
+    ): Promise<SelectResultArray<Q, Schema>>;
+
+    function select<B extends SelectQueryBuilder<Schema, any, any>>(
+        query: ValidQueryBuilder<Schema, B>,
+        params?: unknown[],
+    ): Promise<SelectBuilderResultArray<B>>;
+
+    function select(
+        query:
+            | ValidQuery<string, Schema>
+            | SelectQueryBuilder<Schema, any, any>,
+        params?: unknown[],
     ) {
-        type Result = Prettify<QueryResult<Q, Schema>>;
-        return handler(query, params) as Promise<Result[]>;
+        if (typeof query === "string") {
+            return handler(query, params) as Promise<any>;
+        }
+
+        const sql = query.toString();
+        const finalParams = params ?? [ ...query.getParams() ];
+        return handler(sql, finalParams) as Promise<any>;
     }
+
+    return select;
 }
-
-
 
 // ============================================================================
 // Utility Types
@@ -144,4 +197,4 @@ export function createSelectFn<Schema extends DatabaseSchema>(handler: QueryHand
 export type IsValidSelect<
     SQL extends string,
     Schema extends DatabaseSchema,
-> = ValidateSelectSQL<SQL, Schema> extends true ? true : false
+> = ValidateSelectSQL<SQL, Schema> extends true ? true : false;

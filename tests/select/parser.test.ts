@@ -241,6 +241,33 @@ type P_NoWhere_Check = P_NoWhere extends SQLSelectQuery<infer Q>
 type _P21 = RequireTrue<P_NoWhere_Check>
 
 // ============================================================================
+// Fragment Parser Exports (builder support)
+// ============================================================================
+
+// Ensure fragment parsers used by the builder are exported and have expected shapes
+import type {
+    ParseOrderByItems,
+    ParseWhereClause,
+} from "../../src/index.js"
+
+// WHERE fragment parser should accept a full query tail and return where/rest
+type P_WhereFragment = ParseWhereClause<"WHERE id = 1 ORDER BY name">
+type P_WhereFragment_Check = P_WhereFragment extends {
+    where: ParsedCondition
+    rest: string
+}
+    ? true
+    : false
+type _PWhereFragment = RequireTrue<P_WhereFragment_Check>
+
+// ORDER BY items parser should produce an array of OrderByItem
+type P_OrderByItems = ParseOrderByItems<["name ASC", "created_at DESC"]>
+type P_OrderByItems_Check = P_OrderByItems extends OrderByItem[]
+    ? true
+    : false
+type _POrderByItems = RequireTrue<P_OrderByItems_Check>
+
+// ============================================================================
 // ORDER BY Tests
 // ============================================================================
 

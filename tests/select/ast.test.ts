@@ -215,6 +215,12 @@ type _SI1 = RequireTrue<AssertExtends<ColumnRef, SelectItem>>
 type _SI2 = RequireTrue<AssertExtends<AggregateExpr, SelectItem>>
 type _SI3 = RequireTrue<AssertExtends<TableWildcard, SelectItem>>
 
+// Test: ColumnRef with optional flag is still a valid SelectItem (builder support)
+type SI_OptionalColumn = ColumnRef<UnboundColumnRef<"id">, "user_id"> & {
+    readonly optional: true;
+}
+type _SIOptionalFlag = RequireTrue<AssertExtends<SI_OptionalColumn, SelectItem>>
+
 // Test: SQLSelectQuery structure
 type SSQ = SQLSelectQuery<SelectClause>
 type _SSQ1 = RequireTrue<AssertEqual<SSQ["type"], "SQLQuery">>

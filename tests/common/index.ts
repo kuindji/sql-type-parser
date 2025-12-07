@@ -8,6 +8,7 @@
 
 export type { TokenizerTestsPass } from "./tokenizer.test.js"
 export type { UtilsTestsPass } from "./utils.test.js"
+export type { CommonBuilderTestsPass } from "./builder.test.js"
 
 /**
  * All common tests pass if this type is true

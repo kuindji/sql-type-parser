@@ -19,10 +19,12 @@ export type {
     ParseColumnList,
     ParseColumnRefType,
     ParseOrderByItem,
+    ParseOrderByItems,
     ParseSelectSQL,
     ParseSingleColumn,
     ParseSingleJoin,
     ParseTableRef,
+    ParseWhereClause,
     ScanTokensForColumnRefs,
 } from "./parser.js";
 
@@ -54,6 +56,7 @@ export type {
 export type {
     DatabaseSchema,
     MatchError,
+    MatchSelectClause,
     MatchSelectQuery,
     QueryResult,
     ValidateQuery,
@@ -61,4 +64,21 @@ export type {
 } from "./matcher.js";
 
 // Re-export validator types
-export type { ValidateSelectOptions, ValidateSelectSQL } from "./validator.js";
+export type {
+    ValidateSelectClause,
+    ValidateSelectOptions,
+    ValidateSelectSQL,
+} from "./validator.js";
+
+// Re-export builder types and runtime helpers (experimental)
+export type {
+    BuilderReturnType,
+    BuilderSQL,
+    EmptyState as SelectEmptyState,
+    ErrorState as SelectErrorState,
+    SelectBuilderAnyState,
+    SelectBuilderState,
+    ValidateBuilder,
+} from "./builder.js";
+
+export { assembleSelectSQL, createSelectQuery } from "./builder.js";

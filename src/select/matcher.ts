@@ -140,7 +140,7 @@ type IntersectResultType<Left, Right> = {
 /**
  * Match a SELECT clause against the schema
  */
-type MatchSelectClause<
+export type MatchSelectClause<
     Select,
     Schema extends DatabaseSchema,
 > = Select extends SelectClause<
@@ -445,8 +445,15 @@ type MatchColumnList<
     : {};
 
 /**
+ * Helper: check if a SelectItem has been marked as optional
+ */
+type IsOptionalSelectItem<Col> = Col extends { readonly optional: true } ? true
+    : false;
+
+/**
  * Match a single column (ColumnRef, AggregateExpr, or TableWildcard)
  * Note: We use [ColType] extends [...] to prevent distribution over union types
+ * Optional columns (from conditional selects/joins) are unioned with `undefined`.
  */
 type MatchSingleColumn<
     Col,
@@ -456,12 +463,30 @@ type MatchSingleColumn<
     ? ResolveColumnRef<Ref, Context, Schema> extends infer ColType
         ? [ ColType ] extends [ MatchError<string> ]
             ? { [K in Alias]: ColType; }
-        : { [K in Alias]: ColType; }
+        : IsOptionalSelectItem<Col> extends true
+            ? { [K in Alias]: ColType | undefined; }
+            : { [K in Alias]: ColType; }
     : never
     : Col extends TableWildcard<infer TableOrAlias, infer WildcardSchema>
         ? ResolveTableWildcard<TableOrAlias, WildcardSchema, Context, Schema>
     : Col extends AggregateExpr<infer Func, infer Arg, infer Alias>
-        ? { [K in Alias]: GetAggregateResultType<Func, Arg, Context, Schema>; }
+        ? IsOptionalSelectItem<Col> extends true
+            ? {
+                [K in Alias]: GetAggregateResultType<
+                    Func,
+                    Arg,
+                    Context,
+                    Schema
+                > | undefined;
+            }
+            : {
+                [K in Alias]: GetAggregateResultType<
+                    Func,
+                    Arg,
+                    Context,
+                    Schema
+                >;
+            }
     : MatchError<"Unknown column type">;
 
 /**
@@ -906,14 +931,26 @@ export type ValidateQuery<Result> = FindFirstError<Result> extends never ? true
 // ============================================================================
 
 /**
- * Validate a SQL query against a schema
- * Returns true if valid, or error message if invalid
+ * Validate a SQL query against a schema.
  *
- * This uses the dedicated validator for comprehensive validation.
+ * By default this performs full validation (all clauses). Callers that need a
+ * lighter validation path (for example, builder fragment checks) can pass
+ * `Options` with `validateAllFields: false` to skip deep WHERE/JOIN/HAVING
+ * clause validation while still validating SELECT columns and table/alias
+ * resolution.
+ *
+ * This delegates to the dedicated validator implementation.
  *
  * @see ValidateSelectSQL in ./validator.js for the implementation
  */
 export type ValidateSQL<
     SQL extends string,
     Schema extends DatabaseSchema,
-> = import("./validator.js").ValidateSelectSQL<SQL, Schema>;
+    Options = undefined,
+> = [ Options ] extends [ undefined ]
+    ? import("./validator.js").ValidateSelectSQL<SQL, Schema>
+    : import("./validator.js").ValidateSelectSQL<
+        SQL,
+        Schema,
+        Options & import("./validator.js").ValidateSelectOptions
+    >;

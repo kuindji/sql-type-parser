@@ -8,42 +8,48 @@
  */
 
 // Common utilities tests (shared by all query types)
-export type { CommonTestsPass, TokenizerTestsPass, UtilsTestsPass } from "./common/index.js"
+export type {
+    CommonTestsPass,
+    TokenizerTestsPass,
+    UtilsTestsPass,
+} from "./common/index.js";
 
 // SELECT query tests
 export type {
-  SelectTestsPass,
-  ParserTestsPass,
-  UnionTestsPass,
-  DynamicTestsPass,
-  ASTTestsPass,
-  MatcherTestsPass,
-  ValidatorTestsPass,
-} from "./select/index.js"
+    ASTTestsPass,
+    DynamicTestsPass,
+    MatcherTestsPass,
+    ParserTestsPass,
+    SelectTestsPass,
+    UnionTestsPass,
+    ValidatorTestsPass,
+} from "./select/index.js";
 
 // INSERT query tests
 export type {
-  InsertParserTestsPass,
-  InsertMatcherTestsPass,
-  InsertValidatorTestsPass,
-} from "./insert/index.js"
+    InsertMatcherTestsPass,
+    InsertParserTestsPass,
+    InsertValidatorTestsPass,
+} from "./insert/index.js";
 
 // UPDATE query tests
 export type {
-  UpdateParserTestsPass,
-  UpdateMatcherTestsPass,
-  UpdateValidatorTestsPass,
-} from "./update/index.js"
+    UpdateMatcherTestsPass,
+    UpdateParserTestsPass,
+    UpdateValidatorTestsPass,
+} from "./update/index.js";
 
 // DELETE query tests
 export type {
-  DeleteParserTestsPass,
-  DeleteMatcherTestsPass,
-  DeleteValidatorTestsPass,
-} from "./delete/index.js"
+    DeleteMatcherTestsPass,
+    DeleteParserTestsPass,
+    DeleteValidatorTestsPass,
+} from "./delete/index.js";
+
+// Database integration helpers
+export type { DbCreateSelectFnTestsPass } from "./db.test.js";
 
 /**
  * Master test result - true if all tests pass
  */
-export type AllTestsPass = true
-
+export type AllTestsPass = true;

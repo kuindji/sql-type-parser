@@ -13,3 +13,6 @@ export * from "./matcher-examples.js";
 
 // Database integration examples - showing real-world usage patterns
 export * from "./db-integration-examples.js";
+
+// Builder examples - showcasing the SELECT builder helpers
+export * from "./builder-examples.js";

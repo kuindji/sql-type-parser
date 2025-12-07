@@ -129,6 +129,17 @@ export type {
     WhereTerminators,
 } from "./common/index.js";
 
+// Re-export common builder runtime utilities
+export {
+    // appendParamsRuntime,
+    // buildParamString,
+    // ConditionTreeBuilder,
+    createConditionTree,
+    // whenRuntime,
+} from "./common/index.js";
+
+export type { ParamString, QueryParamValue } from "./common/index.js";
+
 // ============================================================================
 // SELECT Query Types
 // ============================================================================
@@ -141,12 +152,22 @@ export type {
     ExtendedColumnRefType,
     IntervalExpr,
     LiteralExpr,
+    // Matcher/validator internals used by builder
+    MatchSelectClause,
     // Matcher types
     MatchSelectQuery,
+    // Fragment parsers used by the builder
+    ParseOrderByItems,
+    ParseWhereClause,
     QueryResult,
+    // Builder types / helpers
+    SelectBuilderAnyState,
+    SelectBuilderState,
     // Select types
     SelectClause,
     SelectColumns,
+    SelectEmptyState,
+    SelectErrorState,
     SelectItem,
     // SQL constants
     SQLConstantExpr,
@@ -159,11 +180,40 @@ export type {
     UnionClauseAny,
     UnionOperatorType,
     ValidateQuery,
+    ValidateSelectClause,
     ValidateSelectOptions,
     // Validator types
     ValidateSelectSQL,
     ValidateSQL,
 } from "./select/index.js";
+
+// Re-export SELECT builder advanced types/helpers
+export type {
+    AssembleBuilderSql,
+    BuilderResultType,
+    BuilderReturnType,
+    BuilderSQL,
+    BuilderSqlTag,
+    BuilderStateOf,
+    BuilderStateTag,
+    CanReplaceJoin,
+    EmptyBuilderState,
+    EmptySqlState,
+    EmptyState,
+    ErrorState,
+    JoinStrictness,
+    JoinTypeToStrictness,
+    RuntimeSelectState,
+    SelectItemsFromState,
+    SelectQueryBuilder,
+    StateToSelectClause,
+    StateToSelectQueryClause,
+    TableNameOf,
+    ValidateBuilder,
+} from "./select/builder.js";
+
+// Re-export SELECT builder runtime helpers
+export { assembleSelectSQL, createSelectQuery } from "./select/index.js";
 
 // ============================================================================
 // INSERT Query Types
@@ -268,7 +318,10 @@ export type {
 export { createSelectFn } from "./db.js";
 export type {
     IsValidSelect,
+    SelectBuilderResult,
+    SelectBuilderResultArray,
     SelectResult,
     SelectResultArray,
     ValidQuery,
+    ValidQueryBuilder,
 } from "./db.js";

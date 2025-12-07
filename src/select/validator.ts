@@ -208,7 +208,7 @@ type ValidateUnionClause<
  * 7. GROUP BY field references (when validateAllFields is true)
  * 8. ORDER BY field references (when validateAllFields is true)
  */
-type ValidateSelectClause<
+export type ValidateSelectClause<
     Select,
     Schema extends DatabaseSchema,
     Options extends ValidateSelectOptions = DefaultValidateOptions,

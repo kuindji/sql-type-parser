@@ -150,7 +150,10 @@ export type ColumnRef<
 /**
  * Selected columns can be column refs, aggregates, table wildcards, or *
  */
-export type SelectItem = ColumnRef | AggregateExpr | TableWildcard;
+export type SelectItem =
+    | (ColumnRef & { readonly optional?: boolean; })
+    | (AggregateExpr & { readonly optional?: boolean; })
+    | TableWildcard;
 
 /**
  * Array of selected columns

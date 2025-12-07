@@ -6,10 +6,15 @@
  */
 
 import type {
+    ColumnRef,
     DatabaseSchema,
     MatchError,
     MatchSelectQuery,
     QueryResult,
+    SelectClause,
+    SQLSelectQuery,
+    TableRef,
+    UnboundColumnRef,
     ValidateQuery,
     ValidateSQL,
 } from "../../src/index.js";
@@ -193,6 +198,27 @@ type _M13 = RequireTrue<
 >;
 
 // ============================================================================
+// Optional Column (builder support) Tests
+// ============================================================================
+
+// Simulate a SelectClause where a column has been marked as optional
+type M_OptionalSelectClause = SelectClause<
+    [
+        ColumnRef<UnboundColumnRef<"id">, "id"> & {
+            readonly optional: true;
+        },
+    ],
+    TableRef<"users", "u", undefined>
+>;
+
+type M_OptionalSelectQuery = SQLSelectQuery<M_OptionalSelectClause>;
+
+type M_OptionalResult = MatchSelectQuery<M_OptionalSelectQuery, TestSchema>;
+type _MOptional = RequireTrue<
+    AssertEqual<M_OptionalResult, { id: number | undefined; }>
+>;
+
+// ============================================================================
 // Table Alias Tests
 // ============================================================================
 
@@ -315,7 +341,7 @@ type _M25 = RequireTrue<
 
 // Test: table.* with join
 type M_WildcardJoin = QueryResult<
-    "SELECT u.*, p.title FROM users AS u INNER JOIN posts AS p ON u.id = p.author_id",
+    "SELECT u.*, posts.title FROM users AS u INNER JOIN posts ON u.id = posts.author_id",
     TestSchema
 >;
 type _M26 = RequireTrue<
