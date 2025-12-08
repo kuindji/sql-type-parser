@@ -169,27 +169,41 @@ type ColumnQuery<
 type IsLiteralString<T> = T extends string ? string extends T ? false : true
     : false;
 
+/** Detect `unknown` specifically (not just assignable to unknown). */
+type IsUnknown<T> = unknown extends T ? [ T ] extends [ unknown ] ? true
+    : false
+    : false;
+
 /** Strip simple PostgreSQL-style casts (`expr::type`). */
 type StripCast<S extends string> = S extends `${infer Base}::${string}` ? Base
+    : S;
+
+/**
+ * Remove surrounding double quotes from an identifier segment.
+ * Keeps the inner content intact so case-sensitive names survive.
+ */
+type StripIdentifierQuotes<S extends string> = S extends `"${infer Inner}"`
+    ? Inner
     : S;
 
 type TrimStr<S extends string> = S extends ` ${infer T}` ? TrimStr<T>
     : S extends `${infer T} ` ? TrimStr<T>
     : S;
 
-type LastAlias<S extends string> = TrimStr<S> extends
-    `${infer _Head} AS ${infer Rest}` ? LastAlias<Rest>
-    : TrimStr<S>;
-
 type ExtractAlias<S extends string> = TrimStr<S> extends
-    `${string} AS ${string}` ? LastAlias<S>
+    `${infer _Before} AS ${infer After}`
+    ? ExtractAlias<TrimStr<After>> extends infer Alias extends string ? Alias
+    : TrimStr<After>
+    : TrimStr<S> extends `${infer _Before} as ${infer After}`
+        ? ExtractAlias<TrimStr<After>> extends infer Alias extends string
+            ? Alias
+        : TrimStr<After>
     : undefined;
 
-type ExprWithoutAlias<S extends string> = ExtractAlias<S> extends infer A
-    ? A extends string
-        ? TrimStr<S> extends `${infer Expr} AS ${A}` ? TrimStr<Expr>
-        : TrimStr<S>
-    : TrimStr<S>
+type ExprWithoutAlias<S extends string> = TrimStr<S> extends
+    `${infer Before} AS ${infer _After}` ? ExprWithoutAlias<TrimStr<Before>>
+    : TrimStr<S> extends `${infer Before} as ${infer _After}`
+        ? ExprWithoutAlias<TrimStr<Before>>
     : TrimStr<S>;
 
 type SplitAlias<S extends string> = [
@@ -205,10 +219,12 @@ type StripAliasIdentifier<S extends string> = S extends
 type ExtractColumnIdentifier<S extends string> = SplitAlias<S> extends [
     infer Expr extends string,
     infer Alias extends string | undefined,
-] ? Alias extends string ? Alias
-    : StripCast<Expr> extends `${string}.${infer Tail}` ? Tail
-    : StripCast<Expr>
-    : StripCast<S>;
+] ? Alias extends string ? StripIdentifierQuotes<Alias>
+    : StripIdentifierQuotes<
+        StripCast<Expr> extends `${string}.${infer Tail}` ? Tail
+            : StripCast<Expr>
+    >
+    : StripIdentifierQuotes<StripCast<S>>;
 
 /** Look up a column's TS type from the default schema tables. */
 type ColumnTypeFromSchema<
@@ -224,11 +240,54 @@ type ColumnTypeFromSchema<
     : R
     : unknown;
 
+type ColumnTypeFromTable<
+    Schema extends DatabaseSchema,
+    Table extends string,
+    ColName extends string,
+> = Table extends keyof SchemaTables<Schema>
+    ? ColName extends keyof SchemaTables<Schema>[Table]
+        ? SchemaTables<Schema>[Table][ColName]
+    : unknown
+    : unknown;
+
+/**
+ * Best-effort extraction of the primary FROM table.
+ * Falls back to parsing the recorded contextSQL if fromTable is not set.
+ */
+type PrimaryTable<
+    Schema extends DatabaseSchema,
+    State extends BuilderStateTag<any, any, any>,
+> = State["fromTable"] extends infer From extends string ? From
+    : State["contextSQL"] extends `FROM ${infer FromSrc}`
+        ? ParseTableRef<FromSrc> extends { table: infer T extends string; } ? T
+        : never
+    : never;
+
 /** Compute the result type for a simple column expression. */
 type ColumnTypeForExpr<
     Schema extends DatabaseSchema,
+    State extends BuilderStateTag<any, any, any>,
     Expr extends string,
 > = Expr extends `${string}::${string}` ? string
+    : Expr extends `${infer Table}.${string}` ? ColumnTypeFromTable<
+            Schema,
+            StripIdentifierQuotes<Table>,
+            ExtractColumnIdentifier<Expr>
+        > extends infer Qualified extends unknown
+            ? IsUnknown<Qualified> extends true
+                ? ColumnTypeFromSchema<Schema, ExtractColumnIdentifier<Expr>>
+            : Qualified
+        : unknown
+    : PrimaryTable<Schema, State> extends infer From extends string
+        ? ColumnTypeFromTable<
+            Schema,
+            From,
+            ExtractColumnIdentifier<Expr>
+        > extends infer FromType extends unknown
+            ? IsUnknown<FromType> extends true
+                ? ColumnTypeFromSchema<Schema, ExtractColumnIdentifier<Expr>>
+            : FromType
+        : unknown
     : ColumnTypeFromSchema<Schema, ExtractColumnIdentifier<Expr>>;
 
 type ExpressionType<
@@ -239,8 +298,8 @@ type ExpressionType<
     : Expr extends `CAST${string}` ? string
     : Expr extends `COUNT${string}` ? number
     : Expr extends `(SELECT COUNT${string})` ? number
-    : ColumnTypeForExpr<Schema, Expr> extends never ? unknown
-    : ColumnTypeForExpr<Schema, Expr>;
+    : ColumnTypeForExpr<Schema, State, Expr> extends never ? unknown
+    : ColumnTypeForExpr<Schema, State, Expr>;
 
 type ColumnRow<
     Schema extends DatabaseSchema,
@@ -841,10 +900,10 @@ type WithFromForSchema<
     // builder state.
     : Src extends SelectQueryBuilder<
         Schema,
-        BuilderStateTag<any, any, any>,
+        infer SubState extends BuilderStateTag<any, any, any>,
         any
     > ? BuilderStateTag<
-            State["fromTable"],
+            SubState["fromTable"],
             State["row"],
             State["contextSQL"]
         >

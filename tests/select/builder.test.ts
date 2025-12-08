@@ -698,15 +698,32 @@ describe("clause assembly and typing", () => {
     });
 
     it("supports group by, having, and order by", () => {
+        type OrderItemId = string & { __type: "Orders_Table.id"; };
+        type OrderUserId = string & { __type: "Orders_Table.userId"; };
+        type OrderStatus = string & { __type: "Orders_Table.status"; };
+        type OrderTotal = string & { __type: "Orders_Table.total"; };
+        type UserId = string & { __type: "Users_Table.id"; };
+        type UserName = string & { __type: "Users_Table.name"; };
+        type ProductId = string & { __type: "Products_Table.id"; };
+        type ProductName = string & { __type: "Products_Table.name"; };
         type B_GroupSchema = {
             defaultSchema: "public";
             schemas: {
                 public: {
                     Orders_Table: {
-                        id: number;
-                        user_id: number;
-                        status: string;
-                        total: number;
+                        id: OrderItemId;
+                        userId: OrderUserId;
+                        status: OrderStatus;
+                        total: OrderTotal;
+                    };
+                    Users_Table: {
+                        id: UserId;
+                        name: UserName;
+                    };
+                    Products_Table: {
+                        id: ProductId;
+                        name: ProductName;
+                        price: number;
                     };
                 };
             };
@@ -719,30 +736,35 @@ describe("clause assembly and typing", () => {
 
         const grouped = createSelectQuery<B_GroupSchema>()
             .from(`"Orders_Table" o`)
-            .select([ "o.user_id", "o.status" ])
-            .groupBy([ "o.user_id", "o.status" ])
+            .select([
+                `o."userId"`,
+                `o.status`,
+                `(o.status || ' ' || o."userId")::text as combined`,
+            ])
+            .groupBy([ `o."userId"`, `o.status` ])
             .having(havingTree)
-            .orderBy([ "o.user_id ASC nulls first", "o.status DESC" ]);
+            .orderBy([ `o."userId" asc nulls first`, `o.status desc` ]);
 
         const groupedSql = grouped.toString();
 
         expect(groupedSql).toBe(
-            `SELECT o.user_id, o.status FROM "Orders_Table" o GROUP BY o.user_id, o.status HAVING (COUNT(o.id) > 1) ORDER BY o.user_id ASC nulls first, o.status DESC`,
+            `SELECT o."userId", o.status, (o.status || ' ' || o."userId")::text as combined FROM "Orders_Table" o GROUP BY o."userId", o.status HAVING (COUNT(o.id) > 1) ORDER BY o."userId" asc nulls first, o.status desc`,
         );
 
         type GroupedSql = BuilderSQL<typeof grouped>;
         type _GroupedSqlMatches = RequireTrue<
             AssertEqual<
                 GroupedSql,
-                `SELECT o.user_id, o.status FROM "Orders_Table" o GROUP BY o.user_id, o.status HAVING (COUNT(o.id) > 1) ORDER BY o.user_id ASC nulls first, o.status DESC`
+                `SELECT o."userId", o.status, (o.status || ' ' || o."userId")::text as combined FROM "Orders_Table" o GROUP BY o."userId", o.status HAVING (COUNT(o.id) > 1) ORDER BY o."userId" asc nulls first, o.status desc`
             >
         >;
 
         type GroupedRow = BuilderReturnType<typeof grouped>;
         type _GroupedRowMatches = RequireTrue<
             AssertEqual<GroupedRow, {
-                user_id: number;
-                status: string;
+                userId: OrderUserId;
+                status: OrderStatus;
+                combined: string;
             }>
         >;
     });
@@ -770,6 +792,7 @@ describe("clause assembly and typing", () => {
         >;
 
         type ReturnType = BuilderReturnType<typeof outer>;
+        const _outerIdType: number = null as unknown as ReturnType["user_id"];
         type _ReturnTypeMatches = RequireTrue<
             AssertEqual<ReturnType, {
                 user_id: number;
@@ -1085,14 +1108,25 @@ describe("assembleSelectSQL utility coverage", () => {
 });
 
 describe("reusable parts", () => {
+    type UserId = string & { __type: "Users_Table.id"; };
+    type UserName = string & { __type: "Users_Table.name"; };
+    type UserActive = boolean & { __type: "Users_Table.active"; };
+    type OrderId = string & { __type: "Orders_Table.id"; };
+    type OrderUserId = string & { __type: "Orders_Table.userId"; };
+    type OrderTotal = string & { __type: "Orders_Table.total"; };
     type B_ReuseSchema = {
         defaultSchema: "public";
         schemas: {
             public: {
                 users: {
-                    id: number;
-                    name: string;
-                    active: boolean;
+                    id: UserId;
+                    name: UserName;
+                    active: UserActive;
+                };
+                orders: {
+                    id: OrderId;
+                    userId: OrderUserId;
+                    total: OrderTotal;
                 };
             };
         };
@@ -1119,23 +1153,30 @@ describe("reusable parts", () => {
     it("applies reusable parts using .apply()", () => {
         const builder = createSelectQuery<B_ReuseSchema>()
             .from("users")
+            .select("id")
             .apply(addActiveFilter)
             .apply(selectName);
 
         const sql = builder.toString();
-        expect(sql).toBe("SELECT name FROM users WHERE active = TRUE");
+        expect(sql).toBe("SELECT id, name FROM users WHERE active = TRUE");
 
         type ReuseSql = BuilderSQL<typeof builder>;
         type _ReuseSqlMatches = RequireTrue<
             AssertEqual<
                 ReuseSql,
-                "SELECT name FROM users WHERE active = TRUE"
+                "SELECT id, name FROM users WHERE active = TRUE"
             >
         >;
 
         type ReuseRow = BuilderReturnType<typeof builder>;
+        type _ReuseRowIdMatches = RequireTrue<
+            AssertEqual<ReuseRow["id"], UserId>
+        >;
+        type _ReuseRowKeys = RequireTrue<
+            AssertEqual<keyof ReuseRow, "id" | "name">
+        >;
         type _ReuseRowMatches = RequireTrue<
-            AssertEqual<ReuseRow, { name: string; }>
+            AssertEqual<ReuseRow, { id: UserId; name: UserName; }>
         >;
     });
 });
