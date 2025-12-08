@@ -120,6 +120,31 @@ export type EmptySqlState = BuilderSqlTag;
  */
 export type EmptyBuilderState = BuilderStateTag<undefined, {}, undefined>;
 
+/**
+ * Constraint type for generic functions accepting any BuilderSqlTag.
+ * Use this instead of `BuilderSqlTag<any, any, ...>` to avoid verbose notation
+ * and ensure resilience to future library changes.
+ */
+export type AnyBuilderSqlTag = BuilderSqlTag<
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any
+>;
+
+/**
+ * Constraint type for generic functions accepting any BuilderStateTag.
+ * Use this instead of `BuilderStateTag<any, any, any>` to avoid verbose notation
+ * and ensure resilience to future library changes.
+ */
+export type AnyBuilderStateTag = BuilderStateTag<any, any, any>;
+
 // Schema helpers for default-schema table lookup (used only for simple
 // table-name resolution; alias and join handling comes from QueryResult +
 // parser/matcher via contextSQL).

@@ -189,6 +189,8 @@ export type {
 
 // Re-export SELECT builder advanced types/helpers
 export type {
+    AnyBuilderSqlTag,
+    AnyBuilderStateTag,
     AssembleBuilderSql,
     BuilderResultType,
     BuilderReturnType,

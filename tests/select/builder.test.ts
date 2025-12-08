@@ -29,6 +29,8 @@ import type {
 } from "../../src/index.js";
 
 import type {
+    AnyBuilderSqlTag,
+    AnyBuilderStateTag,
     BuilderReturnType,
     BuilderSQL,
     BuilderSqlTag,
@@ -1106,19 +1108,8 @@ describe("withParams()", () => {
 
     function setPeriod<
         Schema extends DatabaseSchema,
-        State extends BuilderStateTag<any, any, any>,
-        Sql extends BuilderSqlTag<
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any
-        >,
+        State extends AnyBuilderStateTag,
+        Sql extends AnyBuilderSqlTag,
         Field extends string,
     >(
         b: SelectQueryBuilder<Schema, State, Sql>,
@@ -1264,19 +1255,8 @@ describe("reusable parts", () => {
     // Reusable part: adds WHERE clause
     const addActiveFilter = <
         Schema extends DatabaseSchema,
-        State extends BuilderStateTag<any, any, any>,
-        Sql extends BuilderSqlTag<
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any
-        >,
+        State extends AnyBuilderStateTag,
+        Sql extends AnyBuilderSqlTag,
     >(
         b: SelectQueryBuilder<Schema, State, Sql>,
     ) => b.where("active = TRUE");
@@ -1284,19 +1264,8 @@ describe("reusable parts", () => {
     // Reusable part: adds SELECT
     const selectName = <
         Schema extends DatabaseSchema,
-        State extends BuilderStateTag<any, any, any>,
-        Sql extends BuilderSqlTag<
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any
-        >,
+        State extends AnyBuilderStateTag,
+        Sql extends AnyBuilderSqlTag,
     >(
         b: SelectQueryBuilder<Schema, State, Sql>,
     ) => b.select("name");
