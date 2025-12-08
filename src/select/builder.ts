@@ -21,6 +21,7 @@ import type {
     ColumnRefType,
     CTEDefinition,
     JoinClause,
+    MapSQLTypeToTS,
     OrderByItem,
     TableSource,
     WhereExpr,
@@ -190,6 +191,35 @@ type TrimStr<S extends string> = S extends ` ${infer T}` ? TrimStr<T>
     : S extends `${infer T} ` ? TrimStr<T>
     : S;
 
+type FirstToken<S extends string> = TrimStr<S> extends `${infer Head} ${string}`
+    ? Head
+    : TrimStr<S>;
+
+type StripAliasFromCast<S extends string> = TrimStr<S> extends
+    `${infer Before} AS ${string}` ? StripAliasFromCast<TrimStr<Before>>
+    : TrimStr<S> extends `${infer Before} as ${string}`
+        ? StripAliasFromCast<TrimStr<Before>>
+    : S;
+
+type StripCastParams<S extends string> = S extends `${infer Base}(${string})`
+    ? Base
+    : S;
+
+type NormalizeCastTarget<S extends string> = Lowercase<
+    StripCastParams<FirstToken<StripAliasFromCast<TrimStr<S>>>>
+>;
+
+type CastTarget<Expr extends string> = Expr extends `${string}::${infer Cast}`
+    ? NormalizeCastTarget<Cast>
+    : Expr extends `CAST(${string} AS ${infer Cast})${string}`
+        ? NormalizeCastTarget<Cast>
+    : undefined;
+
+type CastReturnType<Cast extends string> = MapSQLTypeToTS<Cast> extends infer M
+    ? IsUnknown<M> extends true ? string
+    : M
+    : string;
+
 type ExtractAlias<S extends string> = TrimStr<S> extends
     `${infer _Before} AS ${infer After}`
     ? ExtractAlias<TrimStr<After>> extends infer Alias extends string ? Alias
@@ -268,7 +298,9 @@ type ColumnTypeForExpr<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
     Expr extends string,
-> = Expr extends `${string}::${string}` ? string
+> = CastTarget<Expr> extends infer Cast extends string ? CastReturnType<Cast>
+    : Expr extends `${string}::${string}` ? string
+    : Expr extends `CAST(${string}` ? string
     : Expr extends `${infer Table}.${string}` ? ColumnTypeFromTable<
             Schema,
             StripIdentifierQuotes<Table>,
@@ -294,8 +326,10 @@ type ExpressionType<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
     Expr extends string,
-> = Expr extends `${string}::${string}` ? string
-    : Expr extends `CAST${string}` ? string
+> = Expr extends `${string}::${infer Cast}`
+    ? CastReturnType<NormalizeCastTarget<Cast>>
+    : Expr extends `CAST(${string} AS ${infer Cast})${string}`
+        ? CastReturnType<NormalizeCastTarget<Cast>>
     : Expr extends `COUNT${string}` ? number
     : Expr extends `(SELECT COUNT${string})` ? number
     : ColumnTypeForExpr<Schema, State, Expr> extends never ? unknown

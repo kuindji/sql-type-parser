@@ -831,20 +831,21 @@ describe("complex expressions in select()", () => {
             .select(
                 "CASE WHEN u.active THEN 1 ELSE 0 END AS active_flag",
             )
+            .select(`(u.id is not null)::boolean as id_not_null`)
             .select("CAST(u.id AS TEXT) AS id_text")
             .where("u.active = TRUE");
 
         const exprSql = exprBuilder.toString();
 
         expect(exprSql).toBe(
-            "SELECT COALESCE(u.name, 'n/a') AS display_name, CASE WHEN u.active THEN 1 ELSE 0 END AS active_flag, CAST(u.id AS TEXT) AS id_text FROM users u WHERE u.active = TRUE",
+            "SELECT COALESCE(u.name, 'n/a') AS display_name, CASE WHEN u.active THEN 1 ELSE 0 END AS active_flag, (u.id is not null)::boolean as id_not_null, CAST(u.id AS TEXT) AS id_text FROM users u WHERE u.active = TRUE",
         );
 
         type ExprSql = BuilderSQL<typeof exprBuilder>;
         type _ExprSqlMatches = RequireTrue<
             AssertEqual<
                 ExprSql,
-                "SELECT COALESCE(u.name, 'n/a') AS display_name, CASE WHEN u.active THEN 1 ELSE 0 END AS active_flag, CAST(u.id AS TEXT) AS id_text FROM users u WHERE u.active = TRUE"
+                "SELECT COALESCE(u.name, 'n/a') AS display_name, CASE WHEN u.active THEN 1 ELSE 0 END AS active_flag, (u.id is not null)::boolean as id_not_null, CAST(u.id AS TEXT) AS id_text FROM users u WHERE u.active = TRUE"
             >
         >;
 
@@ -854,12 +855,14 @@ describe("complex expressions in select()", () => {
         const _dbgReturnType: ReturnType = null as unknown as {
             display_name: unknown;
             active_flag: unknown;
+            id_not_null: boolean;
             id_text: string;
         };
         type _ReturnTypeMatches = RequireTrue<
             AssertEqual<ReturnType, {
                 display_name: unknown;
                 active_flag: unknown;
+                id_not_null: boolean;
                 id_text: string;
             }>
         >;
