@@ -220,6 +220,7 @@ export {
     assembleSelectSQL,
     createSelectQuery,
     createUntypedQuery,
+    createUntypedSelectQuery,
 } from "./select/index.js";
 
 // ============================================================================

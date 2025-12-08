@@ -1392,7 +1392,7 @@ describe("UntypedSelectBuilder", () => {
             page: number,
             size: number,
         ) {
-            return b.limit(size).offset((page - 1) * size);
+            return b.when(true, b => b.limit(size).offset((page - 1) * size));
         }
 
         const untypedQuery = createUntypedQuery<{ id: number; }>()

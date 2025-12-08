@@ -86,4 +86,5 @@ export {
     assembleSelectSQL,
     createSelectQuery,
     createUntypedQuery,
+    createUntypedSelectQuery,
 } from "./builder.js";

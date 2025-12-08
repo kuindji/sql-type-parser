@@ -2375,6 +2375,8 @@ export function createUntypedQuery<
     ) as unknown as UntypedSelectBuilder<Result>;
 }
 
+export const createUntypedSelectQuery = createUntypedQuery;
+
 // ============================================================================
 // SQL Assembly Utility (runtime-only)
 // ============================================================================
