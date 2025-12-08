@@ -95,6 +95,7 @@ export interface BuilderSqlTag<
     OrderBy extends string | undefined = undefined,
     Limit extends number | undefined = undefined,
     Params extends readonly QueryParamValue[] = readonly [],
+    Offset extends number | undefined = undefined,
 > {
     readonly select: Select;
     readonly from: From;
@@ -105,6 +106,7 @@ export interface BuilderSqlTag<
     readonly orderBy: OrderBy;
     readonly limit: Limit;
     readonly params: Params;
+    readonly offset: Offset;
 }
 
 /**
@@ -506,15 +508,15 @@ type ClauseValueToString<Value, Sep extends string> = Value extends string
     : undefined;
 
 type SelectClauseString<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = ClauseValueToString<Sql["select"], ", ">;
 
 type JoinClauseString<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = ClauseValueToString<Sql["joins"], " ">;
 
 type ContextSqlFromTag<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = Sql["from"] extends infer From extends string
     ? JoinClauseString<Sql> extends infer Joins extends string
         ? Joins extends "" ? `FROM ${From}` : `FROM ${From} ${Joins}`
@@ -526,7 +528,18 @@ type ContextSqlFromTag<
  * Add columns to the SELECT fragment in the SQL tag.
  */
 type WithSelectSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Cols extends string | readonly string[],
     Id extends string | undefined,
 > = BuilderSqlTag<
@@ -545,7 +558,8 @@ type WithSelectSql<
     Sql["having"],
     Sql["orderBy"],
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 /**
@@ -555,7 +569,18 @@ type WithSelectSql<
  * full SQL literal reconstruction but keeps types sound.
  */
 type WithFromSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Src,
 > = BuilderSqlTag<
     Sql["select"],
@@ -566,14 +591,26 @@ type WithFromSql<
     Sql["having"],
     Sql["orderBy"],
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 /**
  * Append a JOIN fragment to the SQL tag.
  */
 type WithJoinSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     JoinSql extends string,
     Id extends string | undefined,
 > = BuilderSqlTag<
@@ -592,11 +629,23 @@ type WithJoinSql<
     Sql["having"],
     Sql["orderBy"],
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 type WithoutSelectSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Id extends string,
 > = BuilderSqlTag<
     ClauseListOrUndefined<
@@ -609,11 +658,23 @@ type WithoutSelectSql<
     Sql["having"],
     Sql["orderBy"],
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 type WithoutJoinSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Id extends string,
 > = BuilderSqlTag<
     Sql["select"],
@@ -626,13 +687,14 @@ type WithoutJoinSql<
     Sql["having"],
     Sql["orderBy"],
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 type StateFromSql<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = BuilderStateTag<
     State["fromTable"],
     BuilderFullRow<Schema, Sql>,
@@ -651,7 +713,18 @@ type ConditionToSql<Cond> = Cond extends
  * Append a WHERE fragment (combined with AND) to the SQL tag.
  */
 type WithWhereSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Cond,
 > = BuilderSqlTag<
     Sql["select"],
@@ -663,14 +736,26 @@ type WithWhereSql<
     Sql["having"],
     Sql["orderBy"],
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 /**
  * Append a GROUP BY fragment (combined with commas) to the SQL tag.
  */
 type WithGroupBySql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Cols extends string | readonly string[],
     Id extends string | undefined,
 > = BuilderSqlTag<
@@ -683,14 +768,26 @@ type WithGroupBySql<
     Sql["having"],
     Sql["orderBy"],
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 /**
  * Append a HAVING fragment (combined with AND) to the SQL tag.
  */
 type WithHavingSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Cond,
 > = BuilderSqlTag<
     Sql["select"],
@@ -703,14 +800,26 @@ type WithHavingSql<
         : ConditionToSql<Cond>,
     Sql["orderBy"],
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 /**
  * Append an ORDER BY fragment (combined with commas) to the SQL tag.
  */
 type WithOrderBySql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Cols extends string | readonly string[],
     Id extends string | undefined,
 > = BuilderSqlTag<
@@ -723,14 +832,26 @@ type WithOrderBySql<
     Sql["orderBy"] extends string ? `${Sql["orderBy"]}, ${ColsToString<Cols>}`
         : ColsToString<Cols>,
     Sql["limit"],
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
 >;
 
 /**
  * Set or replace the LIMIT fragment in the SQL tag.
  */
 type WithLimitSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Limit extends number,
 > = BuilderSqlTag<
     Sql["select"],
@@ -741,7 +862,38 @@ type WithLimitSql<
     Sql["having"],
     Sql["orderBy"],
     Limit,
-    Sql["params"]
+    Sql["params"],
+    Sql["offset"]
+>;
+
+/**
+ * Set or replace the OFFSET fragment in the SQL tag.
+ */
+type WithOffsetSql<
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
+    Offset extends number,
+> = BuilderSqlTag<
+    Sql["select"],
+    Sql["from"],
+    Sql["joins"],
+    Sql["where"],
+    Sql["groupBy"],
+    Sql["having"],
+    Sql["orderBy"],
+    Sql["limit"],
+    Sql["params"],
+    Offset
 >;
 
 /**
@@ -749,7 +901,18 @@ type WithLimitSql<
  * clause fragments unchanged.
  */
 type WithParamsSql<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >,
     Params extends readonly QueryParamValue[],
 > = BuilderSqlTag<
     Sql["select"],
@@ -760,7 +923,8 @@ type WithParamsSql<
     Sql["having"],
     Sql["orderBy"],
     Sql["limit"],
-    readonly [ ...Sql["params"], ...Params ]
+    readonly [ ...Sql["params"], ...Params ],
+    Sql["offset"]
 >;
 
 /**
@@ -769,7 +933,7 @@ type WithParamsSql<
  * and LIMIT.
  */
 export type AssembleBuilderSql<
-    P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > =
     // SELECT clause
     (SelectClauseString<P> extends string ? `SELECT ${SelectClauseString<P>}`
@@ -799,9 +963,14 @@ export type AssembleBuilderSql<
                                 : SelHaving) extends
                                 infer SelOrder extends string
                                 // LIMIT
-                                ? P["limit"] extends number
+                                ? (P["limit"] extends number
                                     ? `${SelOrder} LIMIT ${P["limit"]}`
-                                : SelOrder
+                                    : SelOrder) extends
+                                    infer SelLimit extends string
+                                    ? P["offset"] extends number
+                                        ? `${SelLimit} OFFSET ${P["offset"]}`
+                                    : SelLimit
+                                : never
                             : never
                         : never
                     : never
@@ -975,7 +1144,7 @@ type MergeConditionalState<
 type CallbackResultState<
     Schema extends DatabaseSchema,
     S extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
     CB,
 > = CB extends (
     b: SelectQueryBuilder<Schema, S, Sql>,
@@ -990,7 +1159,7 @@ type CallbackResultState<
 type CallbackResultSql<
     Schema extends DatabaseSchema,
     S extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
     CB,
 > = CB extends (
     b: SelectQueryBuilder<Schema, S, Sql>,
@@ -999,6 +1168,7 @@ type CallbackResultSql<
     Schema,
     any,
     infer AfterSql extends BuilderSqlTag<
+        any,
         any,
         any,
         any,
@@ -1087,8 +1257,18 @@ const EMPTY_RUNTIME_STATE: RuntimeSelectState = {
 export interface SelectQueryBuilder<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any> =
-        EmptySqlState,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > = EmptySqlState,
 > {
     /**
      * Optional runtime-only accessor for debugging / tests.
@@ -1232,6 +1412,13 @@ export interface SelectQueryBuilder<
     ): SelectQueryBuilder<Schema, State, WithLimitSql<Sql, L>>;
 
     /**
+     * Set OFFSET value.
+     */
+    offset<const O extends number>(
+        offset: O,
+    ): SelectQueryBuilder<Schema, State, WithOffsetSql<Sql, O>>;
+
+    /**
      * Add positional parameters and receive their placeholder string.
      *
      * Parameters are accumulated on the builder and exposed via `getParams()`.
@@ -1332,8 +1519,18 @@ export interface SelectQueryBuilder<
 class SelectQueryBuilderImpl<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any> =
-        EmptySqlState,
+    Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > = EmptySqlState,
 > {
     readonly _state: RuntimeSelectState;
 
@@ -1674,6 +1871,23 @@ class SelectQueryBuilderImpl<
             Schema,
             State,
             WithLimitSql<Sql, L>
+        >;
+    }
+
+    offset<const O extends number>(
+        offset: O,
+    ): SelectQueryBuilder<Schema, State, WithOffsetSql<Sql, O>> {
+        const nextState = this.clone({ offset });
+        return new SelectQueryBuilderImpl<
+            Schema,
+            State,
+            WithOffsetSql<Sql, O>
+        >(
+            nextState,
+        ) as unknown as SelectQueryBuilder<
+            Schema,
+            State,
+            WithOffsetSql<Sql, O>
         >;
     }
 
@@ -2156,7 +2370,7 @@ type OptionalizeNewSelects<
 export type BuilderResultType<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > =
     & Flatten<State["row"]>
     & {
@@ -2178,7 +2392,18 @@ export type BuilderResultType<
 export type BuilderSQL<B> = B extends SelectQueryBuilder<
     any,
     any,
-    infer Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>
+    infer Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >
 > ? AssembleBuilderSql<Sql>
     : never;
 
@@ -2197,7 +2422,7 @@ export type BuilderStateOf<B> = B extends SelectQueryBuilder<
  * into a plain string type.
  */
 type BuilderSqlString<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = AssembleBuilderSql<Sql> extends infer Q extends string ? Q
     : string;
 
@@ -2208,14 +2433,14 @@ type BuilderSqlString<
  * limits while still surfacing obvious FROM/JOIN mistakes.
  */
 type BuilderFromTableSpec<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = Sql["from"] extends infer F extends string
     ? F extends `${infer T} ${string}` ? T
     : F
     : never;
 
 type BuilderJoinTablesSpec<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = JoinClauseString<Sql> extends infer J extends string ? ExtractJoinTables<J>
     : never;
 
@@ -2274,7 +2499,7 @@ type BuilderCheckTables<
 
 type BuilderTablesValid<
     Schema extends DatabaseSchema,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = BuilderCheckTable<
     Schema,
     BuilderFromTableSpec<Sql>
@@ -2306,7 +2531,7 @@ type SelectListToRow<
 /** Helper: row inferred from the assembled SELECT fragment. */
 type BuilderFullRow<
     Schema extends DatabaseSchema,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = SelectClauseString<Sql> extends infer Sel extends string
     ? SelectListToRow<Schema, Sel>
     : {};
@@ -2314,7 +2539,7 @@ type BuilderFullRow<
 type BuilderReturnForParts<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = BuilderTablesValid<Schema, Sql> extends true ? Flatten<State["row"]>
     : MatchError<BuilderTablesValid<Schema, Sql> & string>;
 
@@ -2324,7 +2549,18 @@ type BuilderReturnForParts<
 export type BuilderReturnType<B> = B extends SelectQueryBuilder<
     infer Schema extends DatabaseSchema,
     infer State extends BuilderStateTag<any, any, any>,
-    infer Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>
+    infer Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >
 > ? BuilderReturnForParts<Schema, State, Sql>
     : never;
 
@@ -2337,7 +2573,7 @@ export type BuilderReturnType<B> = B extends SelectQueryBuilder<
 type BuilderResultBrand<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = BuilderReturnForParts<Schema, State, Sql>;
 
 /**
@@ -2350,7 +2586,18 @@ export type ValidateBuilder<
 > = B extends SelectQueryBuilder<
     infer Schema extends DatabaseSchema,
     any,
-    infer Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>
+    infer Sql extends BuilderSqlTag<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >
 > ? BuilderTablesValid<Schema, Sql>
     : never;
 

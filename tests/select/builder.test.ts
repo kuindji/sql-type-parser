@@ -370,6 +370,69 @@ describe("basic query building", () => {
             }>
         >;
     });
+
+    it("supports limit with offset and preserves ordering", () => {
+        type B_OffsetSchema = {
+            defaultSchema: "public";
+            schemas: {
+                public: {
+                    users: {
+                        id: number;
+                    };
+                };
+            };
+        };
+
+        const builder = createSelectQuery<B_OffsetSchema>()
+            .from("users")
+            .select("id")
+            .offset(5)
+            .limit(10);
+
+        const sql = builder.toString();
+        expect(sql).toBe("SELECT id FROM users LIMIT 10 OFFSET 5");
+
+        type OffsetSql = BuilderSQL<typeof builder>;
+        type _OffsetSqlMatches = RequireTrue<
+            AssertEqual<OffsetSql, "SELECT id FROM users LIMIT 10 OFFSET 5">
+        >;
+
+        type OffsetRow = BuilderReturnType<typeof builder>;
+        type _OffsetRowMatches = RequireTrue<
+            AssertEqual<OffsetRow, { id: number; }>
+        >;
+    });
+
+    it("supports offset without limit", () => {
+        type B_OffsetOnlySchema = {
+            defaultSchema: "public";
+            schemas: {
+                public: {
+                    users: {
+                        id: number;
+                    };
+                };
+            };
+        };
+
+        const builder = createSelectQuery<B_OffsetOnlySchema>()
+            .from("users")
+            .select("id")
+            .offset(3);
+
+        const sql = builder.toString();
+        expect(sql).toBe("SELECT id FROM users OFFSET 3");
+
+        type OffsetOnlySql = BuilderSQL<typeof builder>;
+        type _OffsetOnlySqlMatches = RequireTrue<
+            AssertEqual<OffsetOnlySql, "SELECT id FROM users OFFSET 3">
+        >;
+
+        type OffsetOnlyRow = BuilderReturnType<typeof builder>;
+        type _OffsetOnlyRowMatches = RequireTrue<
+            AssertEqual<OffsetOnlyRow, { id: number; }>
+        >;
+    });
 });
 
 // ============================================================================
@@ -1139,7 +1202,18 @@ describe("reusable parts", () => {
     const addActiveFilter = <
         Schema extends DatabaseSchema,
         State extends BuilderStateTag<any, any, any>,
-        Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+        Sql extends BuilderSqlTag<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
     >(
         b: SelectQueryBuilder<Schema, State, Sql>,
     ) => b.where("active = TRUE");
@@ -1148,7 +1222,18 @@ describe("reusable parts", () => {
     const selectName = <
         Schema extends DatabaseSchema,
         State extends BuilderStateTag<any, any, any>,
-        Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any>,
+        Sql extends BuilderSqlTag<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
     >(
         b: SelectQueryBuilder<Schema, State, Sql>,
     ) => b.select("name");
