@@ -884,7 +884,7 @@ type IsFunctionCall<T extends string> =
 
 /**
  * Check if the expression is complex (contains JSON operators, concatenation, function calls,
- * nested parens, type casts, parameter placeholders, arithmetic, etc.)
+ * nested parens, type casts, parameter placeholders, arithmetic, IS NULL/IS NOT NULL, etc.)
  */
 type IsComplexExpression<T extends string> = T extends `${string}->${string}`
     ? true
@@ -898,6 +898,15 @@ type IsComplexExpression<T extends string> = T extends `${string}->${string}`
     : HasTypeCast<T> extends true ? true
     : IsParameterRef<T> extends true ? true
     : IsArithmeticExpression<T> extends true ? true
+    : IsNullCheckExpression<T> extends true ? true
+    : false;
+
+/**
+ * Check if the expression contains IS NULL or IS NOT NULL
+ */
+type IsNullCheckExpression<T extends string> = T extends
+    `${string} IS NOT NULL${string}` ? true
+    : T extends `${string} IS NULL${string}` ? true
     : false;
 
 /**
@@ -1361,7 +1370,26 @@ type IsKeywordOrOperator<T extends string> =
             // NULLS FIRST/LAST for ORDER BY
             | "NULLS"
             | "FIRST"
-            | "LAST" ? true
+            | "LAST"
+            // EXTRACT field keywords (epoch, dow, doy, etc.)
+            | "EPOCH"
+            | "epoch"
+            | "DOW"
+            | "dow"
+            | "DOY"
+            | "doy"
+            | "ISODOW"
+            | "isodow"
+            | "ISOYEAR"
+            | "isoyear"
+            | "QUARTER"
+            | "quarter"
+            | "TIMEZONE"
+            | "timezone"
+            | "TIMEZONE_HOUR"
+            | "timezone_hour"
+            | "TIMEZONE_MINUTE"
+            | "timezone_minute" ? true
         // SQL constants (CURRENT_DATE, CURRENT_TIMESTAMP, etc.)
         : T extends SQLConstantName ? true
         // Comparison operators
