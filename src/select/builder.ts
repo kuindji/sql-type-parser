@@ -2227,6 +2227,155 @@ export function createSelectQuery<
 }
 
 // ============================================================================
+// Untyped Select Builder (No Type-Level Computation)
+// ============================================================================
+
+/**
+ * Untyped SELECT query builder interface.
+ *
+ * This interface mirrors `SelectQueryBuilder` but avoids all type-level
+ * computation. Every method returns `UntypedSelectBuilder<Result>`, so
+ * TypeScript doesn't spend cycles computing complex schema-driven types.
+ *
+ * Use this when:
+ * - Your query has many complex SQL expressions that overwhelm TypeScript
+ * - You know the result type upfront and don't need schema inference
+ * - You want to compose with typed builder functions (it's assignable to
+ *   `SelectQueryBuilder<any, any, any>`)
+ *
+ * The `Result` type parameter is your declared return type – it flows through
+ * unchanged regardless of what columns/tables you add.
+ */
+export interface UntypedSelectBuilder<Result = unknown> {
+    /** Runtime state accessor (same as typed builder). */
+    readonly _state: RuntimeSelectState;
+
+    /** Add columns to the SELECT list. */
+    select(
+        columns: string | readonly string[],
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Set the FROM source (table name or subquery SQL). */
+    from(
+        source: string | UntypedSelectBuilder<any>,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Add a raw JOIN fragment. */
+    join(joinSql: string, id?: string): UntypedSelectBuilder<Result>;
+
+    /** Remove SELECT fragments by ID. */
+    removeSelect(id: string): UntypedSelectBuilder<Result>;
+
+    /** Remove JOIN fragments by ID. */
+    removeJoin(id: string): UntypedSelectBuilder<Result>;
+
+    /** Add a WHERE condition. */
+    where(
+        condition: string | ConditionTreeBuilder,
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Add GROUP BY columns. */
+    groupBy(
+        columns: string | readonly string[],
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Add a HAVING condition. */
+    having(
+        condition: string | ConditionTreeBuilder,
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Add ORDER BY columns. */
+    orderBy(
+        columns: string | readonly string[],
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Set LIMIT value. */
+    limit(limit: number): UntypedSelectBuilder<Result>;
+
+    /** Set OFFSET value. */
+    offset(offset: number): UntypedSelectBuilder<Result>;
+
+    /**
+     * Add positional parameters and receive their placeholder string.
+     *
+     * Note: The placeholder string is typed as `string` (not computed).
+     */
+    withParams<Params extends readonly QueryParamValue[]>(
+        params: Params,
+        callback: (
+            b: UntypedSelectBuilder<Result>,
+            paramString: string,
+        ) => UntypedSelectBuilder<Result>,
+    ): UntypedSelectBuilder<Result>;
+
+    /**
+     * Conditional execution helper.
+     *
+     * Unlike the typed builder, this doesn't merge conditional column types –
+     * Result stays fixed.
+     */
+    when(
+        condition: boolean,
+        callback: (
+            b: UntypedSelectBuilder<Result>,
+        ) => UntypedSelectBuilder<Result>,
+    ): UntypedSelectBuilder<Result>;
+
+    /**
+     * Apply a reusable builder function.
+     */
+    apply(
+        fn: (b: UntypedSelectBuilder<Result>) => UntypedSelectBuilder<Result>,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Generate the SQL string. */
+    toBrandedString(): string & { __type: Result; };
+
+    /** Retrieve accumulated positional query parameters. */
+    getParams(): ReadonlyArray<QueryParamValue>;
+
+    /** Generate the SQL string (unbranded). */
+    toString(): string;
+}
+
+/**
+ * Create an untyped SELECT query builder.
+ *
+ * @template Result - The expected result row type (you declare this upfront)
+ *
+ * @example
+ * ```ts
+ * interface OrderSummary {
+ *     orderId: number;
+ *     customerName: string;
+ *     total: number;
+ * }
+ *
+ * const query = createUntypedQuery<OrderSummary>()
+ *     .from("orders o")
+ *     .join("LEFT JOIN customers c ON c.id = o.customer_id")
+ *     .select(["o.id AS orderId", "c.name AS customerName", "o.total"])
+ *     .where("o.status = 'completed'");
+ *
+ * // query.toString() works as expected
+ * // Type is UntypedSelectBuilder<OrderSummary>
+ * ```
+ */
+export function createUntypedQuery<
+    Result = unknown,
+>(): UntypedSelectBuilder<Result> {
+    // Reuse the same runtime implementation – just cast the type
+    return new SelectQueryBuilderImpl<any, any, any>(
+        EMPTY_RUNTIME_STATE,
+    ) as unknown as UntypedSelectBuilder<Result>;
+}
+
+// ============================================================================
 // SQL Assembly Utility (runtime-only)
 // ============================================================================
 

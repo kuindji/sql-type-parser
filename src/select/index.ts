@@ -78,7 +78,12 @@ export type {
     ErrorState as SelectErrorState,
     SelectBuilderAnyState,
     SelectBuilderState,
+    UntypedSelectBuilder,
     ValidateBuilder,
 } from "./builder.js";
 
-export { assembleSelectSQL, createSelectQuery } from "./builder.js";
+export {
+    assembleSelectSQL,
+    createSelectQuery,
+    createUntypedQuery,
+} from "./builder.js";

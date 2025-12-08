@@ -24,6 +24,7 @@
 import type {
     BuilderResultType,
     SelectQueryBuilder,
+    UntypedSelectBuilder,
     ValidateBuilder,
 } from "./select/builder.js";
 import type { DatabaseSchema, QueryResult } from "./select/matcher.js";
@@ -158,11 +159,21 @@ export type QueryHandler = (query: string, params?: unknown[]) => unknown;
 export function createSelectFn<Schema extends DatabaseSchema>(
     handler: QueryHandler,
 ) {
+    // String query overload (validated against schema)
     function select<Q extends string>(
         query: ValidQuery<Q, Schema>,
         params?: unknown[],
     ): Promise<SelectResultArray<Q, Schema>>;
 
+    // Untyped builder overload - MUST come before typed builder to avoid
+    // deep type instantiation when TypeScript tries to match against
+    // SelectQueryBuilder<Schema, any, any>
+    function select<Result>(
+        query: UntypedSelectBuilder<Result>,
+        params?: unknown[],
+    ): Promise<Result[]>;
+
+    // Typed builder overload (validated against schema)
     function select<B extends SelectQueryBuilder<Schema, any, any>>(
         query: ValidQueryBuilder<Schema, B>,
         params?: unknown[],
@@ -171,6 +182,7 @@ export function createSelectFn<Schema extends DatabaseSchema>(
     function select(
         query:
             | ValidQuery<string, Schema>
+            | UntypedSelectBuilder<unknown>
             | SelectQueryBuilder<Schema, any, any>,
         params?: unknown[],
     ) {

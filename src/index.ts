@@ -211,11 +211,16 @@ export type {
     StateToSelectClause,
     StateToSelectQueryClause,
     TableNameOf,
+    UntypedSelectBuilder,
     ValidateBuilder,
 } from "./select/builder.js";
 
 // Re-export SELECT builder runtime helpers
-export { assembleSelectSQL, createSelectQuery } from "./select/index.js";
+export {
+    assembleSelectSQL,
+    createSelectQuery,
+    createUntypedQuery,
+} from "./select/index.js";
 
 // ============================================================================
 // INSERT Query Types
