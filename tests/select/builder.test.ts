@@ -440,16 +440,18 @@ describe("basic query building", () => {
 // ============================================================================
 
 describe("join query building", () => {
+    type User_id = string & { __type: "Users_Table.id"; };
+    type Order_id = string & { __type: "Orders_Table.id"; };
     type B_JoinSchema = {
         defaultSchema: "public";
         schemas: {
             public: {
                 users: {
-                    id: number;
+                    id: User_id;
                     name: string;
                 };
                 orders: {
-                    id: number;
+                    id: Order_id;
                     user_id: number;
                     total: number;
                 };
@@ -482,7 +484,7 @@ describe("join query building", () => {
 
         type IsValidJoinResult = RequireTrue<
             AssertEqual<B_JoinResult, {
-                id: number;
+                id: User_id;
                 name: string;
                 total: number;
             }>
@@ -528,7 +530,7 @@ describe("join query building", () => {
         >;
         type IsValidConditionalJoinResult = RequireTrue<
             AssertEqual<B_ConditionalJoinResult, {
-                id: number;
+                id: User_id;
                 name: string | undefined;
                 total: number | undefined;
             }>

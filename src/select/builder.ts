@@ -283,6 +283,97 @@ type ColumnTypeFromTable<
     : unknown;
 
 /**
+ * Resolve an alias to a table name from the contextSQL.
+ * Given contextSQL like "FROM users u LEFT JOIN orders o ON ..." and alias "u",
+ * returns "users".
+ */
+type ResolveAliasToTable<
+    Context extends string | undefined,
+    Alias extends string,
+> = Context extends string
+    ? ExtractAliasFromFrom<Context, Alias> extends infer T
+        ? [ T ] extends [ never ] ? ExtractAliasFromJoins<Context, Alias>
+        : T
+    : ExtractAliasFromJoins<Context, Alias>
+    : never;
+
+/**
+ * Extract the FROM table spec and parse alias from it.
+ */
+type ExtractAliasFromFrom<
+    Context extends string,
+    Alias extends string,
+> = Context extends `${string}FROM ${infer FromContent}`
+    ? ExtractTableSpecBeforeKeyword<FromContent> extends
+        infer TableSpec extends string ? ParseTableAlias<TableSpec, Alias>
+    : never
+    : never;
+
+/**
+ * Get table spec before next SQL keyword (JOIN, WHERE, etc.)
+ */
+type ExtractTableSpecBeforeKeyword<S extends string> = S extends
+    `${infer Before} INNER JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} LEFT JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} RIGHT JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} FULL JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} CROSS JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} WHERE ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} GROUP ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} ORDER ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} LIMIT ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} OFFSET ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} HAVING ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} UNION ${string}` ? TrimStr<Before>
+    : TrimStr<S>;
+
+/**
+ * Parse "users u" or "users AS u" or "schema.users u" to extract table for alias.
+ * Returns the actual table name if the alias matches.
+ */
+type ParseTableAlias<
+    Spec extends string,
+    Alias extends string,
+> =
+    // Handle "table AS alias" format
+    TrimStr<Spec> extends `${infer Table} AS ${infer FoundAlias}`
+        ? TrimStr<FoundAlias> extends Alias ? ExtractTableName<TrimStr<Table>>
+        : never
+        // Handle "table as alias" format (lowercase)
+        : TrimStr<Spec> extends `${infer Table} as ${infer FoundAlias}`
+            ? TrimStr<FoundAlias> extends Alias
+                ? ExtractTableName<TrimStr<Table>>
+            : never
+        // Handle "table alias" format (space-separated, match last token as alias)
+        : TrimStr<Spec> extends `${infer Table} ${infer FoundAlias}`
+            ? TrimStr<FoundAlias> extends Alias
+                ? ExtractTableName<TrimStr<Table>>
+            : never
+        : never;
+
+/**
+ * Extract actual table name (handle schema.table and quoted identifiers).
+ */
+type ExtractTableName<S extends string> = S extends
+    `${infer _Schema}.${infer Table}` ? StripIdentifierQuotes<Table>
+    : StripIdentifierQuotes<S>;
+
+/**
+ * Search JOINs in the context for alias.
+ */
+type ExtractAliasFromJoins<
+    Context extends string,
+    Alias extends string,
+> = Context extends `${string}JOIN ${infer JoinContent} ON ${infer AfterOn}`
+    ? ExtractTableSpecBeforeKeyword<JoinContent> extends
+        infer JoinSpec extends string
+        ? ParseTableAlias<JoinSpec, Alias> extends infer T extends string ? T
+        : ExtractAliasFromJoins<`JOIN ${AfterOn}`, Alias>
+    : ExtractAliasFromJoins<`JOIN ${AfterOn}`, Alias>
+    : never;
+
+/**
  * Best-effort extraction of the primary FROM table.
  * Falls back to parsing the recorded contextSQL if fromTable is not set.
  */
@@ -295,6 +386,25 @@ type PrimaryTable<
         : never
     : never;
 
+/**
+ * Helper: resolve table name for a qualified column expression.
+ * First tries direct table lookup, then alias resolution from context.
+ */
+type ResolveTableForQualifiedColumn<
+    Schema extends DatabaseSchema,
+    State extends BuilderStateTag<any, any, any>,
+    TableOrAlias extends string,
+> =
+    // First check if it's a direct table name
+    StripIdentifierQuotes<TableOrAlias> extends keyof SchemaTables<Schema>
+        ? StripIdentifierQuotes<TableOrAlias>
+        // Otherwise try to resolve as alias from contextSQL
+        : ResolveAliasToTable<
+            State["contextSQL"],
+            TableOrAlias
+        > extends infer Resolved extends string ? Resolved
+        : never;
+
 /** Compute the result type for a simple column expression. */
 type ColumnTypeForExpr<
     Schema extends DatabaseSchema,
@@ -303,15 +413,24 @@ type ColumnTypeForExpr<
 > = CastTarget<Expr> extends infer Cast extends string ? CastReturnType<Cast>
     : Expr extends `${string}::${string}` ? string
     : Expr extends `CAST(${string}` ? string
-    : Expr extends `${infer Table}.${string}` ? ColumnTypeFromTable<
+    : Expr extends `${infer TableOrAlias}.${string}`
+        ? ResolveTableForQualifiedColumn<
             Schema,
-            StripIdentifierQuotes<Table>,
-            ExtractColumnIdentifier<Expr>
-        > extends infer Qualified extends unknown
-            ? IsUnknown<Qualified> extends true
-                ? ColumnTypeFromSchema<Schema, ExtractColumnIdentifier<Expr>>
-            : Qualified
-        : unknown
+            State,
+            TableOrAlias
+        > extends infer ResolvedTable extends string ? ColumnTypeFromTable<
+                Schema,
+                ResolvedTable,
+                ExtractColumnIdentifier<Expr>
+            > extends infer ColType extends unknown
+                ? IsUnknown<ColType> extends true
+                    ? ColumnTypeFromSchema<
+                        Schema,
+                        ExtractColumnIdentifier<Expr>
+                    >
+                : ColType
+            : unknown
+        : ColumnTypeFromSchema<Schema, ExtractColumnIdentifier<Expr>>
     : PrimaryTable<Schema, State> extends infer From extends string
         ? ColumnTypeFromTable<
             Schema,
@@ -2524,8 +2643,9 @@ type SplitSelectList<S extends string> = S extends
 type SelectListToRow<
     Schema extends DatabaseSchema,
     Sel extends string,
+    ContextSQL extends string | undefined = undefined,
 > = SplitSelectList<Sel> extends infer Cols extends readonly string[]
-    ? ColumnsArrayToRow<Schema, BuilderStateTag<any, any, any>, Cols>
+    ? ColumnsArrayToRow<Schema, BuilderStateTag<any, any, ContextSQL>, Cols>
     : {};
 
 /** Helper: row inferred from the assembled SELECT fragment. */
@@ -2533,7 +2653,7 @@ type BuilderFullRow<
     Schema extends DatabaseSchema,
     Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > = SelectClauseString<Sql> extends infer Sel extends string
-    ? SelectListToRow<Schema, Sel>
+    ? SelectListToRow<Schema, Sel, ContextSqlFromTag<Sql>>
     : {};
 
 type BuilderReturnForParts<
