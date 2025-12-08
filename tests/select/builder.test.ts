@@ -661,10 +661,10 @@ describe("when() coverage", () => {
         const conditionalBuilder = createSelectQuery<B_WhenSchema>()
             .from("users u")
             .select("u.id")
+            .offset(10)
             .when(
                 applyConditional,
                 b => b
-                    .from("users u")
                     .join("LEFT JOIN orders o ON o.user_id = u.id", "orders")
                     .where(filters, "filters")
                     .limit(20)
@@ -678,14 +678,14 @@ describe("when() coverage", () => {
         const conditionalSql = conditionalBuilder.toString();
 
         expect(conditionalSql).toBe(
-            "SELECT u.id, u.name, u.email AS email_alias, o.total, o.status FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE (u.active = TRUE AND o.total > 50) LIMIT 20",
+            "SELECT u.id, u.name, u.email AS email_alias, o.total, o.status FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE (u.active = TRUE AND o.total > 50) LIMIT 20 OFFSET 10",
         );
 
         type ConditionalSqlLiteral = BuilderSQL<typeof conditionalBuilder>;
         type _ConditionalSqlLiteralMatches = RequireTrue<
             AssertEqual<
                 ConditionalSqlLiteral,
-                "SELECT u.id, u.name, u.email AS email_alias, o.total, o.status FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE (u.active = TRUE AND o.total > 50) LIMIT 20"
+                "SELECT u.id, u.name, u.email AS email_alias, o.total, o.status FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE (u.active = TRUE AND o.total > 50) LIMIT 20 OFFSET 10"
             >
         >;
 
@@ -1081,6 +1081,8 @@ describe("type safety and helper exposure", () => {
 });
 
 describe("withParams()", () => {
+    type User_id = string & { __type: "Users_Table.id"; };
+    type Order_id = string & { __type: "Orders_Table.id"; };
     type B_ParamSchema = {
         defaultSchema: "public";
         schemas: {
@@ -1089,31 +1091,90 @@ describe("withParams()", () => {
                     id: number;
                     active: boolean;
                     status: string;
+                    createdAt: string;
+                };
+                Orders_Table: {
+                    id: Order_id;
+                    user_id: number;
+                    total: number;
                 };
             };
         };
     };
 
+    const startDate = `${Math.floor(Math.random() * 10000)}-01-01`;
+
+    function setPeriod<
+        Schema extends DatabaseSchema,
+        State extends BuilderStateTag<any, any, any>,
+        Sql extends BuilderSqlTag<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
+        Field extends string,
+    >(
+        b: SelectQueryBuilder<Schema, State, Sql>,
+        field: Field,
+    ) {
+        const [ start, end ] = [
+            startDate,
+            `2025-01-31`,
+        ];
+
+        return b
+            .when(
+                !!start && !!end,
+                (b) => b.where(`${field} between '${start}' and '${end}'`),
+            )
+            .when(!!start && !end, b => b.where(`${field} >= '${start}'`))
+            .when(!start && !!end, b => b.where(`${field} <= '${end}'`));
+    }
+
     it("accumulates params and preserves placeholder literals", () => {
+        // Use deterministic conditions for runtime testing
+        const customCondition = true;
         const builder = createSelectQuery<B_ParamSchema>()
-            .from("users")
+            .from("users u")
+            .select([ "u.id", `u."createdAt"` ])
+            .orderBy("u.id desc")
             .withParams([ 1 ] as const, (b, paramString) => {
                 const _firstPlaceholder: "$1" = paramString;
-                return b.where(`id = ${paramString}`);
+                return b.where(`u.id = ${paramString}`);
             })
             .withParams([ true, "active" ] as const, (b, paramString) => {
                 const _secondPlaceholder: "$2, $3" = paramString;
-                return b.where(`status IN (${paramString})`);
-            });
+                return b.where(`u.status IN (${paramString})`);
+            })
+            .offset(10 as number)
+            .limit(10 as number)
+            .where("u.id > 10")
+            .when(customCondition, (b) => b.where("u.active = TRUE"))
+            .when(customCondition, (b) => b.where("u.id > 100"))
+            .when(!customCondition, (b) => b.where("u.id < 100"))
+            .when(true, b => setPeriod(b, "u.createdAt"));
 
+        // Runtime: only conditions that are true at runtime are included
+        // - customCondition=true: includes "u.active = TRUE" and "u.id > 100", excludes "u.id < 100"
+        // - setPeriod: since both start and end are truthy, only the "between" clause is added
         expect(builder.toString()).toBe(
-            "SELECT * FROM users WHERE id = $1 AND status IN ($2, $3)",
+            `SELECT u.id, u."createdAt" FROM users u WHERE u.id = $1 AND u.status IN ($2, $3) AND u.id > 10 AND u.active = TRUE AND u.id > 100 AND u.createdAt between '${startDate}' and '2025-01-31' ORDER BY u.id desc LIMIT 10 OFFSET 10`,
         );
         expect(builder.getParams()).toEqual([ 1, true, "active" ]);
 
+        type ParamRow = BuilderReturnType<typeof builder>;
+
+        // Type-level: ALL .when() branches are tracked regardless of runtime conditions
         type ParamSql = BuilderSQL<typeof builder>;
-        const paramSqlLiteral:
-            "SELECT * FROM users WHERE id = $1 AND status IN ($2, $3)" =
+        const _paramSqlLiteral:
+            `SELECT u.id, u."createdAt" FROM users u WHERE u.id = $1 AND u.status IN ($2, $3) AND u.id > 10 AND u.active = TRUE AND u.id > 100 AND u.id < 100 AND u.createdAt between '${string}' and '${string}' AND u.createdAt >= '${string}' AND u.createdAt <= '${string}' ORDER BY u.id desc LIMIT ${number} OFFSET ${number}` =
                 null as any as ParamSql;
     });
 });

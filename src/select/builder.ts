@@ -423,8 +423,7 @@ type ColumnTypeForExpr<
                 ResolvedTable,
                 ExtractColumnIdentifier<Expr>
             > extends infer ColType extends unknown
-                ? IsUnknown<ColType> extends true
-                    ? ColumnTypeFromSchema<
+                ? IsUnknown<ColType> extends true ? ColumnTypeFromSchema<
                         Schema,
                         ExtractColumnIdentifier<Expr>
                     >
@@ -849,7 +848,8 @@ type WithWhereSql<
     Sql["select"],
     Sql["from"],
     Sql["joins"],
-    Sql["where"] extends string ? `${Sql["where"]} AND ${ConditionToSql<Cond>}`
+    [ Sql["where"] ] extends [ string ]
+        ? `${Sql["where"]} AND ${ConditionToSql<Cond>}`
         : ConditionToSql<Cond>,
     Sql["groupBy"],
     Sql["having"],
@@ -882,7 +882,8 @@ type WithGroupBySql<
     Sql["from"],
     Sql["joins"],
     Sql["where"],
-    Sql["groupBy"] extends string ? `${Sql["groupBy"]}, ${ColsToString<Cols>}`
+    [ Sql["groupBy"] ] extends [ string ]
+        ? `${Sql["groupBy"]}, ${ColsToString<Cols>}`
         : ColsToString<Cols>,
     Sql["having"],
     Sql["orderBy"],
@@ -914,7 +915,7 @@ type WithHavingSql<
     Sql["joins"],
     Sql["where"],
     Sql["groupBy"],
-    Sql["having"] extends string
+    [ Sql["having"] ] extends [ string ]
         ? `${Sql["having"]} AND ${ConditionToSql<Cond>}`
         : ConditionToSql<Cond>,
     Sql["orderBy"],
@@ -948,7 +949,8 @@ type WithOrderBySql<
     Sql["where"],
     Sql["groupBy"],
     Sql["having"],
-    Sql["orderBy"] extends string ? `${Sql["orderBy"]}, ${ColsToString<Cols>}`
+    [ Sql["orderBy"] ] extends [ string ]
+        ? `${Sql["orderBy"]}, ${ColsToString<Cols>}`
         : ColsToString<Cols>,
     Sql["limit"],
     Sql["params"],
@@ -1055,38 +1057,39 @@ export type AssembleBuilderSql<
     P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > =
     // SELECT clause
-    (SelectClauseString<P> extends string ? `SELECT ${SelectClauseString<P>}`
+    ([ SelectClauseString<P> ] extends [ string ]
+        ? `SELECT ${SelectClauseString<P>}`
         : "SELECT *") extends infer Sel extends string
         // FROM clause
-        ? (P["from"] extends string ? `${Sel} FROM ${P["from"]}` : Sel) extends
-            infer SelFrom extends string
+        ? ([ P["from"] ] extends [ string ] ? `${Sel} FROM ${P["from"]}`
+            : Sel) extends infer SelFrom extends string
             // JOINs
-            ? (JoinClauseString<P> extends string
+            ? ([ JoinClauseString<P> ] extends [ string ]
                 ? `${SelFrom} ${JoinClauseString<P>}`
                 : SelFrom) extends infer SelFromJoin extends string
                 // WHERE
-                ? (P["where"] extends string
+                ? ([ P["where"] ] extends [ string ]
                     ? `${SelFromJoin} WHERE ${P["where"]}`
                     : SelFromJoin) extends infer SelWhere extends string
                     // GROUP BY
-                    ? (P["groupBy"] extends string
+                    ? ([ P["groupBy"] ] extends [ string ]
                         ? `${SelWhere} GROUP BY ${P["groupBy"]}`
                         : SelWhere) extends infer SelGroup extends string
                         // HAVING
-                        ? (P["having"] extends string
+                        ? ([ P["having"] ] extends [ string ]
                             ? `${SelGroup} HAVING ${P["having"]}`
                             : SelGroup) extends infer SelHaving extends string
                             // ORDER BY
-                            ? (P["orderBy"] extends string
+                            ? ([ P["orderBy"] ] extends [ string ]
                                 ? `${SelHaving} ORDER BY ${P["orderBy"]}`
                                 : SelHaving) extends
                                 infer SelOrder extends string
                                 // LIMIT
-                                ? (P["limit"] extends number
+                                ? ([ P["limit"] ] extends [ number ]
                                     ? `${SelOrder} LIMIT ${P["limit"]}`
                                     : SelOrder) extends
                                     infer SelLimit extends string
-                                    ? P["offset"] extends number
+                                    ? [ P["offset"] ] extends [ number ]
                                         ? `${SelLimit} OFFSET ${P["offset"]}`
                                     : SelLimit
                                 : never
