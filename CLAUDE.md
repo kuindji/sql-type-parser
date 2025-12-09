@@ -11,15 +11,17 @@
 
 ## Quick Commands
 
+**Important:** This project uses **Bun** as the runtime. Always use `bun run` for running scripts.
+
 ```bash
 # Type-check (validates all types compile correctly)
-npm run typecheck
+bun run typecheck
 
 # Run tests (type-check + bun test)
-npm test
+bun run test
 
 # Build for distribution
-npm run build
+bun run build
 ```
 
 ## Project Structure
@@ -140,10 +142,10 @@ export type ParserTestsPass = true;
 
 ```bash
 # Full test suite (type-check + runtime tests)
-npm test
+bun run test
 
 # Type-check only (faster, validates all type tests)
-npm run typecheck
+bun run typecheck
 ```
 
 ## Code Conventions

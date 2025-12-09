@@ -499,6 +499,10 @@ type ColumnRow<
         >;
     };
 
+/**
+ * Convert an array of column strings to a row type.
+ * Uses accumulator pattern with single flatten at the end for better performance.
+ */
 type ColumnsArrayToRow<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
@@ -516,7 +520,7 @@ type ColumnsArrayToRow<
         // cases fall back to whatever QueryResult can infer from contextSQL.
         Acc & ColumnRow<Schema, State, First>
     >
-    : Acc;
+    : Flatten<Acc>;  // Single flatten at the end
 
 type ColumnsToRow<
     Schema extends DatabaseSchema,
@@ -554,6 +558,7 @@ type AddColumnsForSchema<
 
 /**
  * Join an array of string literal parts with a separator.
+ * Optimized with tail-call accumulator pattern.
  */
 type JoinWith<
     Parts extends string[],
@@ -667,172 +672,120 @@ type ContextSqlFromTag<
     : JoinClauseString<Sql> extends infer Joins extends string ? Joins
     : undefined;
 
+// ---------------------------------------------------------------------------
+// Optimized BuilderSqlTag Update Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper type to update a single field in BuilderSqlTag without manually
+ * specifying all 10 type parameters. Uses mapped types for efficiency.
+ *
+ * This reduces type instantiation complexity when updating the SQL tag.
+ */
+type UpdateSqlTag<
+    Sql extends AnyBuilderSqlTag,
+    Updates extends Partial<{
+        select: any;
+        from: any;
+        joins: any;
+        where: any;
+        groupBy: any;
+        having: any;
+        orderBy: any;
+        limit: any;
+        params: any;
+        offset: any;
+    }>,
+> = BuilderSqlTag<
+    "select" extends keyof Updates ? Updates["select"] : Sql["select"],
+    "from" extends keyof Updates ? Updates["from"] : Sql["from"],
+    "joins" extends keyof Updates ? Updates["joins"] : Sql["joins"],
+    "where" extends keyof Updates ? Updates["where"] : Sql["where"],
+    "groupBy" extends keyof Updates ? Updates["groupBy"] : Sql["groupBy"],
+    "having" extends keyof Updates ? Updates["having"] : Sql["having"],
+    "orderBy" extends keyof Updates ? Updates["orderBy"] : Sql["orderBy"],
+    "limit" extends keyof Updates ? Updates["limit"] : Sql["limit"],
+    "params" extends keyof Updates ? Updates["params"] : Sql["params"],
+    "offset" extends keyof Updates ? Updates["offset"] : Sql["offset"]
+>;
+
 /**
  * Add columns to the SELECT fragment in the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithSelectSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Cols extends string | readonly string[],
     Id extends string | undefined,
-> = BuilderSqlTag<
-    ClauseListOrUndefined<
+> = UpdateSqlTag<Sql, {
+    select: ClauseListOrUndefined<
         UpsertClausePart<
             NormalizeClauseList<Sql["select"]>,
             Id extends string ? Id
                 : `select_${NormalizeClauseList<Sql["select"]>["length"]}`,
             ColsToString<Cols>
         >
-    >,
-    Sql["from"],
-    Sql["joins"],
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+    >;
+}>;
 
 /**
  * Set or replace the FROM fragment in the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  *
  * For subqueries we conservatively fall back to `string`, which will prevent
  * full SQL literal reconstruction but keeps types sound.
  */
 type WithFromSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Src,
-> = BuilderSqlTag<
-    Sql["select"],
-    Src extends string ? Src : string,
-    Sql["joins"],
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+> = UpdateSqlTag<Sql, {
+    from: Src extends string ? Src : string;
+}>;
 
 /**
  * Append a JOIN fragment to the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithJoinSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     JoinSql extends string,
     Id extends string | undefined,
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    ClauseListOrUndefined<
+> = UpdateSqlTag<Sql, {
+    joins: ClauseListOrUndefined<
         UpsertClausePart<
             NormalizeClauseList<Sql["joins"]>,
             Id extends string ? Id
                 : `join_${NormalizeClauseList<Sql["joins"]>["length"]}`,
             JoinSql
         >
-    >,
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+    >;
+}>;
 
+/**
+ * Remove a SELECT fragment by ID.
+ * Optimized to use UpdateSqlTag helper.
+ */
 type WithoutSelectSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Id extends string,
-> = BuilderSqlTag<
-    ClauseListOrUndefined<
+> = UpdateSqlTag<Sql, {
+    select: ClauseListOrUndefined<
         RemoveClausePart<NormalizeClauseList<Sql["select"]>, Id>
-    >,
-    Sql["from"],
-    Sql["joins"],
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+    >;
+}>;
 
+/**
+ * Remove a JOIN fragment by ID.
+ * Optimized to use UpdateSqlTag helper.
+ */
 type WithoutJoinSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Id extends string,
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    ClauseListOrUndefined<
+> = UpdateSqlTag<Sql, {
+    joins: ClauseListOrUndefined<
         RemoveClausePart<NormalizeClauseList<Sql["joins"]>, Id>
-    >,
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+    >;
+}>;
 
 type StateFromSql<
     Schema extends DatabaseSchema,
@@ -854,231 +807,173 @@ type ConditionToSql<Cond> = Cond extends
 
 /**
  * Append a WHERE fragment (combined with AND) to the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithWhereSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Cond,
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    Sql["joins"],
-    [ Sql["where"] ] extends [ string ]
+> = UpdateSqlTag<Sql, {
+    where: [ Sql["where"] ] extends [ string ]
         ? `${Sql["where"]} AND ${ConditionToSql<Cond>}`
-        : ConditionToSql<Cond>,
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+        : ConditionToSql<Cond>;
+}>;
 
 /**
  * Append a GROUP BY fragment (combined with commas) to the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithGroupBySql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Cols extends string | readonly string[],
     Id extends string | undefined,
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    Sql["joins"],
-    Sql["where"],
-    [ Sql["groupBy"] ] extends [ string ]
+> = UpdateSqlTag<Sql, {
+    groupBy: [ Sql["groupBy"] ] extends [ string ]
         ? `${Sql["groupBy"]}, ${ColsToString<Cols>}`
-        : ColsToString<Cols>,
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+        : ColsToString<Cols>;
+}>;
 
 /**
  * Append a HAVING fragment (combined with AND) to the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithHavingSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Cond,
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    Sql["joins"],
-    Sql["where"],
-    Sql["groupBy"],
-    [ Sql["having"] ] extends [ string ]
+> = UpdateSqlTag<Sql, {
+    having: [ Sql["having"] ] extends [ string ]
         ? `${Sql["having"]} AND ${ConditionToSql<Cond>}`
-        : ConditionToSql<Cond>,
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+        : ConditionToSql<Cond>;
+}>;
 
 /**
  * Append an ORDER BY fragment (combined with commas) to the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithOrderBySql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Cols extends string | readonly string[],
     Id extends string | undefined,
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    Sql["joins"],
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    [ Sql["orderBy"] ] extends [ string ]
+> = UpdateSqlTag<Sql, {
+    orderBy: [ Sql["orderBy"] ] extends [ string ]
         ? `${Sql["orderBy"]}, ${ColsToString<Cols>}`
-        : ColsToString<Cols>,
-    Sql["limit"],
-    Sql["params"],
-    Sql["offset"]
->;
+        : ColsToString<Cols>;
+}>;
 
 /**
  * Set or replace the LIMIT fragment in the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithLimitSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Limit extends number,
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    Sql["joins"],
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Limit,
-    Sql["params"],
-    Sql["offset"]
->;
+> = UpdateSqlTag<Sql, { limit: Limit; }>;
 
 /**
  * Set or replace the OFFSET fragment in the SQL tag.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithOffsetSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Offset extends number,
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    Sql["joins"],
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    Sql["params"],
-    Offset
->;
+> = UpdateSqlTag<Sql, { offset: Offset; }>;
 
 /**
  * Append parameter values to the SQL tag metadata while keeping all other
  * clause fragments unchanged.
+ * Optimized to use UpdateSqlTag helper.
  */
 type WithParamsSql<
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
+    Sql extends AnyBuilderSqlTag,
     Params extends readonly QueryParamValue[],
-> = BuilderSqlTag<
-    Sql["select"],
-    Sql["from"],
-    Sql["joins"],
-    Sql["where"],
-    Sql["groupBy"],
-    Sql["having"],
-    Sql["orderBy"],
-    Sql["limit"],
-    readonly [ ...Sql["params"], ...Params ],
-    Sql["offset"]
->;
+> = UpdateSqlTag<Sql, {
+    params: readonly [ ...Sql["params"], ...Params ];
+}>;
+
+// ---------------------------------------------------------------------------
+// Optimized SQL Assembly Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Append a clause to SQL if the value is a string, otherwise return unchanged.
+ * This helper reduces nested conditionals in AssembleBuilderSql.
+ */
+type AppendClause<
+    Base extends string,
+    Keyword extends string,
+    Value,
+> = [ Value ] extends [ string ] ? `${Base} ${Keyword} ${Value}` : Base;
+
+/**
+ * Append a clause to SQL without a keyword (for JOINs which include their own keywords).
+ */
+type AppendClauseNoKeyword<
+    Base extends string,
+    Value,
+> = [ Value ] extends [ string ] ? `${Base} ${Value}` : Base;
+
+/**
+ * Append LIMIT clause (uses number type).
+ */
+type AppendLimitClause<
+    Base extends string,
+    Value,
+> = [ Value ] extends [ number ] ? `${Base} LIMIT ${Value}` : Base;
+
+/**
+ * Append OFFSET clause (uses number type).
+ */
+type AppendOffsetClause<
+    Base extends string,
+    Value,
+> = [ Value ] extends [ number ] ? `${Base} OFFSET ${Value}` : Base;
 
 /**
  * Assemble a SQL string from a BuilderSqlTag. This mirrors the core ordering
  * of `assembleSelectSQL` for SELECT/FROM/JOIN/WHERE/GROUP BY/HAVING/ORDER BY
  * and LIMIT.
+ *
+ * Optimized to use helper types instead of 8+ levels of nested conditionals.
  */
 export type AssembleBuilderSql<
+    P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+> = AppendOffsetClause<
+    AppendLimitClause<
+        AppendClause<
+            AppendClause<
+                AppendClause<
+                    AppendClause<
+                        AppendClauseNoKeyword<
+                            AppendClause<
+                                [ SelectClauseString<P> ] extends [ string ]
+                                    ? `SELECT ${SelectClauseString<P>}`
+                                    : "SELECT *",
+                                "FROM",
+                                P["from"]
+                            >,
+                            JoinClauseString<P>
+                        >,
+                        "WHERE",
+                        P["where"]
+                    >,
+                    "GROUP BY",
+                    P["groupBy"]
+                >,
+                "HAVING",
+                P["having"]
+            >,
+            "ORDER BY",
+            P["orderBy"]
+        >,
+        P["limit"]
+    >,
+    P["offset"]
+>;
+
+/**
+ * Legacy deeply-nested implementation kept for reference.
+ * @deprecated Use AssembleBuilderSql instead
+ */
+type AssembleBuilderSql_Legacy<
     P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
 > =
     // SELECT clause

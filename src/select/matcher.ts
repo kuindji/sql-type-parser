@@ -235,21 +235,19 @@ type ExtractColumnsAsObject<
 
 /**
  * Extract a list of columns as an object type
+ * Uses accumulator pattern with single flatten at the end for better performance
  */
 type ExtractColumnListAsObject<
     Columns extends SelectItem[],
     Context,
     Schema extends DatabaseSchema,
-> = Columns extends [ infer First, ...infer Rest ]
+    Acc = {},
+> = Columns extends [ infer First, ...infer Rest extends SelectItem[] ]
     ? ExtractSingleColumnAsObject<First, Context, Schema> extends
         infer FirstResult
-        ? Rest extends SelectItem[]
-            ? ExtractColumnListAsObject<Rest, Context, Schema> extends
-                infer RestResult ? Flatten<FirstResult & RestResult>
-            : FirstResult
-        : FirstResult
-    : {}
-    : {};
+        ? ExtractColumnListAsObject<Rest, Context, Schema, Acc & FirstResult>
+        : Acc
+    : Flatten<Acc>;
 
 /**
  * Extract a single column as an object entry { alias: type }
@@ -422,22 +420,19 @@ type ExpandAllColumns<Context> = UnionToIntersection<
 
 /**
  * Match a list of columns
+ * Uses accumulator pattern with single flatten at the end for better performance
  */
 type MatchColumnList<
     Columns extends SelectItem[],
     Context,
     Schema extends DatabaseSchema,
-> = Columns extends [ infer First, ...infer Rest ]
+    Acc = {},
+> = Columns extends [ infer First, ...infer Rest extends SelectItem[] ]
     ? MatchSingleColumn<First, Context, Schema> extends infer FirstResult
         ? FirstResult extends MatchError<string> ? FirstResult
-        : Rest extends SelectItem[]
-            ? MatchColumnList<Rest, Context, Schema> extends infer RestResult
-                ? RestResult extends MatchError<string> ? RestResult
-                : Flatten<FirstResult & RestResult>
-            : never
-        : FirstResult
-    : never
-    : {};
+        : MatchColumnList<Rest, Context, Schema, Acc & FirstResult>
+        : never
+    : Flatten<Acc>;
 
 /**
  * Helper: check if a SelectItem has been marked as optional

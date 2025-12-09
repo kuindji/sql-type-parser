@@ -118,94 +118,40 @@ type UpperChar<C extends string> = C extends "a"
 // ============================================================================
 
 /**
- * Increment a number (limited range 0-20)
+ * Lookup table for increment operation (0-20 range)
+ * Using a lookup table provides O(1) type evaluation vs O(n) nested ternaries
  */
-export type Increment<N extends number> = N extends 0
-  ? 1
-  : N extends 1
-    ? 2
-    : N extends 2
-      ? 3
-      : N extends 3
-        ? 4
-        : N extends 4
-          ? 5
-          : N extends 5
-            ? 6
-            : N extends 6
-              ? 7
-              : N extends 7
-                ? 8
-                : N extends 8
-                  ? 9
-                  : N extends 9
-                    ? 10
-                    : N extends 10
-                      ? 11
-                      : N extends 11
-                        ? 12
-                        : N extends 12
-                          ? 13
-                          : N extends 13
-                            ? 14
-                            : N extends 14
-                              ? 15
-                              : N extends 15
-                                ? 16
-                                : N extends 16
-                                  ? 17
-                                  : N extends 17
-                                    ? 18
-                                    : N extends 18
-                                      ? 19
-                                      : N extends 19
-                                        ? 20
-                                        : never
+type IncrementTable = {
+  0: 1; 1: 2; 2: 3; 3: 4; 4: 5; 5: 6; 6: 7; 7: 8; 8: 9; 9: 10;
+  10: 11; 11: 12; 12: 13; 13: 14; 14: 15; 15: 16; 16: 17; 17: 18;
+  18: 19; 19: 20; 20: 21
+}
 
 /**
- * Decrement a number (limited range 0-20)
+ * Lookup table for decrement operation (0-21 range)
+ * Using a lookup table provides O(1) type evaluation vs O(n) nested ternaries
  */
-export type Decrement<N extends number> = N extends 20
-  ? 19
-  : N extends 19
-    ? 18
-    : N extends 18
-      ? 17
-      : N extends 17
-        ? 16
-        : N extends 16
-          ? 15
-          : N extends 15
-            ? 14
-            : N extends 14
-              ? 13
-              : N extends 13
-                ? 12
-                : N extends 12
-                  ? 11
-                  : N extends 11
-                    ? 10
-                    : N extends 10
-                      ? 9
-                      : N extends 9
-                        ? 8
-                        : N extends 8
-                          ? 7
-                          : N extends 7
-                            ? 6
-                            : N extends 6
-                              ? 5
-                              : N extends 5
-                                ? 4
-                                : N extends 4
-                                  ? 3
-                                  : N extends 3
-                                    ? 2
-                                    : N extends 2
-                                      ? 1
-                                      : N extends 1
-                                        ? 0
-                                        : never
+type DecrementTable = {
+  21: 20; 20: 19; 19: 18; 18: 17; 17: 16; 16: 15; 15: 14; 14: 13;
+  13: 12; 12: 11; 11: 10; 10: 9; 9: 8; 8: 7; 7: 6; 6: 5; 5: 4;
+  4: 3; 3: 2; 2: 1; 1: 0; 0: 0
+}
+
+/**
+ * Increment a number (limited range 0-20)
+ * Uses lookup table for O(1) type evaluation
+ */
+export type Increment<N extends number> = N extends keyof IncrementTable
+  ? IncrementTable[N]
+  : never
+
+/**
+ * Decrement a number (limited range 0-21)
+ * Uses lookup table for O(1) type evaluation
+ */
+export type Decrement<N extends number> = N extends keyof DecrementTable
+  ? DecrementTable[N]
+  : never
 
 // ============================================================================
 // Type Utilities

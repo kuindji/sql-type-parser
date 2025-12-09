@@ -413,7 +413,73 @@ type ParseColumnList<T extends string[]> = T extends [
 type ParseSingleColumn<T extends string> = Trim<T> extends ""
     ? ParseError<"Empty column">
     : IsAggregate<Trim<T>> extends true ? ParseAggregateColumn<Trim<T>>
-    : ParseSimpleColumn<Trim<T>>;
+    : ParseSimpleColumnOptimized<Trim<T>>;
+
+/**
+ * Classify a column expression by its first distinctive pattern.
+ * This reduces the number of type guard evaluations from 12+ to ~3
+ * by using first-character/pattern dispatch.
+ *
+ * IMPORTANT: Complex expressions check must happen before literal checks
+ * because expressions like "1 + 1" start with a number but are complex.
+ */
+type ClassifyColumnType<T extends string> =
+    // Global wildcard
+    T extends "*" ? "wildcard"
+    // Table wildcard (t.* or schema.t.*)
+    : T extends `${string}.*` | `${string}. *` ? "table_wildcard"
+    // EXISTS/NOT EXISTS (check before complex since IsComplexExpression includes parens)
+    : T extends `EXISTS ( ${string}` | `NOT EXISTS ( ${string}` ? "exists"
+    // Scalar subquery (check before complex since IsComplexExpression includes parens)
+    : T extends `( SELECT ${string}` ? "subquery"
+    // CAST function (check before complex)
+    : T extends `CAST ( ${string}` | `cast ( ${string}` ? "cast"
+    // Complex expressions (JSON ops, concatenation, parens, functions, arithmetic)
+    // Must be checked BEFORE literals because "1 + 1" starts with number
+    : IsComplexExpression<T> extends true ? "complex"
+    // SQL constants - check all patterns
+    : IsSQLConstantExpression<T> extends true ? "sql_constant"
+    // INTERVAL expressions - after complex check
+    : T extends `INTERVAL ${string}` | `INTERVAL '${string}` ? "interval"
+    // Numeric literals (including negative) - only if NOT complex
+    : T extends `${number}${string}` | `-${number}${string}` ? "literal"
+    // String literals
+    : T extends `'${string}` ? "literal"
+    // NULL, TRUE, FALSE
+    : T extends `NULL${string}` | `TRUE${string}` | `FALSE${string}` ? "literal"
+    // Default to simple column
+    : "simple";
+
+/**
+ * Optimized column parser using first-character dispatch
+ * Reduces type guard cascade from 12+ checks to classification + single dispatch
+ */
+type ParseSimpleColumnOptimized<T extends string> =
+    ClassifyColumnType<T> extends infer Type
+        ? Type extends "wildcard" ? TableWildcard<"*", undefined>
+        : Type extends "table_wildcard" ? ParseTableWildcard<T>
+        : Type extends "literal" ? ParseLiteralColumn<T>
+        : Type extends "sql_constant" ? ParseSQLConstantColumn<T>
+        : Type extends "interval" ? ParseIntervalColumn<T>
+        : Type extends "exists" ? ParseExistsColumn<T>
+        : Type extends "subquery" ? ParseSubqueryColumn<T>
+        : Type extends "cast" ? ParseCastColumn<T>
+        : Type extends "complex" ? ParseComplexColumn<T>
+        : ParseSimpleColumnRef<T>
+        : never;
+
+/**
+ * Parse a simple column reference with optional alias (no special expressions)
+ */
+type ParseSimpleColumnRef<T extends string> =
+    T extends `${infer Col} AS ${infer Alias}` ? ColumnRef<
+            ParseColumnRefType<StripTypeCast<Trim<Col>>>,
+            RemoveQuotes<Alias>
+        >
+    : ColumnRef<
+        ParseColumnRefType<StripTypeCast<T>>,
+        ExtractColumnName<StripTypeCast<T>>
+    >;
 
 /**
  * Check if a column is an aggregate function
@@ -448,8 +514,11 @@ type ParseAggregateArg<T extends string> = Trim<T> extends "*" ? "*"
 /**
  * Parse a simple column reference with optional alias
  * Handles PostgreSQL type casting syntax (::type), complex expressions, subqueries, EXISTS, INTERVAL, and literals
+ *
+ * @deprecated Use ParseSimpleColumnOptimized instead - this is kept for reference
+ * The optimized version uses ClassifyColumnType for O(1) dispatch instead of O(n) sequential guards
  */
-type ParseSimpleColumn<T extends string> =
+type ParseSimpleColumn_Legacy<T extends string> =
     // Global wildcard within a column list (SELECT *, col)
     Trim<T> extends "*" ? TableWildcard<"*", undefined>
         // Check for literal values first (number, string, null, boolean)

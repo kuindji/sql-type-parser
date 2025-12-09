@@ -510,21 +510,19 @@ type ExtractColumnsAsObject<
 
 /**
  * Extract a list of columns as an object type
+ * Uses accumulator pattern with single flatten at the end for better performance
  */
 type ExtractColumnListAsObject<
     Columns extends SelectItem[],
     Context,
     Schema extends DatabaseSchema,
-> = Columns extends [ infer First, ...infer Rest ]
+    Acc = {},
+> = Columns extends [ infer First, ...infer Rest extends SelectItem[] ]
     ? ExtractSingleColumnAsObject<First, Context, Schema> extends
         infer FirstResult
-        ? Rest extends SelectItem[]
-            ? ExtractColumnListAsObject<Rest, Context, Schema> extends
-                infer RestResult ? Flatten<FirstResult & RestResult>
-            : FirstResult
-        : FirstResult
-    : {}
-    : {};
+        ? ExtractColumnListAsObject<Rest, Context, Schema, Acc & FirstResult>
+        : Acc
+    : Flatten<Acc>;
 
 /**
  * Extract a single column as an object entry
