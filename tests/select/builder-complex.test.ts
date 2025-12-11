@@ -558,10 +558,10 @@ describe("Complex combined patterns in builder", () => {
             .from("orders")
             .select("id")
             .select("amount")
-            .when(includeRevenue, (b) =>
-                b.select(
-                    "(CASE WHEN commission > 0 THEN commission - COALESCE(commission * rate, 0) ELSE 0 END)::float8 AS revenue",
-                ));
+            .selectIf(
+                includeRevenue,
+                "(CASE WHEN commission > 0 THEN commission - COALESCE(commission * rate, 0) ELSE 0 END)::float8 AS revenue",
+            );
 
         const sql = builder.toString();
         expect(sql).toBe(

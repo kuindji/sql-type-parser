@@ -903,31 +903,41 @@ type WithNamedParamsSql<
  * Conditional type helper for *If() methods.
  *
  * When condition is:
- * - `true` (literal): returns IfTrue type
+ * - `true` (literal): returns IfTrue type (clause added)
  * - `false` (literal): returns IfFalse type (unchanged Sql)
- * - `boolean` (widened): returns union to mark new fields as potentially present
+ * - `boolean` (widened): returns IfTrue (optimistic, avoids union explosion)
  *
- * This avoids callback inference entirely, making type computation O(1) per call.
+ * For Sql tags, we use IfTrue when condition is boolean because:
+ * 1. It avoids exponential union growth with multiple *If() calls
+ * 2. The Sql tag is primarily for SQL string assembly, not result type inference
+ * 3. Result type inference uses State which properly handles optionality
  */
 type ConditionalSqlUpdate<
     Cond extends boolean,
     IfTrue extends AnyBuilderSqlTag,
     IfFalse extends AnyBuilderSqlTag,
-> = Cond extends true ? IfTrue
-    : Cond extends false ? IfFalse
-    : IfTrue | IfFalse;
+> = boolean extends Cond
+    ? IfTrue
+    : Cond extends true ? IfTrue
+    : IfFalse;
 
 /**
  * Conditional state update for selectIf/joinIf that may add columns.
- * When condition is boolean (not literal), new columns are marked optional.
+ *
+ * - When condition is literal `true`: returns After (columns definitely added)
+ * - When condition is literal `false`: returns Before (columns definitely not added)
+ * - When condition is `boolean`: merges states with new columns marked as `| undefined`
+ *
+ * This avoids union explosion when multiple *If() methods are chained.
  */
 type ConditionalStateUpdate<
     Cond extends boolean,
     Before extends AnyBuilderStateTag,
     After extends AnyBuilderStateTag,
-> = Cond extends true ? After
-    : Cond extends false ? Before
-    : MergeConditionalState<Before, After>;
+> = boolean extends Cond
+    ? MergeConditionalState<Before, After>
+    : Cond extends true ? After
+    : Before;
 
 // ---------------------------------------------------------------------------
 // Optimized SQL Assembly Helpers
@@ -1222,156 +1232,6 @@ type MergeConditionalState<
     Flatten<Before["row"] & OptionalizeNewKeys<Before["row"], After["row"]>>,
     Before["contextSQL"] | After["contextSQL"]
 >;
-
-/**
- * Merge two conditional branches (ifTrue and ifFalse) into a single state.
- * Both branches' new keys are marked as optional since only one will execute.
- */
-type MergeTwoConditionalStates<
-    Before extends BuilderStateTag<any, any, any>,
-    IfTrue extends BuilderStateTag<any, any, any>,
-    IfFalse extends BuilderStateTag<any, any, any>,
-> = BuilderStateTag<
-    Before["fromTable"] | IfTrue["fromTable"] | IfFalse["fromTable"],
-    Flatten<
-        Before["row"]
-        & OptionalizeNewKeys<Before["row"], IfTrue["row"]>
-        & OptionalizeNewKeys<Before["row"], IfFalse["row"]>
-    >,
-    Before["contextSQL"] | IfTrue["contextSQL"] | IfFalse["contextSQL"]
->;
-
-// ---------------------------------------------------------------------------
-// Two-callback when() SQL Merging
-// ---------------------------------------------------------------------------
-
-/**
- * Extract IDs from a ClauseList.
- */
-type ClauseListIds<Parts extends ClauseList> = Parts extends readonly [
-    infer First extends SqlClausePart,
-    ...infer Rest extends ClauseList,
-] ? First["id"] | ClauseListIds<Rest>
-    : never;
-
-/**
- * Filter a ClauseList to only include parts whose IDs are NOT in ExcludeIds.
- */
-type FilterNewParts<
-    Parts extends ClauseList,
-    ExcludeIds,
-    Acc extends ClauseList = readonly [],
-> = Parts extends readonly [
-    infer First extends SqlClausePart,
-    ...infer Rest extends ClauseList,
-] ? FilterNewParts<
-        Rest,
-        ExcludeIds,
-        First["id"] extends ExcludeIds ? Acc : readonly [ ...Acc, First ]
-    >
-    : Acc;
-
-/**
- * Append new parts from Source to Target (parts not already in Base).
- * Used to merge SELECT/JOIN clauses: ifTrue parts first, then new ifFalse parts.
- */
-type AppendNewClauseParts<
-    Base extends ClauseList | string | undefined,
-    IfTrue extends ClauseList | string | undefined,
-    IfFalse extends ClauseList | string | undefined,
-> = NormalizeClauseList<IfTrue> extends infer TrueParts extends ClauseList
-    ? NormalizeClauseList<Base> extends infer BaseParts extends ClauseList
-        ? NormalizeClauseList<IfFalse> extends infer FalseParts extends ClauseList
-            ? ClauseListOrUndefined<
-                readonly [
-                    ...TrueParts,
-                    ...FilterNewParts<FalseParts, ClauseListIds<BaseParts>>
-                ]
-            >
-        : TrueParts
-    : NormalizeClauseList<IfTrue>
-    : undefined;
-
-/**
- * Merge two BuilderSqlTags from the ifTrue and ifFalse branches of when().
- *
- * For list-based clauses (select, joins): takes ifTrue parts, then appends
- * new parts from ifFalse (parts not in the base SQL).
- *
- * For scalar clauses (where, groupBy, etc.): prefers ifTrue, falls back to ifFalse.
- */
-type MergeTwoSqlTags<
-    Base extends AnyBuilderSqlTag,
-    IfTrue extends AnyBuilderSqlTag,
-    IfFalse extends AnyBuilderSqlTag,
-> = BuilderSqlTag<
-    AppendNewClauseParts<Base["select"], IfTrue["select"], IfFalse["select"]>,
-    IfTrue["from"] extends string ? IfTrue["from"]
-        : IfFalse["from"] extends string ? IfFalse["from"]
-        : undefined,
-    AppendNewClauseParts<Base["joins"], IfTrue["joins"], IfFalse["joins"]>,
-    IfTrue["where"] extends string ? IfTrue["where"]
-        : IfFalse["where"] extends string ? IfFalse["where"]
-        : undefined,
-    IfTrue["groupBy"] extends string ? IfTrue["groupBy"]
-        : IfFalse["groupBy"] extends string ? IfFalse["groupBy"]
-        : undefined,
-    IfTrue["having"] extends string ? IfTrue["having"]
-        : IfFalse["having"] extends string ? IfFalse["having"]
-        : undefined,
-    IfTrue["orderBy"] extends string ? IfTrue["orderBy"]
-        : IfFalse["orderBy"] extends string ? IfFalse["orderBy"]
-        : undefined,
-    IfTrue["limit"] extends number ? IfTrue["limit"]
-        : IfFalse["limit"] extends number ? IfFalse["limit"]
-        : undefined,
-    readonly [ ...IfTrue["params"], ...IfFalse["params"] ],
-    IfTrue["offset"] extends number ? IfTrue["offset"]
-        : IfFalse["offset"] extends number ? IfFalse["offset"]
-        : undefined
->;
-
-
-type CallbackResultState<
-    Schema extends DatabaseSchema,
-    S extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
-    CB,
-> = CB extends (
-    b: SelectQueryBuilder<Schema, S, Sql>,
-    ...args: any[]
-) => SelectQueryBuilder<
-    Schema,
-    infer AfterState extends BuilderStateTag<any, any, any>,
-    any
-> ? AfterState
-    : S;
-
-type CallbackResultSql<
-    Schema extends DatabaseSchema,
-    S extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
-    CB,
-> = CB extends (
-    b: SelectQueryBuilder<Schema, S, Sql>,
-    ...args: any[]
-) => SelectQueryBuilder<
-    Schema,
-    any,
-    infer AfterSql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >
-> ? AfterSql
-    : Sql;
 
 // ============================================================================
 // Runtime SELECT Builder Skeleton
@@ -1792,64 +1652,6 @@ export interface SelectQueryBuilder<
     ): SelectQueryBuilder<Schema, State, WithNamedParamsSql<Sql, P>>;
 
     /**
-     * Conditional execution helper; runtime behavior is shared via whenRuntime.
-     *
-     * Type-level: the callback is treated as always-executed. Columns and joins
-     * added inside `.when()` are merged into State, with new columns marked as
-     * optional (their types unioned with `undefined`).
-     */
-    when<
-        CB extends (
-            b: SelectQueryBuilder<Schema, State, Sql>,
-        ) => SelectQueryBuilder<Schema, any, any>,
-    >(
-        condition: boolean,
-        ifTrue: CB,
-    ): SelectQueryBuilder<
-        Schema,
-        MergeConditionalState<
-            State,
-            CallbackResultState<Schema, State, Sql, CB>
-        >,
-        CallbackResultSql<Schema, State, Sql, CB>
-    >;
-
-    /**
-     * Conditional execution helper with both true and false branches.
-     *
-     * Type-level: both callbacks are treated as always-executed. Columns and
-     * joins added in either branch are merged into State, with new columns
-     * marked as optional (their types unioned with `undefined`).
-     *
-     * This variant reduces TypeScript type computation compared to chaining
-     * two separate `.when()` calls with opposite conditions.
-     */
-    when<
-        CBTrue extends (
-            b: SelectQueryBuilder<Schema, State, Sql>,
-        ) => SelectQueryBuilder<Schema, any, any>,
-        CBFalse extends (
-            b: SelectQueryBuilder<Schema, State, Sql>,
-        ) => SelectQueryBuilder<Schema, any, any>,
-    >(
-        condition: boolean,
-        ifTrue: CBTrue,
-        ifFalse: CBFalse,
-    ): SelectQueryBuilder<
-        Schema,
-        MergeTwoConditionalStates<
-            State,
-            CallbackResultState<Schema, State, Sql, CBTrue>,
-            CallbackResultState<Schema, State, Sql, CBFalse>
-        >,
-        MergeTwoSqlTags<
-            Sql,
-            CallbackResultSql<Schema, State, Sql, CBTrue>,
-            CallbackResultSql<Schema, State, Sql, CBFalse>
-        >
-    >;
-
-    /**
      * Apply a reusable builder function to this builder.
      *
      * Allows composing the builder with external functions that encapsulate
@@ -1873,6 +1675,32 @@ export interface SelectQueryBuilder<
             b: SelectQueryBuilder<Schema, State, Sql>,
         ) => SelectQueryBuilder<Schema, NewState, NewSql>,
     ): SelectQueryBuilder<Schema, NewState, NewSql>;
+
+    /**
+     * Conditionally apply a reusable builder function.
+     *
+     * More performant than `.when()` for applying reusable functions because
+     * it avoids callback type inference entirely. The function must return
+     * the same builder type it receives (State and Sql unchanged at type level).
+     *
+     * Use this for reusable functions that only add WHERE clauses, or when
+     * you don't need type-level tracking of the function's modifications.
+     *
+     * @example
+     * ```ts
+     * function addDateFilter(b: SelectQueryBuilder<Schema, State, Sql>) {
+     *     return b.where("created_at > NOW() - INTERVAL '1 day'");
+     * }
+     *
+     * builder.applyIf(shouldFilter, addDateFilter);
+     * ```
+     */
+    applyIf<Cond extends boolean>(
+        condition: Cond,
+        fn: (
+            b: SelectQueryBuilder<Schema, State, Sql>,
+        ) => SelectQueryBuilder<Schema, any, any>,
+    ): SelectQueryBuilder<Schema, State, Sql>;
 
     /**
      * Generate the SQL string from the internal runtime state.
@@ -2424,43 +2252,6 @@ class SelectQueryBuilderImpl<
         >;
     }
 
-    // -----------------------------------------------------------------------
-    // Shared runtime .when()
-    // -----------------------------------------------------------------------
-
-    when<
-        CBTrue extends (
-            b: SelectQueryBuilder<Schema, State, Sql>,
-        ) => SelectQueryBuilder<Schema, any, any>,
-        CBFalse extends (
-            b: SelectQueryBuilder<Schema, State, Sql>,
-        ) => SelectQueryBuilder<Schema, any, any>,
-    >(
-        condition: boolean,
-        ifTrue: CBTrue,
-        ifFalse?: CBFalse,
-    ): SelectQueryBuilder<Schema, any, any> {
-        // Runtime: execute the appropriate callback based on condition.
-        // When it runs, keep the callback's full runtime state (including SELECT
-        // fragments) so assembled SQL reflects the conditional changes. The
-        // type-level state still marks new columns as optional.
-
-        const callback = condition ? ifTrue : ifFalse;
-
-        if (!callback) {
-            // No ifFalse callback provided and condition is false
-            return this as unknown as SelectQueryBuilder<Schema, any, any>;
-        }
-
-        const result = callback(
-            this as unknown as SelectQueryBuilder<Schema, State, Sql>,
-        ) as unknown as SelectQueryBuilderImpl<Schema, any, any>;
-
-        return new SelectQueryBuilderImpl<Schema, any, any>(
-            result._state,
-        ) as unknown as SelectQueryBuilder<Schema, any, any>;
-    }
-
     apply<
         NewState extends BuilderStateTag<any, any, any>,
         NewSql extends BuilderSqlTag<
@@ -2480,6 +2271,18 @@ class SelectQueryBuilderImpl<
         ) => SelectQueryBuilder<Schema, NewState, NewSql>,
     ): SelectQueryBuilder<Schema, NewState, NewSql> {
         return fn(this as unknown as SelectQueryBuilder<Schema, State, Sql>);
+    }
+
+    applyIf<Cond extends boolean>(
+        condition: Cond,
+        fn: (
+            b: SelectQueryBuilder<Schema, State, Sql>,
+        ) => SelectQueryBuilder<Schema, any, any>,
+    ): SelectQueryBuilder<Schema, State, Sql> {
+        if (condition) {
+            return fn(this as unknown as SelectQueryBuilder<Schema, State, Sql>) as unknown as SelectQueryBuilder<Schema, State, Sql>;
+        }
+        return this as unknown as SelectQueryBuilder<Schema, State, Sql>;
     }
 
     getParams(): ReadonlyArray<QueryParamValue> {
@@ -3230,24 +3033,41 @@ type BuilderReturnForParts<
     : MatchError<BuilderTablesValid<Schema, Sql> & string>;
 
 /**
+ * Lightweight table validation that only uses from/joins from the Sql tag.
+ * Avoids needing to fully instantiate complex union Sql types.
+ */
+type LightweightTablesValid<
+    Schema extends DatabaseSchema,
+    From,
+    Joins,
+> = BuilderCheckTable<
+    Schema,
+    From extends string
+        ? From extends `${infer T} ${string}` ? T : From
+        : never
+> extends infer FromResult
+    ? FromResult extends true
+        ? Joins extends string
+            ? BuilderCheckTables<Schema, ExtractJoinTables<Joins> & string>
+            : Joins extends ClauseList
+                ? BuilderCheckTables<Schema, ExtractJoinTables<ClauseListToString<Joins, " ">> & string>
+                : true
+        : FromResult
+    : true;
+
+/**
  * Result type of the builder query string.
+ *
+ * Uses lightweight extraction of only the from/joins fields needed for
+ * table validation, avoiding deep type instantiation of complex Sql tags.
  */
 export type BuilderReturnType<B> = B extends SelectQueryBuilder<
     infer Schema extends DatabaseSchema,
     infer State extends BuilderStateTag<any, any, any>,
-    infer Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >
-> ? BuilderReturnForParts<Schema, State, Sql>
+    infer Sql extends AnyBuilderSqlTag
+> ? LightweightTablesValid<Schema, Sql["from"], Sql["joins"]> extends true
+        ? Flatten<State["row"]>
+        : MatchError<LightweightTablesValid<Schema, Sql["from"], Sql["joins"]> & string>
     : never;
 
 /**

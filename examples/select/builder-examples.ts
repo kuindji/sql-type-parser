@@ -43,18 +43,18 @@ type PaidOrdersSQL = BuilderSQL<typeof PaidOrdersBuilder>;
 type PaidOrdersRow = BuilderReturnType<typeof PaidOrdersBuilder>;
 type PaidOrdersRuntime = RuntimeSelectState;
 
-// Conditional fragments with .when() mark added columns as optional
+// Conditional fragments with *If() methods mark added columns as optional
+const includeComments: boolean = true;
 const BlogMetricsBuilder = createSelectQuery<BlogSchema>()
     .select([ "posts.id", "posts.title" ])
     .from("posts")
-    .when(true, b =>
-        b
-            .join(
-                "LEFT JOIN comments ON comments.post_id = posts.id",
-                "comments",
-            )
-            .select("COUNT(comments.id) AS comment_count")
-            .where("comments.is_approved = TRUE"));
+    .joinIf(
+        includeComments,
+        "LEFT JOIN comments ON comments.post_id = posts.id",
+        "comments",
+    )
+    .selectIf(includeComments, "COUNT(comments.id) AS comment_count")
+    .whereIf(includeComments, "comments.is_approved = TRUE");
 
 type BlogMetricsSQL = BuilderSQL<typeof BlogMetricsBuilder>;
 type BlogMetricsRow = BuilderReturnType<typeof BlogMetricsBuilder>;

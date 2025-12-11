@@ -18,11 +18,7 @@ import type {
     SelectQueryBuilder,
 } from "../../src/select/builder.js";
 
-import type {
-    AssertEqual,
-    AssertExtends,
-    RequireTrue,
-} from "../helpers.js";
+import type { AssertEqual, AssertExtends, RequireTrue } from "../helpers.js";
 
 import {
     createConditionTree,
@@ -160,9 +156,8 @@ describe("whereIf()", () => {
         >;
     });
 
-    it("should replace nested when() for simple conditionals", () => {
-        // Old pattern (causes type complexity with nesting):
-        // .when(!!period, b => setPeriod(b), b => b.when(!!start, b => b.where(...)))
+    it("should handle complex conditionals with whereIf()", () => {
+        // Use whereIf() for conditional WHERE clauses - avoids type complexity
 
         // New pattern:
         const period = false;
@@ -215,7 +210,7 @@ describe("selectIf()", () => {
         >;
     });
 
-    it("should NOT add columns when condition is false", () => {
+    it("should NOT add columns when condition is literal false", () => {
         const builder = createSelectQuery<TestSchema>()
             .from("users")
             .select("id")
@@ -223,26 +218,38 @@ describe("selectIf()", () => {
 
         expect(builder.toString()).toBe("SELECT id FROM users");
 
+        // With literal false, the column is definitely not added
         type Row = BuilderReturnType<typeof builder>;
         type _RowMatches = RequireTrue<AssertEqual<Row, { id: UserId; }>>;
     });
 
     it("should mark columns as optional when condition is runtime boolean", () => {
         const includeEmail: boolean = Math.random() > 0.5;
+        const includeName: boolean = Math.random() > 0.5;
+        const includeActive: boolean = Math.random() > 0.5;
 
         const builder = createSelectQuery<TestSchema>()
             .from("users")
             .select("id")
-            .selectIf(includeEmail, "email");
+            .selectIf(includeEmail, "email")
+            .selectIf(includeName, "name")
+            .selectIf(includeActive, "active");
 
-        // Type-level: email should be optional since condition might be false
-        // When condition is widened boolean, we get a union of states
+        // Type-level: conditional columns are marked as type | undefined
+        // This is a single merged type, NOT a union explosion
         type Row = BuilderReturnType<typeof builder>;
 
-        // The row should include id always, and email optionally
-        type _RowHasId = RequireTrue<AssertExtends<{ id: UserId; }, Row>>;
-        type _EmailIsOptional = RequireTrue<
-            AssertExtends<Row, { id: UserId; } | { id: UserId; email: string; }>
+        // The row should have id always, and optional fields as type | undefined
+        type _RowMatches = RequireTrue<
+            AssertEqual<
+                Row,
+                {
+                    id: UserId;
+                    email: string | undefined;
+                    name: UserName | undefined;
+                    active: boolean | undefined;
+                }
+            >
         >;
     });
 
@@ -250,13 +257,20 @@ describe("selectIf()", () => {
         const builder = createSelectQuery<TestSchema>()
             .from("users")
             .select("id")
-            .selectIf(true, [ "name", "email" ]);
+            .selectIf(true as boolean, [ "name", "email" ]);
 
         expect(builder.toString()).toBe("SELECT id, name, email FROM users");
 
         type Row = BuilderReturnType<typeof builder>;
         type _RowMatches = RequireTrue<
-            AssertEqual<Row, { id: UserId; name: UserName; email: string; }>
+            AssertEqual<
+                Row,
+                {
+                    id: UserId;
+                    name: UserName | undefined;
+                    email: string | undefined;
+                }
+            >
         >;
     });
 });
@@ -291,7 +305,11 @@ describe("joinIf()", () => {
         const builder = createSelectQuery<TestSchema>()
             .from("users u")
             .select("u.id")
-            .joinIf(true, "LEFT JOIN orders o ON o.userId = u.id", "orders_join");
+            .joinIf(
+                true,
+                "LEFT JOIN orders o ON o.userId = u.id",
+                "orders_join",
+            );
 
         expect(builder.toString()).toBe(
             "SELECT u.id FROM users u LEFT JOIN orders o ON o.userId = u.id",
@@ -448,7 +466,9 @@ describe("limitIf()", () => {
         expect(builder.toString()).toBe("SELECT id FROM users");
 
         type Sql = BuilderSQL<typeof builder>;
-        type _SqlMatches = RequireTrue<AssertEqual<Sql, "SELECT id FROM users">>;
+        type _SqlMatches = RequireTrue<
+            AssertEqual<Sql, "SELECT id FROM users">
+        >;
     });
 });
 
@@ -476,7 +496,9 @@ describe("offsetIf()", () => {
         expect(builder.toString()).toBe("SELECT id FROM users");
 
         type Sql = BuilderSQL<typeof builder>;
-        type _SqlMatches = RequireTrue<AssertEqual<Sql, "SELECT id FROM users">>;
+        type _SqlMatches = RequireTrue<
+            AssertEqual<Sql, "SELECT id FROM users">
+        >;
     });
 
     it("should work with limitIf()", () => {
@@ -542,20 +564,17 @@ describe("*If() methods integration", () => {
         );
     });
 
-    it("should work with when() for complex conditionals", () => {
-        // Use *If() for simple conditionals, when() for complex ones
+    it("should work with whereIf() for complex conditionals", () => {
+        // Use *If() methods for all conditionals - no when() needed
         const period = { start: "2024-01-01", end: "2024-12-31" };
         const sortByTotal = true;
+        const hasPeriod = !!period;
 
         const builder = createSelectQuery<TestSchema>()
             .from("users u")
             .select("u.id")
-            .when(
-                !!period,
-                b => b
-                    .where(`u."createdAt" >= '${period.start}'`)
-                    .where(`u."createdAt" <= '${period.end}'`),
-            )
+            .whereIf(hasPeriod, `u."createdAt" >= '${period.start}'`)
+            .whereIf(hasPeriod, `u."createdAt" <= '${period.end}'`)
             .orderByIf(sortByTotal, "u.id DESC");
 
         expect(builder.toString()).toBe(
@@ -737,7 +756,9 @@ describe("withParams() with named parameters", () => {
             .from("users u")
             .withParams({ userId: 123, minTotal: 100 })
             .select("u.id")
-            .join("LEFT JOIN orders o ON o.userId = u.id AND o.total > :minTotal")
+            .join(
+                "LEFT JOIN orders o ON o.userId = u.id AND o.total > :minTotal",
+            )
             .select("o.total")
             .where("u.id = :userId");
 
