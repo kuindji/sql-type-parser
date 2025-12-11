@@ -1183,6 +1183,115 @@ type MergeConditionalState<
     Before["contextSQL"] | After["contextSQL"]
 >;
 
+/**
+ * Merge two conditional branches (ifTrue and ifFalse) into a single state.
+ * Both branches' new keys are marked as optional since only one will execute.
+ */
+type MergeTwoConditionalStates<
+    Before extends BuilderStateTag<any, any, any>,
+    IfTrue extends BuilderStateTag<any, any, any>,
+    IfFalse extends BuilderStateTag<any, any, any>,
+> = BuilderStateTag<
+    Before["fromTable"] | IfTrue["fromTable"] | IfFalse["fromTable"],
+    Flatten<
+        Before["row"]
+        & OptionalizeNewKeys<Before["row"], IfTrue["row"]>
+        & OptionalizeNewKeys<Before["row"], IfFalse["row"]>
+    >,
+    Before["contextSQL"] | IfTrue["contextSQL"] | IfFalse["contextSQL"]
+>;
+
+// ---------------------------------------------------------------------------
+// Two-callback when() SQL Merging
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract IDs from a ClauseList.
+ */
+type ClauseListIds<Parts extends ClauseList> = Parts extends readonly [
+    infer First extends SqlClausePart,
+    ...infer Rest extends ClauseList,
+] ? First["id"] | ClauseListIds<Rest>
+    : never;
+
+/**
+ * Filter a ClauseList to only include parts whose IDs are NOT in ExcludeIds.
+ */
+type FilterNewParts<
+    Parts extends ClauseList,
+    ExcludeIds,
+    Acc extends ClauseList = readonly [],
+> = Parts extends readonly [
+    infer First extends SqlClausePart,
+    ...infer Rest extends ClauseList,
+] ? FilterNewParts<
+        Rest,
+        ExcludeIds,
+        First["id"] extends ExcludeIds ? Acc : readonly [ ...Acc, First ]
+    >
+    : Acc;
+
+/**
+ * Append new parts from Source to Target (parts not already in Base).
+ * Used to merge SELECT/JOIN clauses: ifTrue parts first, then new ifFalse parts.
+ */
+type AppendNewClauseParts<
+    Base extends ClauseList | string | undefined,
+    IfTrue extends ClauseList | string | undefined,
+    IfFalse extends ClauseList | string | undefined,
+> = NormalizeClauseList<IfTrue> extends infer TrueParts extends ClauseList
+    ? NormalizeClauseList<Base> extends infer BaseParts extends ClauseList
+        ? NormalizeClauseList<IfFalse> extends infer FalseParts extends ClauseList
+            ? ClauseListOrUndefined<
+                readonly [
+                    ...TrueParts,
+                    ...FilterNewParts<FalseParts, ClauseListIds<BaseParts>>
+                ]
+            >
+        : TrueParts
+    : NormalizeClauseList<IfTrue>
+    : undefined;
+
+/**
+ * Merge two BuilderSqlTags from the ifTrue and ifFalse branches of when().
+ *
+ * For list-based clauses (select, joins): takes ifTrue parts, then appends
+ * new parts from ifFalse (parts not in the base SQL).
+ *
+ * For scalar clauses (where, groupBy, etc.): prefers ifTrue, falls back to ifFalse.
+ */
+type MergeTwoSqlTags<
+    Base extends AnyBuilderSqlTag,
+    IfTrue extends AnyBuilderSqlTag,
+    IfFalse extends AnyBuilderSqlTag,
+> = BuilderSqlTag<
+    AppendNewClauseParts<Base["select"], IfTrue["select"], IfFalse["select"]>,
+    IfTrue["from"] extends string ? IfTrue["from"]
+        : IfFalse["from"] extends string ? IfFalse["from"]
+        : undefined,
+    AppendNewClauseParts<Base["joins"], IfTrue["joins"], IfFalse["joins"]>,
+    IfTrue["where"] extends string ? IfTrue["where"]
+        : IfFalse["where"] extends string ? IfFalse["where"]
+        : undefined,
+    IfTrue["groupBy"] extends string ? IfTrue["groupBy"]
+        : IfFalse["groupBy"] extends string ? IfFalse["groupBy"]
+        : undefined,
+    IfTrue["having"] extends string ? IfTrue["having"]
+        : IfFalse["having"] extends string ? IfFalse["having"]
+        : undefined,
+    IfTrue["orderBy"] extends string ? IfTrue["orderBy"]
+        : IfFalse["orderBy"] extends string ? IfFalse["orderBy"]
+        : undefined,
+    IfTrue["limit"] extends number ? IfTrue["limit"]
+        : IfFalse["limit"] extends number ? IfFalse["limit"]
+        : undefined,
+    readonly [ ...IfTrue["params"], ...IfFalse["params"] ],
+    IfTrue["offset"] extends number ? IfTrue["offset"]
+        : IfFalse["offset"] extends number ? IfFalse["offset"]
+        : undefined
+>;
+
+
 type CallbackResultState<
     Schema extends DatabaseSchema,
     S extends BuilderStateTag<any, any, any>,
@@ -1502,7 +1611,7 @@ export interface SelectQueryBuilder<
         ) => SelectQueryBuilder<Schema, any, any>,
     >(
         condition: boolean,
-        callback: CB,
+        ifTrue: CB,
     ): SelectQueryBuilder<
         Schema,
         MergeConditionalState<
@@ -1510,6 +1619,41 @@ export interface SelectQueryBuilder<
             CallbackResultState<Schema, State, Sql, CB>
         >,
         CallbackResultSql<Schema, State, Sql, CB>
+    >;
+
+    /**
+     * Conditional execution helper with both true and false branches.
+     *
+     * Type-level: both callbacks are treated as always-executed. Columns and
+     * joins added in either branch are merged into State, with new columns
+     * marked as optional (their types unioned with `undefined`).
+     *
+     * This variant reduces TypeScript type computation compared to chaining
+     * two separate `.when()` calls with opposite conditions.
+     */
+    when<
+        CBTrue extends (
+            b: SelectQueryBuilder<Schema, State, Sql>,
+        ) => SelectQueryBuilder<Schema, any, any>,
+        CBFalse extends (
+            b: SelectQueryBuilder<Schema, State, Sql>,
+        ) => SelectQueryBuilder<Schema, any, any>,
+    >(
+        condition: boolean,
+        ifTrue: CBTrue,
+        ifFalse: CBFalse,
+    ): SelectQueryBuilder<
+        Schema,
+        MergeTwoConditionalStates<
+            State,
+            CallbackResultState<Schema, State, Sql, CBTrue>,
+            CallbackResultState<Schema, State, Sql, CBFalse>
+        >,
+        MergeTwoSqlTags<
+            Sql,
+            CallbackResultSql<Schema, State, Sql, CBTrue>,
+            CallbackResultSql<Schema, State, Sql, CBFalse>
+        >
     >;
 
     /**
@@ -2011,49 +2155,36 @@ class SelectQueryBuilderImpl<
     // -----------------------------------------------------------------------
 
     when<
-        CB extends (
+        CBTrue extends (
+            b: SelectQueryBuilder<Schema, State, Sql>,
+        ) => SelectQueryBuilder<Schema, any, any>,
+        CBFalse extends (
             b: SelectQueryBuilder<Schema, State, Sql>,
         ) => SelectQueryBuilder<Schema, any, any>,
     >(
         condition: boolean,
-        callback: CB,
-    ): SelectQueryBuilder<
-        Schema,
-        MergeConditionalState<
-            State,
-            CallbackResultState<Schema, State, Sql, CB>
-        >,
-        CallbackResultSql<Schema, State, Sql, CB>
-    > {
-        type NewState = MergeConditionalState<
-            State,
-            CallbackResultState<Schema, State, Sql, CB>
-        >;
-        type NewSql = CallbackResultSql<Schema, State, Sql, CB>;
-
-        // Runtime: execute the callback only when the condition is true. When
-        // it runs, keep the callback's full runtime state (including SELECT
+        ifTrue: CBTrue,
+        ifFalse?: CBFalse,
+    ): SelectQueryBuilder<Schema, any, any> {
+        // Runtime: execute the appropriate callback based on condition.
+        // When it runs, keep the callback's full runtime state (including SELECT
         // fragments) so assembled SQL reflects the conditional changes. The
         // type-level state still marks new columns as optional.
-        if (!condition) {
-            return this as unknown as SelectQueryBuilder<
-                Schema,
-                NewState,
-                NewSql
-            >;
+
+        const callback = condition ? ifTrue : ifFalse;
+
+        if (!callback) {
+            // No ifFalse callback provided and condition is false
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
         }
 
         const result = callback(
             this as unknown as SelectQueryBuilder<Schema, State, Sql>,
         ) as unknown as SelectQueryBuilderImpl<Schema, any, any>;
 
-        return new SelectQueryBuilderImpl<Schema, NewState, NewSql>(
+        return new SelectQueryBuilderImpl<Schema, any, any>(
             result._state,
-        ) as unknown as SelectQueryBuilder<
-            Schema,
-            NewState,
-            NewSql
-        >;
+        ) as unknown as SelectQueryBuilder<Schema, any, any>;
     }
 
     apply<
@@ -2216,7 +2347,10 @@ export interface UntypedSelectBuilder<Result = unknown> {
      */
     when(
         condition: boolean,
-        callback: (
+        ifTrue: (
+            b: UntypedSelectBuilder<Result>,
+        ) => UntypedSelectBuilder<Result>,
+        ifFalse?: (
             b: UntypedSelectBuilder<Result>,
         ) => UntypedSelectBuilder<Result>,
     ): UntypedSelectBuilder<Result>;
@@ -2580,6 +2714,14 @@ export type BuilderResultType<
 // ============================================================================
 
 /**
+ * Distributing wrapper for AssembleBuilderSql.
+ * When Sql is a union, this distributes over each member.
+ */
+type AssembleBuilderSqlDistributive<
+    Sql extends AnyBuilderSqlTag,
+> = Sql extends AnyBuilderSqlTag ? AssembleBuilderSql<Sql> : never;
+
+/**
  * Extract the assembled SQL string literal for a given builder type.
  */
 export type BuilderSQL<B> = B extends SelectQueryBuilder<
@@ -2597,7 +2739,7 @@ export type BuilderSQL<B> = B extends SelectQueryBuilder<
         any,
         any
     >
-> ? AssembleBuilderSql<Sql>
+> ? AssembleBuilderSqlDistributive<Sql>
     : never;
 
 /**

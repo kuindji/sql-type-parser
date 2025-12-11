@@ -140,16 +140,21 @@ export class ConditionTreeBuilder<
      * Conditional modification helper shared by all builders.
      *
      * Runtime semantics:
-     * - If condition is true: the callback is executed and its result returned.
-     * - If condition is false: the callback is skipped and `this` is returned.
+     * - If condition is true: the ifTrue callback is executed and its result returned.
+     * - If condition is false and ifFalse provided: ifFalse callback is executed.
+     * - If condition is false and no ifFalse: `this` is returned unchanged.
      *
      * Type-level behavior for specific builders is implemented separately.
      */
     when<Next extends ConditionTreeBuilder<any, any>>(
         condition: boolean,
-        callback: (b: ConditionTreeBuilder<Op, Expr>) => Next,
+        ifTrue: (b: ConditionTreeBuilder<Op, Expr>) => Next,
+        ifFalse?: (b: ConditionTreeBuilder<Op, Expr>) => Next,
     ): ConditionTreeBuilder<Op, Expr> | Next {
-        return condition ? callback(this) : this;
+        if (condition) {
+            return ifTrue(this);
+        }
+        return ifFalse ? ifFalse(this) : this;
     }
 
     /**
@@ -220,15 +225,20 @@ export function createConditionTree<Op extends "and" | "or">(
  * This is a small convenience wrapper that implements the shared
  * runtime semantics:
  *
- * - If condition is true: execute callback and return its result.
- * - If condition is false: skip callback and return builder unchanged.
+ * - If condition is true: execute ifTrue callback and return its result.
+ * - If condition is false and ifFalse provided: execute ifFalse callback.
+ * - If condition is false and no ifFalse: return builder unchanged.
  */
 export function whenRuntime<B>(
     builder: B,
     condition: boolean,
-    callback: (b: B) => B,
+    ifTrue: (b: B) => B,
+    ifFalse?: (b: B) => B,
 ): B {
-    return condition ? callback(builder) : builder;
+    if (condition) {
+        return ifTrue(builder);
+    }
+    return ifFalse ? ifFalse(builder) : builder;
 }
 
 // ---------------------------------------------------------------------------

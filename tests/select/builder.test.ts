@@ -538,6 +538,111 @@ describe("join query building", () => {
             }>
         >;
     });
+
+    it("should support when() with two callbacks (ifTrue and ifFalse)", () => {
+        const condition: boolean = false;
+
+        // Using two-callback when() instead of chaining two when() calls
+        // ifTrue: select name, ifFalse: join orders and select total
+        const twoCallbackBuilder = createSelectQuery<B_JoinSchema>()
+            .from("users u")
+            .select("u.id")
+            .when(
+                condition,
+                b => b.select("u.name"),
+                b => b.join("INNER JOIN orders o ON o.user_id = u.id").select("o.total"),
+            );
+
+        // Runtime: condition is false, so ifFalse branch executes
+        expect(twoCallbackBuilder.toString()).toBe(
+            "SELECT u.id, o.total FROM users u INNER JOIN orders o ON o.user_id = u.id",
+        );
+
+        // Type-level SQL: merged string with ifTrue parts first, then ifFalse parts
+        type TwoCallbackSql = BuilderSQL<typeof twoCallbackBuilder>;
+        type _TwoCallbackSqlMatches = RequireTrue<
+            AssertEqual<
+                TwoCallbackSql,
+                "SELECT u.id, u.name, o.total FROM users u INNER JOIN orders o ON o.user_id = u.id"
+            >
+        >;
+
+        // Type-level: both branches are tracked, new columns are optional
+        type TwoCallbackResult = BuilderReturnType<typeof twoCallbackBuilder>;
+        type _TwoCallbackResultMatches = RequireTrue<
+            AssertEqual<TwoCallbackResult, {
+                id: User_id;
+                name: string | undefined;
+                total: number | undefined;
+            }>
+        >;
+    });
+
+    it("should support when() with two callbacks - true branch", () => {
+        const condition: boolean = true;
+
+        const builder = createSelectQuery<B_JoinSchema>()
+            .from("users u")
+            .select("u.id")
+            .when(
+                condition,
+                b => b.select("u.name"),
+                b => b.join("INNER JOIN orders o ON o.user_id = u.id").select("o.total"),
+            );
+
+        // Runtime: condition is true, so ifTrue branch executes
+        expect(builder.toString()).toBe(
+            "SELECT u.id, u.name FROM users u",
+        );
+
+        // Type-level SQL: merged string with ifTrue parts first, then ifFalse parts
+        type Sql = BuilderSQL<typeof builder>;
+        type _SqlMatches = RequireTrue<
+            AssertEqual<
+                Sql,
+                "SELECT u.id, u.name, o.total FROM users u INNER JOIN orders o ON o.user_id = u.id"
+            >
+        >;
+    });
+
+    it("should support when() with two callbacks including joins", () => {
+        const includeOrders: boolean = false;
+
+        const builder = createSelectQuery<B_JoinSchema>()
+            .from("users u")
+            .select("u.id")
+            .when(
+                includeOrders,
+                b => b
+                    .join("INNER JOIN orders o ON o.user_id = u.id")
+                    .select("o.total"),
+                b => b.select("u.name"),
+            );
+
+        // Runtime: condition is false, so ifFalse branch executes (no join)
+        expect(builder.toString()).toBe(
+            "SELECT u.id, u.name FROM users u",
+        );
+
+        // Type-level SQL: merged string with ifTrue parts first, then ifFalse parts
+        type Sql = BuilderSQL<typeof builder>;
+        type _SqlMatches = RequireTrue<
+            AssertEqual<
+                Sql,
+                "SELECT u.id, o.total, u.name FROM users u INNER JOIN orders o ON o.user_id = u.id"
+            >
+        >;
+
+        // Type-level: both branches tracked
+        type Result = BuilderReturnType<typeof builder>;
+        type _ResultMatches = RequireTrue<
+            AssertEqual<Result, {
+                id: User_id;
+                total: number | undefined;
+                name: string | undefined;
+            }>
+        >;
+    });
 });
 
 describe("removal by id", () => {
@@ -1360,6 +1465,40 @@ describe("UntypedSelectBuilder", () => {
         // Runtime: only the TRUE condition is applied
         expect(query.toString()).toBe(
             "SELECT id FROM users WHERE active = TRUE",
+        );
+    });
+
+    it("supports when() with two callbacks (ifTrue and ifFalse)", () => {
+        const includeInactive = false;
+        const query = createUntypedQuery<{ id: number; }>()
+            .from("users")
+            .select("id")
+            .when(
+                includeInactive,
+                (b) => b.where("active = FALSE"),
+                (b) => b.where("active = TRUE"),
+            );
+
+        // Runtime: condition is false, so ifFalse branch executes
+        expect(query.toString()).toBe(
+            "SELECT id FROM users WHERE active = TRUE",
+        );
+    });
+
+    it("supports when() with two callbacks - true branch", () => {
+        const includeInactive = true;
+        const query = createUntypedQuery<{ id: number; }>()
+            .from("users")
+            .select("id")
+            .when(
+                includeInactive,
+                (b) => b.where("active = FALSE"),
+                (b) => b.where("active = TRUE"),
+            );
+
+        // Runtime: condition is true, so ifTrue branch executes
+        expect(query.toString()).toBe(
+            "SELECT id FROM users WHERE active = FALSE",
         );
     });
 
