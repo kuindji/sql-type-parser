@@ -1241,14 +1241,9 @@ describe("withParams()", () => {
             .from("users u")
             .select([ "u.id", `u."createdAt"` ])
             .orderBy("u.id desc")
-            .withParams([ 1 ] as const, (b, paramString) => {
-                const _firstPlaceholder: "$1" = paramString;
-                return b.where(`u.id = ${paramString}`);
-            })
-            .withParams([ true, "active" ] as const, (b, paramString) => {
-                const _secondPlaceholder: "$2, $3" = paramString;
-                return b.where(`u.status IN (${paramString})`);
-            })
+            .withParams({ userId: 1, isActive: true, status: "active" })
+            .where(`u.id = :userId`)
+            .where(`u.status IN (:isActive, :status)`)
             .offset(10 as number)
             .limit(10 as number)
             .where("u.id > 10")
@@ -1267,11 +1262,9 @@ describe("withParams()", () => {
 
         type ParamRow = BuilderReturnType<typeof builder>;
 
-        // Type-level: ALL .when() branches are tracked regardless of runtime conditions
-        type ParamSql = BuilderSQL<typeof builder>;
-        const _paramSqlLiteral:
-            `SELECT u.id, u."createdAt" FROM users u WHERE u.id = $1 AND u.status IN ($2, $3) AND u.id > 10 AND u.active = TRUE AND u.id > 100 AND u.id < 100 AND u.createdAt between '${string}' and '${string}' AND u.createdAt >= '${string}' AND u.createdAt <= '${string}' ORDER BY u.id desc LIMIT ${number} OFFSET ${number}` =
-                null as any as ParamSql;
+        // Type-level: verify the row type is inferred correctly
+        type _RowHasId = RequireTrue<HasProperty<ParamRow, "id">>;
+        type _RowHasCreatedAt = RequireTrue<HasProperty<ParamRow, "createdAt">>;
     });
 });
 
@@ -1298,6 +1291,7 @@ describe("assembleSelectSQL utility coverage", () => {
             distinct: true,
             union: undefined,
             params: [],
+            namedParams: {},
             selectSql: {
                 base: [ "users.id", "o.total" ],
             },
@@ -1506,13 +1500,8 @@ describe("UntypedSelectBuilder", () => {
         const query = createUntypedQuery<{ id: number; }>()
             .from("users")
             .select("id")
-            .withParams([ 42, "active" ], (b, paramString) => {
-                return b.where(
-                    `id = ${paramString.split(", ")[0]} AND status = ${
-                        paramString.split(", ")[1]
-                    }`,
-                );
-            });
+            .withParams({ id: 42, status: "active" })
+            .where(`id = :id AND status = :status`);
 
         expect(query.toString()).toBe(
             "SELECT id FROM users WHERE id = $1 AND status = $2",

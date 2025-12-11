@@ -96,6 +96,7 @@ export interface BuilderSqlTag<
     Limit extends number | undefined = undefined,
     Params extends readonly QueryParamValue[] = readonly [],
     Offset extends number | undefined = undefined,
+    NamedParams extends Record<string, QueryParamValue> | undefined = undefined,
 > {
     readonly select: Select;
     readonly from: From;
@@ -107,6 +108,7 @@ export interface BuilderSqlTag<
     readonly limit: Limit;
     readonly params: Params;
     readonly offset: Offset;
+    readonly namedParams: NamedParams;
 }
 
 /**
@@ -126,6 +128,7 @@ export type EmptyBuilderState = BuilderStateTag<undefined, {}, undefined>;
  * and ensure resilience to future library changes.
  */
 export type AnyBuilderSqlTag = BuilderSqlTag<
+    any,
     any,
     any,
     any,
@@ -656,15 +659,15 @@ type ClauseValueToString<Value, Sep extends string> = Value extends string
     : undefined;
 
 type SelectClauseString<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = ClauseValueToString<Sql["select"], ", ">;
 
 type JoinClauseString<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = ClauseValueToString<Sql["joins"], " ">;
 
 type ContextSqlFromTag<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = Sql["from"] extends infer From extends string
     ? JoinClauseString<Sql> extends infer Joins extends string
         ? Joins extends "" ? `FROM ${From}` : `FROM ${From} ${Joins}`
@@ -695,6 +698,7 @@ type UpdateSqlTag<
         limit: any;
         params: any;
         offset: any;
+        namedParams: any;
     }>,
 > = BuilderSqlTag<
     "select" extends keyof Updates ? Updates["select"] : Sql["select"],
@@ -706,7 +710,9 @@ type UpdateSqlTag<
     "orderBy" extends keyof Updates ? Updates["orderBy"] : Sql["orderBy"],
     "limit" extends keyof Updates ? Updates["limit"] : Sql["limit"],
     "params" extends keyof Updates ? Updates["params"] : Sql["params"],
-    "offset" extends keyof Updates ? Updates["offset"] : Sql["offset"]
+    "offset" extends keyof Updates ? Updates["offset"] : Sql["offset"],
+    "namedParams" extends keyof Updates ? Updates["namedParams"]
+        : Sql["namedParams"]
 >;
 
 /**
@@ -790,7 +796,7 @@ type WithoutJoinSql<
 type StateFromSql<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = BuilderStateTag<
     State["fromTable"],
     BuilderFullRow<Schema, Sql>,
@@ -878,16 +884,50 @@ type WithOffsetSql<
 > = UpdateSqlTag<Sql, { offset: Offset; }>;
 
 /**
- * Append parameter values to the SQL tag metadata while keeping all other
- * clause fragments unchanged.
- * Optimized to use UpdateSqlTag helper.
+ * Set named parameters on the SQL tag.
+ * Named params use `:name` syntax in SQL strings and are replaced with `$N`
+ * placeholders at runtime based on Object.keys() order.
  */
-type WithParamsSql<
+type WithNamedParamsSql<
     Sql extends AnyBuilderSqlTag,
-    Params extends readonly QueryParamValue[],
+    P extends Record<string, QueryParamValue>,
 > = UpdateSqlTag<Sql, {
-    params: readonly [ ...Sql["params"], ...Params ];
+    namedParams: P;
 }>;
+
+// ---------------------------------------------------------------------------
+// Conditional *If() Type Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Conditional type helper for *If() methods.
+ *
+ * When condition is:
+ * - `true` (literal): returns IfTrue type
+ * - `false` (literal): returns IfFalse type (unchanged Sql)
+ * - `boolean` (widened): returns union to mark new fields as potentially present
+ *
+ * This avoids callback inference entirely, making type computation O(1) per call.
+ */
+type ConditionalSqlUpdate<
+    Cond extends boolean,
+    IfTrue extends AnyBuilderSqlTag,
+    IfFalse extends AnyBuilderSqlTag,
+> = Cond extends true ? IfTrue
+    : Cond extends false ? IfFalse
+    : IfTrue | IfFalse;
+
+/**
+ * Conditional state update for selectIf/joinIf that may add columns.
+ * When condition is boolean (not literal), new columns are marked optional.
+ */
+type ConditionalStateUpdate<
+    Cond extends boolean,
+    Before extends AnyBuilderStateTag,
+    After extends AnyBuilderStateTag,
+> = Cond extends true ? After
+    : Cond extends false ? Before
+    : MergeConditionalState<Before, After>;
 
 // ---------------------------------------------------------------------------
 // Optimized SQL Assembly Helpers
@@ -935,7 +975,7 @@ type AppendOffsetClause<
  * Optimized to use helper types instead of 8+ levels of nested conditionals.
  */
 export type AssembleBuilderSql<
-    P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = AppendOffsetClause<
     AppendLimitClause<
         AppendClause<
@@ -974,7 +1014,7 @@ export type AssembleBuilderSql<
  * @deprecated Use AssembleBuilderSql instead
  */
 type AssembleBuilderSql_Legacy<
-    P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    P extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > =
     // SELECT clause
     ([ SelectClauseString<P> ] extends [ string ]
@@ -1295,7 +1335,7 @@ type MergeTwoSqlTags<
 type CallbackResultState<
     Schema extends DatabaseSchema,
     S extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
     CB,
 > = CB extends (
     b: SelectQueryBuilder<Schema, S, Sql>,
@@ -1310,7 +1350,7 @@ type CallbackResultState<
 type CallbackResultSql<
     Schema extends DatabaseSchema,
     S extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
     CB,
 > = CB extends (
     b: SelectQueryBuilder<Schema, S, Sql>,
@@ -1364,8 +1404,10 @@ export interface RuntimeSelectState extends SelectBuilderState {
     readonly cteSql: { readonly [id: string]: string; };
     /** Raw UNION fragment (if any) */
     readonly unionSql?: string;
-    /** Collected query parameter values (positional) */
+    /** Collected query parameter values (positional) - legacy, prefer namedParams */
     readonly params: ReadonlyArray<QueryParamValue>;
+    /** Named parameters - keys become :name placeholders, values go to params array */
+    readonly namedParams: Record<string, QueryParamValue>;
 }
 
 /**
@@ -1385,6 +1427,7 @@ const EMPTY_RUNTIME_STATE: RuntimeSelectState = {
     distinct: false,
     union: undefined,
     params: [],
+    namedParams: {},
     selectSql: {},
     fromSql: undefined,
     joinSql: {},
@@ -1408,18 +1451,7 @@ const EMPTY_RUNTIME_STATE: RuntimeSelectState = {
 export interface SelectQueryBuilder<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    > = EmptySqlState,
+    Sql extends AnyBuilderSqlTag = EmptySqlState,
 > {
     /**
      * Optional runtime-only accessor for debugging / tests.
@@ -1569,34 +1601,195 @@ export interface SelectQueryBuilder<
         offset: O,
     ): SelectQueryBuilder<Schema, State, WithOffsetSql<Sql, O>>;
 
+    // -----------------------------------------------------------------------
+    // Conditional *If() Methods
+    // -----------------------------------------------------------------------
+
     /**
-     * Add positional parameters and receive their placeholder string.
+     * Conditionally add columns to the SELECT list.
      *
-     * Parameters are accumulated on the builder and exposed via `getParams()`.
+     * More performant than `.when()` for simple conditional selects because
+     * it avoids callback type inference. When condition is a non-literal
+     * boolean, new columns are marked as optional in the result type.
      */
-    withParams<
-        const Params extends readonly QueryParamValue[],
-        CB extends (
-            b: SelectQueryBuilder<
-                Schema,
-                State,
-                WithParamsSql<Sql, Params>
-            >,
-            paramString: ParamString<Params, Sql["params"]["length"]>,
-        ) => SelectQueryBuilder<Schema, any, any>,
+    selectIf<
+        Cond extends boolean,
+        const Cols extends string | readonly string[],
+        Id extends string | undefined = undefined,
     >(
-        params: Params,
-        callback: CB,
+        condition: Cond,
+        columns: Cols,
+        id?: Id,
     ): SelectQueryBuilder<
         Schema,
-        CallbackResultState<
-            Schema,
+        ConditionalStateUpdate<
+            Cond,
             State,
-            WithParamsSql<Sql, Params>,
-            CB
+            AddColumnsForSchema<Schema, State, Cols>
         >,
-        CallbackResultSql<Schema, State, WithParamsSql<Sql, Params>, CB>
+        ConditionalSqlUpdate<
+            Cond,
+            WithSelectSql<Sql, Cols, Id>,
+            Sql
+        >
     >;
+
+    /**
+     * Conditionally add a JOIN fragment.
+     *
+     * More performant than `.when()` for simple conditional joins because
+     * it avoids callback type inference.
+     */
+    joinIf<
+        Cond extends boolean,
+        JoinSql extends string,
+        Id extends string | undefined = undefined,
+    >(
+        condition: Cond,
+        joinSql: JoinSql,
+        id?: Id,
+    ): SelectQueryBuilder<
+        Schema,
+        ConditionalStateUpdate<
+            Cond,
+            State,
+            WithJoinContext<State, JoinSql>
+        >,
+        ConditionalSqlUpdate<
+            Cond,
+            WithJoinSql<Sql, JoinSql, Id>,
+            Sql
+        >
+    >;
+
+    /**
+     * Conditionally add a WHERE condition.
+     *
+     * More performant than `.when()` for simple conditional filters because
+     * it avoids callback type inference entirely.
+     */
+    whereIf<
+        Cond extends boolean,
+        W extends string | ConditionTreeBuilder,
+    >(
+        condition: Cond,
+        clause: W,
+        id?: string,
+    ): SelectQueryBuilder<
+        Schema,
+        State,
+        ConditionalSqlUpdate<Cond, WithWhereSql<Sql, W>, Sql>
+    >;
+
+    /**
+     * Conditionally add GROUP BY columns.
+     *
+     * More performant than `.when()` for simple conditional grouping.
+     */
+    groupByIf<
+        Cond extends boolean,
+        const Cols extends string | readonly string[],
+        Id extends string | undefined = undefined,
+    >(
+        condition: Cond,
+        columns: Cols,
+        id?: Id,
+    ): SelectQueryBuilder<
+        Schema,
+        State,
+        ConditionalSqlUpdate<Cond, WithGroupBySql<Sql, Cols, Id>, Sql>
+    >;
+
+    /**
+     * Conditionally add a HAVING condition.
+     *
+     * More performant than `.when()` for simple conditional having clauses.
+     */
+    havingIf<
+        Cond extends boolean,
+        H extends string | ConditionTreeBuilder,
+    >(
+        condition: Cond,
+        condition_: H,
+        id?: string,
+    ): SelectQueryBuilder<
+        Schema,
+        State,
+        ConditionalSqlUpdate<Cond, WithHavingSql<Sql, H>, Sql>
+    >;
+
+    /**
+     * Conditionally add ORDER BY columns.
+     *
+     * More performant than `.when()` for simple conditional ordering.
+     */
+    orderByIf<
+        Cond extends boolean,
+        const Cols extends string | readonly string[],
+        Id extends string | undefined = undefined,
+    >(
+        condition: Cond,
+        columns: Cols,
+        id?: Id,
+    ): SelectQueryBuilder<
+        Schema,
+        State,
+        ConditionalSqlUpdate<Cond, WithOrderBySql<Sql, Cols, Id>, Sql>
+    >;
+
+    /**
+     * Conditionally set LIMIT value.
+     *
+     * More performant than `.when()` for simple conditional limits.
+     */
+    limitIf<
+        Cond extends boolean,
+        const L extends number,
+    >(
+        condition: Cond,
+        limit: L,
+    ): SelectQueryBuilder<
+        Schema,
+        State,
+        ConditionalSqlUpdate<Cond, WithLimitSql<Sql, L>, Sql>
+    >;
+
+    /**
+     * Conditionally set OFFSET value.
+     *
+     * More performant than `.when()` for simple conditional offsets.
+     */
+    offsetIf<
+        Cond extends boolean,
+        const O extends number,
+    >(
+        condition: Cond,
+        offset: O,
+    ): SelectQueryBuilder<
+        Schema,
+        State,
+        ConditionalSqlUpdate<Cond, WithOffsetSql<Sql, O>, Sql>
+    >;
+
+    /**
+     * Set named parameters for the query.
+     *
+     * Use `:paramName` syntax in SQL strings (WHERE, JOIN, etc.) and they will
+     * be replaced with `$1`, `$2`, etc. at runtime based on object key order.
+     *
+     * @example
+     * ```typescript
+     * builder
+     *   .withParams({ userId: 123, status: 'active' })
+     *   .where('user_id = :userId')
+     *   .where('status = :status')
+     * // SQL: "... WHERE user_id = $1 AND status = $2"
+     * // Params: [123, 'active']
+     * ```
+     */
+    withParams<P extends Record<string, QueryParamValue>>(
+        params: P,
+    ): SelectQueryBuilder<Schema, State, WithNamedParamsSql<Sql, P>>;
 
     /**
      * Conditional execution helper; runtime behavior is shared via whenRuntime.
@@ -1705,18 +1898,7 @@ export interface SelectQueryBuilder<
 class SelectQueryBuilderImpl<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    > = EmptySqlState,
+    Sql extends AnyBuilderSqlTag = EmptySqlState,
 > {
     readonly _state: RuntimeSelectState;
 
@@ -2077,76 +2259,168 @@ class SelectQueryBuilderImpl<
         >;
     }
 
-    withParams<
-        const Params extends readonly QueryParamValue[],
-        CB extends (
-            b: SelectQueryBuilder<
-                Schema,
-                State,
-                WithParamsSql<Sql, Params>
-            >,
-            paramString: ParamString<Params, Sql["params"]["length"]>,
-        ) => SelectQueryBuilder<Schema, any, any>,
-    >(
-        params: Params,
-        callback: CB,
-    ): SelectQueryBuilder<
-        Schema,
-        CallbackResultState<
-            Schema,
-            State,
-            WithParamsSql<Sql, Params>,
-            CB
-        >,
-        CallbackResultSql<Schema, State, WithParamsSql<Sql, Params>, CB>
-    > {
-        const { params: nextParams, paramString } = appendParamsRuntime(
-            this._state.params,
-            params as readonly QueryParamValue[],
-        );
+    // -----------------------------------------------------------------------
+    // Conditional *If() Runtime Implementations
+    // -----------------------------------------------------------------------
 
-        const nextState = this.clone({ params: nextParams });
-        const builderWithParams = new SelectQueryBuilderImpl<
+    selectIf<
+        Cond extends boolean,
+        const Cols extends string | readonly string[],
+        Id extends string | undefined = undefined,
+    >(
+        condition: Cond,
+        columns: Cols,
+        id?: Id,
+    ): SelectQueryBuilder<Schema, any, any> {
+        if (!condition) {
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
+        }
+        return this.select(columns, id) as unknown as SelectQueryBuilder<
+            Schema,
+            any,
+            any
+        >;
+    }
+
+    joinIf<
+        Cond extends boolean,
+        JoinSql extends string,
+        Id extends string | undefined = undefined,
+    >(
+        condition: Cond,
+        joinSql: JoinSql,
+        id?: Id,
+    ): SelectQueryBuilder<Schema, any, any> {
+        if (!condition) {
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
+        }
+        return this.join(joinSql, id) as unknown as SelectQueryBuilder<
+            Schema,
+            any,
+            any
+        >;
+    }
+
+    whereIf<
+        Cond extends boolean,
+        W extends string | ConditionTreeBuilder,
+    >(
+        condition: Cond,
+        clause: W,
+        id?: string,
+    ): SelectQueryBuilder<Schema, any, any> {
+        if (!condition) {
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
+        }
+        return this.where(clause, id) as unknown as SelectQueryBuilder<
+            Schema,
+            any,
+            any
+        >;
+    }
+
+    groupByIf<
+        Cond extends boolean,
+        const Cols extends string | readonly string[],
+        Id extends string | undefined = undefined,
+    >(
+        condition: Cond,
+        columns: Cols,
+        id?: Id,
+    ): SelectQueryBuilder<Schema, any, any> {
+        if (!condition) {
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
+        }
+        return this.groupBy(columns, id) as unknown as SelectQueryBuilder<
+            Schema,
+            any,
+            any
+        >;
+    }
+
+    havingIf<
+        Cond extends boolean,
+        H extends string | ConditionTreeBuilder,
+    >(
+        condition: Cond,
+        havingClause: H,
+        id?: string,
+    ): SelectQueryBuilder<Schema, any, any> {
+        if (!condition) {
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
+        }
+        return this.having(havingClause, id) as unknown as SelectQueryBuilder<
+            Schema,
+            any,
+            any
+        >;
+    }
+
+    orderByIf<
+        Cond extends boolean,
+        const Cols extends string | readonly string[],
+        Id extends string | undefined = undefined,
+    >(
+        condition: Cond,
+        columns: Cols,
+        id?: Id,
+    ): SelectQueryBuilder<Schema, any, any> {
+        if (!condition) {
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
+        }
+        return this.orderBy(columns, id) as unknown as SelectQueryBuilder<
+            Schema,
+            any,
+            any
+        >;
+    }
+
+    limitIf<
+        Cond extends boolean,
+        const L extends number,
+    >(
+        condition: Cond,
+        limit: L,
+    ): SelectQueryBuilder<Schema, any, any> {
+        if (!condition) {
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
+        }
+        return this.limit(limit) as unknown as SelectQueryBuilder<
+            Schema,
+            any,
+            any
+        >;
+    }
+
+    offsetIf<
+        Cond extends boolean,
+        const O extends number,
+    >(
+        condition: Cond,
+        offset: O,
+    ): SelectQueryBuilder<Schema, any, any> {
+        if (!condition) {
+            return this as unknown as SelectQueryBuilder<Schema, any, any>;
+        }
+        return this.offset(offset) as unknown as SelectQueryBuilder<
+            Schema,
+            any,
+            any
+        >;
+    }
+
+    withParams<P extends Record<string, QueryParamValue>>(
+        params: P,
+    ): SelectQueryBuilder<Schema, State, WithNamedParamsSql<Sql, P>> {
+        const nextState = this.clone({ namedParams: params });
+        return new SelectQueryBuilderImpl<
             Schema,
             State,
-            WithParamsSql<Sql, Params>
+            WithNamedParamsSql<Sql, P>
         >(nextState) as unknown as SelectQueryBuilder<
             Schema,
             State,
-            WithParamsSql<Sql, Params>
-        >;
-
-        const result = callback(
-            builderWithParams,
-            paramString as ParamString<Params, Sql["params"]["length"]>,
-        ) as unknown as SelectQueryBuilderImpl<Schema, any, any>;
-
-        const mergedParams = result._state.params.length >= nextParams.length
-            ? result._state.params
-            : nextParams;
-        const mergedState: RuntimeSelectState = {
-            ...result._state,
-            params: mergedParams,
-        };
-
-        return new SelectQueryBuilderImpl<
-            Schema,
-            CallbackResultState<
-                Schema,
-                State,
-                WithParamsSql<Sql, Params>,
-                CB
-            >,
-            CallbackResultSql<Schema, State, WithParamsSql<Sql, Params>, CB>
-        >(mergedState) as unknown as SelectQueryBuilder<
-            Schema,
-            CallbackResultState<
-                Schema,
-                State,
-                WithParamsSql<Sql, Params>,
-                CB
-            >,
-            CallbackResultSql<Schema, State, WithParamsSql<Sql, Params>, CB>
+            WithNamedParamsSql<Sql, P>
         >;
     }
 
@@ -2209,6 +2483,12 @@ class SelectQueryBuilderImpl<
     }
 
     getParams(): ReadonlyArray<QueryParamValue> {
+        // Return named params values in key order (same order as $N placeholders)
+        const namedParams = this._state.namedParams;
+        if (namedParams && Object.keys(namedParams).length > 0) {
+            return Object.values(namedParams);
+        }
+        // Fallback to legacy positional params
         return this._state.params;
     }
 
@@ -2326,17 +2606,72 @@ export interface UntypedSelectBuilder<Result = unknown> {
     /** Set OFFSET value. */
     offset(offset: number): UntypedSelectBuilder<Result>;
 
+    // -----------------------------------------------------------------------
+    // Conditional *If() Methods
+    // -----------------------------------------------------------------------
+
+    /** Conditionally add columns to the SELECT list. */
+    selectIf(
+        condition: boolean,
+        columns: string | readonly string[],
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Conditionally add a JOIN fragment. */
+    joinIf(
+        condition: boolean,
+        joinSql: string,
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Conditionally add a WHERE condition. */
+    whereIf(
+        condition: boolean,
+        clause: string | ConditionTreeBuilder,
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Conditionally add GROUP BY columns. */
+    groupByIf(
+        condition: boolean,
+        columns: string | readonly string[],
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Conditionally add a HAVING condition. */
+    havingIf(
+        condition: boolean,
+        havingClause: string | ConditionTreeBuilder,
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Conditionally add ORDER BY columns. */
+    orderByIf(
+        condition: boolean,
+        columns: string | readonly string[],
+        id?: string,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Conditionally set LIMIT value. */
+    limitIf(
+        condition: boolean,
+        limit: number,
+    ): UntypedSelectBuilder<Result>;
+
+    /** Conditionally set OFFSET value. */
+    offsetIf(
+        condition: boolean,
+        offset: number,
+    ): UntypedSelectBuilder<Result>;
+
     /**
-     * Add positional parameters and receive their placeholder string.
+     * Set named parameters for the query.
      *
-     * Note: The placeholder string is typed as `string` (not computed).
+     * Use `:paramName` syntax in SQL strings and they will be replaced
+     * with `$1`, `$2`, etc. at runtime based on object key order.
      */
-    withParams<Params extends readonly QueryParamValue[]>(
-        params: Params,
-        callback: (
-            b: UntypedSelectBuilder<Result>,
-            paramString: string,
-        ) => UntypedSelectBuilder<Result>,
+    withParams<P extends Record<string, QueryParamValue>>(
+        params: P,
     ): UntypedSelectBuilder<Result>;
 
     /**
@@ -2522,7 +2857,22 @@ export function assembleSelectSQL(state: RuntimeSelectState): string {
         parts.push(state.unionSql);
     }
 
-    return parts.join(" ");
+    let sql = parts.join(" ");
+
+    // Replace named parameters (:name) with positional placeholders ($N)
+    const namedParams = state.namedParams;
+    if (namedParams && Object.keys(namedParams).length > 0) {
+        const paramNames = Object.keys(namedParams);
+        for (let i = 0; i < paramNames.length; i++) {
+            const name = paramNames[i];
+            // Replace :name with $N (1-indexed)
+            // Use word boundary to avoid replacing :name inside :username
+            const regex = new RegExp(`:${name}(?![a-zA-Z0-9_])`, "g");
+            sql = sql.replace(regex, `$${i + 1}`);
+        }
+    }
+
+    return sql;
 }
 
 // ============================================================================
@@ -2697,7 +3047,7 @@ type OptionalizeNewSelects<
 export type BuilderResultType<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > =
     & Flatten<State["row"]>
     & {
@@ -2757,7 +3107,7 @@ export type BuilderStateOf<B> = B extends SelectQueryBuilder<
  * into a plain string type.
  */
 type BuilderSqlString<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = AssembleBuilderSql<Sql> extends infer Q extends string ? Q
     : string;
 
@@ -2768,14 +3118,14 @@ type BuilderSqlString<
  * limits while still surfacing obvious FROM/JOIN mistakes.
  */
 type BuilderFromTableSpec<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = Sql["from"] extends infer F extends string
     ? F extends `${infer T} ${string}` ? T
     : F
     : never;
 
 type BuilderJoinTablesSpec<
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = JoinClauseString<Sql> extends infer J extends string ? ExtractJoinTables<J>
     : never;
 
@@ -2834,7 +3184,7 @@ type BuilderCheckTables<
 
 type BuilderTablesValid<
     Schema extends DatabaseSchema,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = BuilderCheckTable<
     Schema,
     BuilderFromTableSpec<Sql>
@@ -2867,7 +3217,7 @@ type SelectListToRow<
 /** Helper: row inferred from the assembled SELECT fragment. */
 type BuilderFullRow<
     Schema extends DatabaseSchema,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = SelectClauseString<Sql> extends infer Sel extends string
     ? SelectListToRow<Schema, Sel, ContextSqlFromTag<Sql>>
     : {};
@@ -2875,7 +3225,7 @@ type BuilderFullRow<
 type BuilderReturnForParts<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = BuilderTablesValid<Schema, Sql> extends true ? Flatten<State["row"]>
     : MatchError<BuilderTablesValid<Schema, Sql> & string>;
 
@@ -2909,7 +3259,7 @@ export type BuilderReturnType<B> = B extends SelectQueryBuilder<
 type BuilderResultBrand<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
-    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any>,
+    Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
 > = BuilderReturnForParts<Schema, State, Sql>;
 
 /**

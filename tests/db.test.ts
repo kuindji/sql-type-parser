@@ -36,10 +36,9 @@ const qb = createSelectQuery<TestSchema>()
 
 const qbWithParams = createSelectQuery<TestSchema>()
     .from("users")
-    .withParams(
-        [ 1, "bob" ],
-        (b, paramString) => b.select([ "id" ]).where(`id IN (${paramString})`),
-    );
+    .withParams({ id: 1, name: "bob" })
+    .select([ "id" ])
+    .where(`id IN (:id, :name)`);
 
 const invalidBuilder = createSelectQuery<TestSchema>()
     .from("unknown_table")
