@@ -379,4 +379,7 @@ export type MapSQLTypeToTS<T extends string> = T extends
     : T extends "interval" ? string
     : T extends "uuid" ? string
     : T extends "bytea" ? Uint8Array
+    // Array types: recursively handle base type
+    : T extends `${infer BaseType}[]`
+        ? MapSQLTypeToTS<BaseType>[]
     : unknown;
