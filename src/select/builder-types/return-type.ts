@@ -34,18 +34,7 @@ type AssembleBuilderSqlDistributive<
 export type BuilderSQL<B> = B extends SelectQueryBuilder<
     any,
     any,
-    infer Sql extends BuilderSqlTag<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >
+    infer Sql extends AnyBuilderSqlTag
 > ? AssembleBuilderSqlDistributive<Sql>
     : never;
 

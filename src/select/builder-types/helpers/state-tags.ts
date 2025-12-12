@@ -101,9 +101,14 @@ export type UnionSqlError = BuilderSqlTag<
 
 /**
  * Check if an SQL tag is a union error marker.
+ * Uses bidirectional extends check to ensure exact match with "__UNION_ERROR__".
  */
 export type IsUnionSqlError<Sql extends AnyBuilderSqlTag> =
-    Sql["select"] extends "__UNION_ERROR__" ? true : false;
+    Sql["select"] extends "__UNION_ERROR__"
+        ? "__UNION_ERROR__" extends Sql["select"]
+            ? true
+            : false
+        : false;
 
 /**
  * Initial lightweight builder state: no FROM table, no context, and an

@@ -118,7 +118,7 @@ type _InvalidColumnBuilderIsError = RequireTrue<
 type _InvalidColumnBuilderHasColumnError = RequireTrue<
     AssertEqual<
         InvalidColumnBuilderResult,
-        "[SQL Error] Column 'id1' not found in table 'users'"
+        "[SQL Error] Column 'id1' not found in any table"
     >
 >;
 
@@ -224,7 +224,8 @@ type _CastExprIsValid = RequireTrue<
 // Test: alias."invalidColumn" - column doesn't exist
 const aliasInvalidQuotedColumnBuilder = createSelectQuery<TestSchema>()
     .from("users u")
-    .select([ `u."nonexistent"` ]);
+    .select([ `u."id"`, "o.total" ])
+    .join("JOIN orders o on u.id = o.user_id1");
 
 type AliasInvalidQuotedColumnResult = ValidQueryBuilder<
     TestSchema,
@@ -237,7 +238,7 @@ type _AliasInvalidQuotedColumnIsError = RequireTrue<
 // Test: schema.table."invalidColumn" - column doesn't exist
 const schemaTableInvalidQuotedBuilder = createSelectQuery<TestSchema>()
     .from("analytics.events")
-    .select([ `analytics.events."badColumn"` ]);
+    .select([ `analytics.events."badColumn"`, `analytics.events.id` ]);
 
 type SchemaTableInvalidQuotedResult = ValidQueryBuilder<
     TestSchema,
@@ -412,6 +413,106 @@ type SimpleInvalidUnquotedResult = ValidQueryBuilder<
 >;
 type _SimpleInvalidUnquotedIsError = RequireTrue<
     AssertExtends<SimpleInvalidUnquotedResult, `[SQL Error] ${string}`>
+>;
+
+// ===========================================================================
+// NEGATIVE TESTS: Invalid columns in WHERE clause
+// ===========================================================================
+
+// Test: invalid column in WHERE clause
+const invalidWhereBuilder = createSelectQuery<TestSchema>()
+    .from("users u")
+    .select([ "u.id" ])
+    .where("u.nonexistent_col = 1");
+
+type InvalidWhereResult = ValidQueryBuilder<
+    TestSchema,
+    typeof invalidWhereBuilder
+>;
+type _InvalidWhereIsError = RequireTrue<
+    AssertExtends<InvalidWhereResult, `[SQL Error] ${string}`>
+>;
+
+// Test: invalid column with join in WHERE clause
+const invalidWhereWithJoinBuilder = createSelectQuery<TestSchema>()
+    .from("users u")
+    .select([ "u.id", "o.total" ])
+    .join("JOIN orders o ON u.id = o.user_id")
+    .where("o.invalid_column > 100");
+
+type InvalidWhereWithJoinResult = ValidQueryBuilder<
+    TestSchema,
+    typeof invalidWhereWithJoinBuilder
+>;
+type _InvalidWhereWithJoinIsError = RequireTrue<
+    AssertExtends<InvalidWhereWithJoinResult, `[SQL Error] ${string}`>
+>;
+
+// ===========================================================================
+// NEGATIVE TESTS: Invalid columns in HAVING clause
+// ===========================================================================
+
+// Test: invalid column in HAVING clause
+const invalidHavingBuilder = createSelectQuery<TestSchema>()
+    .from("users u")
+    .select([ "u.id", "COUNT(*) as cnt" ])
+    .groupBy("u.id")
+    .having("u.nonexistent_field > 5");
+
+type InvalidHavingResult = ValidQueryBuilder<
+    TestSchema,
+    typeof invalidHavingBuilder
+>;
+type _InvalidHavingIsError = RequireTrue<
+    AssertExtends<InvalidHavingResult, `[SQL Error] ${string}`>
+>;
+
+// ===========================================================================
+// POSITIVE TESTS: Valid columns in WHERE/HAVING clauses
+// ===========================================================================
+
+// Test: valid columns in WHERE clause
+const validWhereBuilder = createSelectQuery<TestSchema>()
+    .from("users u")
+    .select([ "u.id", "u.name" ])
+    .where("u.active = true AND u.id > 10");
+
+type ValidWhereResult = ValidQueryBuilder<
+    TestSchema,
+    typeof validWhereBuilder
+>;
+type _ValidWhereIsValid = RequireTrue<
+    AssertEqual<ValidWhereResult, typeof validWhereBuilder>
+>;
+
+// Test: valid columns in WHERE with JOIN
+const validWhereWithJoinBuilder = createSelectQuery<TestSchema>()
+    .from("users u")
+    .select([ "u.id", "o.total" ])
+    .join("JOIN orders o ON u.id = o.user_id")
+    .where("o.total > 100 AND u.active = true");
+
+type ValidWhereWithJoinResult = ValidQueryBuilder<
+    TestSchema,
+    typeof validWhereWithJoinBuilder
+>;
+type _ValidWhereWithJoinIsValid = RequireTrue<
+    AssertEqual<ValidWhereWithJoinResult, typeof validWhereWithJoinBuilder>
+>;
+
+// Test: valid columns in HAVING clause
+const validHavingBuilder = createSelectQuery<TestSchema>()
+    .from("orders o")
+    .select([ "o.user_id", "SUM(o.total) as total_sum" ])
+    .groupBy("o.user_id")
+    .having("SUM(o.total) > 1000");
+
+type ValidHavingResult = ValidQueryBuilder<
+    TestSchema,
+    typeof validHavingBuilder
+>;
+type _ValidHavingIsValid = RequireTrue<
+    AssertEqual<ValidHavingResult, typeof validHavingBuilder>
 >;
 
 // ---------------------------------------------------------------------------
