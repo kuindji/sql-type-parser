@@ -52,7 +52,7 @@ import type {
     ExtractSubqueryCastType,
     ExtractAliasFromRemainder,
     ScanTokensForColumnRefs,
-} from "./columns.js";
+} from "./columns/index.js";
 import type {
     ParseTableRef,
     ParseDerivedTableAlias,
@@ -75,7 +75,7 @@ export type {
     IsSimpleIdentifier,
     ExtractUntilClosingParen,
     StripTypeCast,
-} from "./columns.js";
+} from "./columns/index.js";
 
 // Override ParseColumns to handle subqueries properly
 export type ParseColumns<T extends string> = ParseColumnsBase<T>;

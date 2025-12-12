@@ -24,7 +24,7 @@ import type {
 } from "../../common/utils.js";
 
 import type { ParseTableRef } from "./from.js";
-import type { ScanTokensForColumnRefs } from "./columns.js";
+import type { ScanTokensForColumnRefs } from "./columns/index.js";
 
 // ============================================================================
 // JOIN Parser

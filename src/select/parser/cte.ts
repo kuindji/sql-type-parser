@@ -7,7 +7,7 @@
  */
 
 import type { Trim } from "../../common/utils.js";
-import type { ExtractUntilClosingParen } from "./columns.js";
+import type { ExtractUntilClosingParen } from "./columns/index.js";
 
 // ============================================================================
 // CTE Utilities

@@ -21,7 +21,7 @@ import type {
     Trim,
 } from "../../common/utils.js";
 
-import type { ExtractUntilClosingParen, IsSimpleIdentifier } from "./columns.js";
+import type { ExtractUntilClosingParen, IsSimpleIdentifier } from "./columns/index.js";
 
 // ============================================================================
 // FROM Clause Parser

@@ -31,7 +31,7 @@ import type {
     ExtractColumnFromToken,
     ParseColumnRefType,
     ScanTokensForColumnRefs,
-} from "./columns.js";
+} from "./columns/index.js";
 
 import type { ParseJoins } from "./joins.js";
 
