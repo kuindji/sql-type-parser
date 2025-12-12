@@ -491,7 +491,7 @@ type ColumnRow<
     infer Expr extends string,
     infer Alias extends string | undefined,
 ] ? {
-        [K in Alias extends string ? Alias : ExtractColumnIdentifier<Expr>]:
+        [K in Alias extends string ? StripIdentifierQuotes<Alias> : ExtractColumnIdentifier<Expr>]:
             ExpressionType<Schema, State, Expr>;
     }
     : {
@@ -1637,6 +1637,10 @@ export interface SelectQueryBuilder<
      * Use `:paramName` syntax in SQL strings (WHERE, JOIN, etc.) and they will
      * be replaced with `$1`, `$2`, etc. at runtime based on object key order.
      *
+     * Note: This method does not affect the type-level SQL tag to avoid
+     * TypeScript depth limit issues when chaining many methods after withParams.
+     * The params are only used at runtime for SQL string assembly.
+     *
      * @example
      * ```typescript
      * builder
@@ -1649,7 +1653,7 @@ export interface SelectQueryBuilder<
      */
     withParams<P extends Record<string, QueryParamValue>>(
         params: P,
-    ): SelectQueryBuilder<Schema, State, WithNamedParamsSql<Sql, P>>;
+    ): SelectQueryBuilder<Schema, State, Sql>;
 
     /**
      * Apply a reusable builder function to this builder.
@@ -2239,16 +2243,16 @@ class SelectQueryBuilderImpl<
 
     withParams<P extends Record<string, QueryParamValue>>(
         params: P,
-    ): SelectQueryBuilder<Schema, State, WithNamedParamsSql<Sql, P>> {
+    ): SelectQueryBuilder<Schema, State, Sql> {
         const nextState = this.clone({ namedParams: params });
         return new SelectQueryBuilderImpl<
             Schema,
             State,
-            WithNamedParamsSql<Sql, P>
+            Sql
         >(nextState) as unknown as SelectQueryBuilder<
             Schema,
             State,
-            WithNamedParamsSql<Sql, P>
+            Sql
         >;
     }
 
@@ -2939,19 +2943,57 @@ type ExtractJoinTables<S extends string> = S extends
     : Rest
     : never;
 
+/** Extract just the table reference (without alias) from a table spec */
+type ExtractTableRefPart<S extends string> =
+    // Pattern: something AS alias
+    Trim<S> extends `${infer TablePart} AS ${string}` ? TablePart
+    // Pattern: "quoted" alias (quoted identifier followed by space and alias)
+    : Trim<S> extends `"${infer Quoted}" ${string}`
+        ? `"${Quoted}"`
+    // Pattern: `quoted` alias (backtick quoted identifier followed by space and alias)
+    : Trim<S> extends `\`${infer Quoted}\` ${string}`
+        ? `\`${Quoted}\``
+    // Pattern: 'quoted' alias (single quoted identifier followed by space and alias)
+    : Trim<S> extends `'${infer Quoted}' ${string}`
+        ? `'${Quoted}'`
+    // Pattern: schema.table alias (need to handle "schema"."table" specially)
+    : Trim<S> extends `"${infer S1}"."${infer T1}" ${string}`
+        ? `"${S1}"."${T1}"`
+    : Trim<S> extends `${infer Schema}.${infer Rest}`
+        // Rest might be "table" alias or table alias
+        ? Rest extends `"${infer Quoted}" ${string}`
+            ? `${Schema}."${Quoted}"`
+        : Rest extends `${infer Table} ${string}`
+            ? `${Schema}.${Table}`
+        : S
+    // Pattern: table alias (unquoted)
+    : Trim<S> extends `${infer Table} ${string}`
+        ? Table
+    // No alias, return as-is
+    : Trim<S>;
+
+/** Parse the schema and table from a table reference (without alias) */
+type ParseTableRefPart<T extends string> =
+    // Pattern: "schema"."table"
+    Trim<T> extends `"${infer Schema}"."${infer Table}"` ? [ Schema, Table ]
+    // Pattern: schema."table"
+    : Trim<T> extends `${infer Schema}."${infer Table}"` ? [ Schema, Table ]
+    // Pattern: "schema".table
+    : Trim<T> extends `"${infer Schema}".${infer Table}` ? [ Schema, Table ]
+    // Pattern: schema.table (both unquoted)
+    : Trim<T> extends `${infer Schema}.${infer Table}` ? [ Schema, Table ]
+    // Pattern: "table" (just quoted)
+    : Trim<T> extends `"${infer Table}"` ? [ undefined, Table ]
+    // Pattern: `table` (backtick quoted)
+    : Trim<T> extends `\`${infer Table}\`` ? [ undefined, Table ]
+    // Pattern: 'table' (single quoted)
+    : Trim<T> extends `'${infer Table}'` ? [ undefined, Table ]
+    // No schema, just table
+    : [ undefined, Trim<T> ];
+
 type NormalizeTableSpec<
     TableSpec extends string,
-> = Trim<TableSpec> extends `"${string}"`
-    ? [ undefined, RemoveQuotes<TableSpec> ]
-    : Trim<TableSpec> extends `\`${string}\``
-        ? [ undefined, RemoveQuotes<TableSpec> ]
-    : Trim<TableSpec> extends `'${string}'`
-        ? [ undefined, RemoveQuotes<TableSpec> ]
-    : Trim<TableSpec> extends `${infer Schema}.${infer Table}` ? [
-            RemoveQuotes<Schema>,
-            RemoveQuotes<Table>,
-        ]
-    : [ undefined, RemoveQuotes<TableSpec> ];
+> = ParseTableRefPart<ExtractTableRefPart<TableSpec>>;
 
 type BuilderCheckTable<
     Schema extends DatabaseSchema,
@@ -2961,15 +3003,16 @@ type BuilderCheckTable<
         infer SchemaName extends string | undefined,
         infer TableName extends string,
     ]
-        ? SchemaName extends string
-            ? SchemaName extends keyof Schema["schemas"]
-                ? TableName extends keyof Schema["schemas"][SchemaName] ? true
-                : `Table '${TableName}' not found in schema '${SchemaName}'`
-            : `Schema '${SchemaName}' not found`
-        : TableName extends keyof SchemaTables<Schema> ? true
-        : `Table '${TableName}' not found in default schema '${DefaultSchemaName<
-            Schema
-        >}'`
+        // Check for undefined explicitly first (due to TypeScript inference quirk)
+        ? [SchemaName] extends [undefined]
+            ? TableName extends keyof SchemaTables<Schema> ? true
+            : `Table '${TableName}' not found in default schema '${DefaultSchemaName<
+                Schema
+            >}'`
+        : SchemaName extends keyof Schema["schemas"]
+            ? TableName extends keyof Schema["schemas"][SchemaName] ? true
+            : `Table '${TableName}' not found in schema '${SchemaName & string}'`
+        : `Schema '${SchemaName & string}' not found`
     : true;
 
 type BuilderCheckTables<

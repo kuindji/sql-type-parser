@@ -725,6 +725,7 @@ describe("clause assembly and typing", () => {
                 `o.status`,
                 `(o.status || ' ' || o."userId")::text as combined`,
             ])
+            .select(/*sql*/ `array_agg(o."id") as "paymentIds"`)
             .groupBy([ `o."userId"`, `o.status` ])
             .having(havingTree)
             .orderBy([ `o."userId" asc nulls first`, `o.status desc` ]);
@@ -732,14 +733,14 @@ describe("clause assembly and typing", () => {
         const groupedSql = grouped.toString();
 
         expect(groupedSql).toBe(
-            `SELECT o."userId", o.status, (o.status || ' ' || o."userId")::text as combined FROM "Orders_Table" o GROUP BY o."userId", o.status HAVING (COUNT(o.id) > 1) ORDER BY o."userId" asc nulls first, o.status desc`,
+            `SELECT o."userId", o.status, (o.status || ' ' || o."userId")::text as combined, array_agg(o."id") as "paymentIds" FROM "Orders_Table" o GROUP BY o."userId", o.status HAVING (COUNT(o.id) > 1) ORDER BY o."userId" asc nulls first, o.status desc`,
         );
 
         type GroupedSql = BuilderSQL<typeof grouped>;
         type _GroupedSqlMatches = RequireTrue<
             AssertEqual<
                 GroupedSql,
-                `SELECT o."userId", o.status, (o.status || ' ' || o."userId")::text as combined FROM "Orders_Table" o GROUP BY o."userId", o.status HAVING (COUNT(o.id) > 1) ORDER BY o."userId" asc nulls first, o.status desc`
+                `SELECT o."userId", o.status, (o.status || ' ' || o."userId")::text as combined, array_agg(o."id") as "paymentIds" FROM "Orders_Table" o GROUP BY o."userId", o.status HAVING (COUNT(o.id) > 1) ORDER BY o."userId" asc nulls first, o.status desc`
             >
         >;
 
@@ -749,6 +750,7 @@ describe("clause assembly and typing", () => {
                 userId: OrderUserId;
                 status: OrderStatus;
                 combined: string;
+                paymentIds: unknown;
             }>
         >;
     });
