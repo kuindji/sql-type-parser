@@ -7,8 +7,8 @@
  * If this file compiles without errors, all tests pass.
  */
 
-import type { QueryResult, ValidateSQL } from "../../src/index.js";
-import type { AssertEqual, AssertExtends, RequireTrue } from "../helpers.js";
+import type { QueryResult, ValidateSQL } from "../../../src/index.js";
+import type { AssertEqual, AssertExtends, RequireTrue } from "../../helpers.js";
 
 // ============================================================================
 // Test Schema

@@ -112,9 +112,9 @@ export type ValidateSQL<
     Schema extends DatabaseSchema,
     Options = undefined,
 > = [ Options ] extends [ undefined ]
-    ? import("../validator.js").ValidateSelectSQL<SQL, Schema>
-    : import("../validator.js").ValidateSelectSQL<
+    ? import("../validator/index.js").ValidateSelectSQL<SQL, Schema>
+    : import("../validator/index.js").ValidateSelectSQL<
         SQL,
         Schema,
-        Options & import("../validator.js").ValidateSelectOptions
+        Options & import("../validator/index.js").ValidateSelectOptions
     >;

@@ -17,8 +17,8 @@ import type {
     ComplexExpr,
     ParseSQL,
     SQLSelectQuery,
-} from "../../src/index.js";
-import type { AssertEqual, AssertExtends, RequireTrue } from "../helpers.js";
+} from "../../../src/index.js";
+import type { AssertEqual, AssertExtends, RequireTrue } from "../../helpers.js";
 
 // ============================================================================
 // COALESCE Expression Tests

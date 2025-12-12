@@ -28,7 +28,7 @@ import type {
 import type { BuilderResultType } from "./select/builder-types/state.js";
 import type { ValidateBuilder } from "./select/builder-types/validation.js";
 import type { DatabaseSchema, QueryResult } from "./select/matcher/index.js";
-import type { ValidateSelectSQL } from "./select/validator.js";
+import type { ValidateSelectSQL } from "./select/validator/index.js";
 
 // ============================================================================
 // Core Types

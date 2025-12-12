@@ -68,7 +68,7 @@ export type {
     ValidateSelectClause,
     ValidateSelectOptions,
     ValidateSelectSQL,
-} from "./validator.js";
+} from "./validator/index.js";
 
 // Re-export builder types and runtime helpers (experimental)
 export type { UntypedSelectBuilder } from "./builder-types/builder.js";

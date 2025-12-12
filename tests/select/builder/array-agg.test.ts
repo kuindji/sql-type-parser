@@ -5,14 +5,15 @@
  * - MapSQLTypeToTS handling of array types (integer[], text[], etc.)
  * - Builder type inference for expressions with casts like array_agg(...)::type[]
  */
-import type { MapSQLTypeToTS } from "../src/common/ast.js";
-import { createSelectQuery } from "../src/select/builder.js";
+import type { MapSQLTypeToTS } from "../../../src/common/ast.js";
+import { createSelectQuery } from "../../../src/select/builder.js";
 
 // =============================================================================
 // Type-level assertion helpers
 // =============================================================================
 type Expect<T extends true> = T;
-type Equal<A, B> = [A] extends [B] ? [B] extends [A] ? true : false : false;
+type Equal<A, B> = [ A ] extends [ B ] ? [ B ] extends [ A ] ? true : false
+    : false;
 
 // =============================================================================
 // Test MapSQLTypeToTS with array types
@@ -54,33 +55,39 @@ const arrayAggBuilder = createSelectQuery<TestSchema>()
     .from("payments p")
     .select(/*sql*/ `array_agg(p."id")::integer[] as "paymentIds"`);
 
-type ArrayAggResult = typeof arrayAggBuilder extends { getResultType(): infer R }
-    ? R
+type ArrayAggResult = typeof arrayAggBuilder extends
+    { getResultType(): infer R; } ? R
     : never;
 
-type _agg_result = Expect<ArrayAggResult extends { paymentIds: number[] } ? true : false>;
+type _agg_result = Expect<
+    ArrayAggResult extends { paymentIds: number[]; } ? true : false
+>;
 
 // Test: string_agg with text[] cast (user uses cast to get typed result)
 const stringAggBuilder = createSelectQuery<TestSchema>()
     .from("users u")
     .select(/*sql*/ `string_agg(u."name", ',')::text as "names"`);
 
-type StringAggResult = typeof stringAggBuilder extends { getResultType(): infer R }
-    ? R
+type StringAggResult = typeof stringAggBuilder extends
+    { getResultType(): infer R; } ? R
     : never;
 
-type _string_agg_result = Expect<StringAggResult extends { names: string } ? true : false>;
+type _string_agg_result = Expect<
+    StringAggResult extends { names: string; } ? true : false
+>;
 
 // Test: json_agg with jsonb[] cast
 const jsonAggBuilder = createSelectQuery<TestSchema>()
     .from("payments p")
     .select(/*sql*/ `json_agg(p."id")::jsonb[] as "paymentData"`);
 
-type JsonAggResult = typeof jsonAggBuilder extends { getResultType(): infer R }
+type JsonAggResult = typeof jsonAggBuilder extends { getResultType(): infer R; }
     ? R
     : never;
 
-type _json_agg_result = Expect<JsonAggResult extends { paymentData: object[] } ? true : false>;
+type _json_agg_result = Expect<
+    JsonAggResult extends { paymentData: object[]; } ? true : false
+>;
 
 // Export to ensure file is treated as a module
 export type ArrayTypeTestsPass = true;
