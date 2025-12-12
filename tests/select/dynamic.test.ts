@@ -15,13 +15,12 @@ import type {
     IsUnionQueryError,
     ParseSQL,
     QueryResult,
-    SelectQueryBuilder,
     SQLSelectQuery,
     UnionQueryError,
     ValidQuery,
 } from "../../src/index.js";
-import type { BuilderStateTag } from "../../src/select/builder.js";
 import { createSelectQuery } from "../../src/index.js";
+import type { BuilderStateTag } from "../../src/select/builder-types/helpers.js";
 import type {
     AssertEqual,
     AssertExtends,
@@ -199,22 +198,33 @@ type _SU3 = RequireFalse<SU_String>;
 
 // Test: QueryResult returns UnionQueryError for union types
 type Currency = "GBP" | "USD" | "EUR";
-type QR_Union = QueryResult<`SELECT '${Currency}' as currency FROM users`, TestSchema>;
+type QR_Union = QueryResult<
+    `SELECT '${Currency}' as currency FROM users`,
+    TestSchema
+>;
 type _QR1 = RequireTrue<AssertExtends<QR_Union, UnionQueryError>>;
 type _QR2 = RequireTrue<IsUnionQueryError<QR_Union>>;
 
 // Test: QueryResult works normally for single literal
 type QR_Normal = QueryResult<"SELECT id FROM users", TestSchema>;
 type _QR3 = RequireFalse<IsUnionQueryError<QR_Normal>>;
-type _QR4 = RequireTrue<AssertExtends<QR_Normal, { id: number }>>;
+type _QR4 = RequireTrue<AssertExtends<QR_Normal, { id: number; }>>;
 
 // Test: Union in complex query template is detected
 type ComplexUnion = "foo" | "bar";
-type QR_Complex = QueryResult<`SELECT id, '${ComplexUnion}' as tag FROM users`, TestSchema>;
+type QR_Complex = QueryResult<
+    `SELECT id, '${ComplexUnion}' as tag FROM users`,
+    TestSchema
+>;
 type _QR5 = RequireTrue<IsUnionQueryError<QR_Complex>>;
 
 // Test: UnionQueryError has the expected shape
-type UQE_Shape = RequireTrue<AssertExtends<UnionQueryError, { readonly __unionError: true; readonly message: string }>>;
+type UQE_Shape = RequireTrue<
+    AssertExtends<
+        UnionQueryError,
+        { readonly __unionError: true; readonly message: string; }
+    >
+>;
 
 // ============================================================================
 // Builder Union Detection Tests
@@ -223,11 +233,19 @@ type UQE_Shape = RequireTrue<AssertExtends<UnionQueryError, { readonly __unionEr
 // Test: Builder state with UnionQueryError in row is valid
 // This verifies that when AddColumnsForSchema detects a union, it produces
 // a BuilderStateTag with UnionQueryError as the row type
-type BuilderStateWithUnionError = BuilderStateTag<"users", UnionQueryError, "FROM users">;
-type _BU1 = RequireTrue<AssertExtends<BuilderStateWithUnionError["row"], UnionQueryError>>;
+type BuilderStateWithUnionError = BuilderStateTag<
+    "users",
+    UnionQueryError,
+    "FROM users"
+>;
+type _BU1 = RequireTrue<
+    AssertExtends<BuilderStateWithUnionError["row"], UnionQueryError>
+>;
 
 // Test: BuilderStateTag with union error is a valid state tag
-type _BU2 = RequireTrue<AssertExtends<BuilderStateWithUnionError, BuilderStateTag<any, any, any>>>;
+type _BU2 = RequireTrue<
+    AssertExtends<BuilderStateWithUnionError, BuilderStateTag<any, any, any>>
+>;
 
 // ============================================================================
 // Builder Method Union Detection Tests
@@ -270,29 +288,39 @@ type WhereLiteralResult = BuilderReturnType<ReturnType<WhereWithLiteral>>;
 type _BWU2 = RequireFalse<IsUnionQueryError<WhereLiteralResult>>;
 
 // --- Test: join() with union produces UnionQueryError ---
-type JoinUnion = "LEFT JOIN posts ON posts.user_id = users.id" | "RIGHT JOIN posts ON posts.user_id = users.id";
+type JoinUnion =
+    | "LEFT JOIN posts ON posts.user_id = users.id"
+    | "RIGHT JOIN posts ON posts.user_id = users.id";
 type JoinUnionBuilder = ReturnType<typeof builderWithSelect.join<JoinUnion>>;
 type JoinUnionResult = BuilderReturnType<JoinUnionBuilder>;
 type _BJU1 = RequireTrue<IsUnionQueryError<JoinUnionResult>>;
 
 // --- Test: join() with literal works normally ---
-type JoinLiteralBuilder = ReturnType<typeof builderWithSelect.join<"LEFT JOIN posts ON posts.user_id = users.id">>;
+type JoinLiteralBuilder = ReturnType<
+    typeof builderWithSelect.join<"LEFT JOIN posts ON posts.user_id = users.id">
+>;
 type JoinLiteralResult = BuilderReturnType<JoinLiteralBuilder>;
 type _BJU2 = RequireFalse<IsUnionQueryError<JoinLiteralResult>>;
 
 // --- Test: orderBy() with union produces UnionQueryError ---
-type OrderByUnionBuilder = ReturnType<typeof builderWithSelect.orderBy<OrderByUnionStr>>;
+type OrderByUnionBuilder = ReturnType<
+    typeof builderWithSelect.orderBy<OrderByUnionStr>
+>;
 type OrderByUnionResult = BuilderReturnType<OrderByUnionBuilder>;
 type _BOU1 = RequireTrue<IsUnionQueryError<OrderByUnionResult>>;
 
 // --- Test: orderBy() with literal works normally ---
-type OrderByLiteralBuilder = ReturnType<typeof builderWithSelect.orderBy<"id ASC">>;
+type OrderByLiteralBuilder = ReturnType<
+    typeof builderWithSelect.orderBy<"id ASC">
+>;
 type OrderByLiteralResult = BuilderReturnType<OrderByLiteralBuilder>;
 type _BOU2 = RequireFalse<IsUnionQueryError<OrderByLiteralResult>>;
 
 // --- Test: groupBy() with union produces UnionQueryError ---
 type GroupByCol = "id" | "name";
-type GroupByUnionBuilder = ReturnType<typeof builderWithSelect.groupBy<GroupByCol>>;
+type GroupByUnionBuilder = ReturnType<
+    typeof builderWithSelect.groupBy<GroupByCol>
+>;
 type GroupByUnionResult = BuilderReturnType<GroupByUnionBuilder>;
 type _BGU1 = RequireTrue<IsUnionQueryError<GroupByUnionResult>>;
 
@@ -302,12 +330,16 @@ type GroupByLiteralResult = BuilderReturnType<GroupByLiteralBuilder>;
 type _BGU2 = RequireFalse<IsUnionQueryError<GroupByLiteralResult>>;
 
 // --- Test: having() with union produces UnionQueryError ---
-type HavingUnionBuilder = ReturnType<typeof builderWithSelect.having<HavingUnionStr>>;
+type HavingUnionBuilder = ReturnType<
+    typeof builderWithSelect.having<HavingUnionStr>
+>;
 type HavingUnionResult = BuilderReturnType<HavingUnionBuilder>;
 type _BHU1 = RequireTrue<IsUnionQueryError<HavingUnionResult>>;
 
 // --- Test: having() with literal works normally ---
-type HavingLiteralBuilder = ReturnType<typeof builderWithSelect.having<"count(*) > 1">>;
+type HavingLiteralBuilder = ReturnType<
+    typeof builderWithSelect.having<"count(*) > 1">
+>;
 type HavingLiteralResult = BuilderReturnType<HavingLiteralBuilder>;
 type _BHU2 = RequireFalse<IsUnionQueryError<HavingLiteralResult>>;
 

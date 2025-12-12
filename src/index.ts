@@ -151,6 +151,9 @@ export type { ParamString, QueryParamValue } from "./common/index.js";
 
 // Re-export SELECT-specific types
 export type {
+    // Builder types
+    BuilderReturnType,
+    BuilderSQL,
     // Column types
     ColumnRef,
     ExistsExpr,
@@ -184,6 +187,7 @@ export type {
     UnionClause,
     UnionClauseAny,
     UnionOperatorType,
+    ValidateBuilder,
     ValidateQuery,
     ValidateSelectClause,
     ValidateSelectOptions,
@@ -191,34 +195,6 @@ export type {
     ValidateSelectSQL,
     ValidateSQL,
 } from "./select/index.js";
-
-// Re-export SELECT builder advanced types/helpers
-export type {
-    AnyBuilderSqlTag,
-    AnyBuilderStateTag,
-    AssembleBuilderSql,
-    BuilderResultType,
-    BuilderReturnType,
-    BuilderSQL,
-    BuilderSqlTag,
-    BuilderStateOf,
-    BuilderStateTag,
-    CanReplaceJoin,
-    EmptyBuilderState,
-    EmptySqlState,
-    EmptyState,
-    ErrorState,
-    JoinStrictness,
-    JoinTypeToStrictness,
-    RuntimeSelectState,
-    SelectItemsFromState,
-    SelectQueryBuilder,
-    StateToSelectClause,
-    StateToSelectQueryClause,
-    TableNameOf,
-    UntypedSelectBuilder,
-    ValidateBuilder,
-} from "./select/builder.js";
 
 // Re-export SELECT builder runtime helpers
 export {

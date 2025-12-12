@@ -15,39 +15,46 @@ import type {
     ColumnRef,
     ColumnRefType,
     CTEDefinition,
-    JoinClause,
     OrderByItem,
     SelectClause,
-    SelectItem,
     TableRef,
-    TableSource,
-    TableWildcard,
     UnboundColumnRef,
     UnionClause,
-    UnionOperatorType,
     WhereExpr,
 } from "../../src/index.js";
 
 import type {
-    AnyBuilderSqlTag,
-    AnyBuilderStateTag,
     BuilderReturnType,
     BuilderSQL,
-    BuilderSqlTag,
-    BuilderStateTag,
-    CanReplaceJoin,
+} from "../../src/select/builder-types/return-type.js";
+
+import type {
+    AnyBuilderSqlTag,
+    AnyBuilderStateTag,
+} from "../../src/select/builder-types/helpers.js";
+
+import type { CanReplaceJoin } from "../../src/select/builder-types/joins.js";
+
+import type {
     EmptyState,
     ErrorState,
     JoinStrictness,
-    RuntimeSelectState,
     SelectBuilderAnyState,
     SelectBuilderState,
+} from "../../src/select/builder-types/state.js";
+
+import type {
     SelectItemsFromState,
-    SelectQueryBuilder,
     StateToSelectClause,
     StateToSelectQueryClause,
-    ValidateBuilder,
-} from "../../src/select/builder.js";
+} from "../../src/select/builder-types/state-to-ast.js";
+
+import type {
+    RuntimeSelectState,
+    SelectQueryBuilder,
+} from "../../src/select/builder-types/builder.js";
+
+import type { ValidateBuilder } from "../../src/select/builder-types/validation.js";
 
 import type {
     AssertEqual,
@@ -1292,7 +1299,7 @@ describe("reusable parts", () => {
 // ============================================================================
 
 import { createUntypedQuery } from "../../src/index.js";
-import type { UntypedSelectBuilder } from "../../src/select/builder.js";
+import type { UntypedSelectBuilder } from "../../src/select/builder-types/builder.js";
 
 describe("UntypedSelectBuilder", () => {
     // Define a result type upfront – no schema needed

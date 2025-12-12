@@ -6,12 +6,9 @@
  */
 
 import { createConditionTree, createSelectQuery } from "../../src/index.js";
-import type {
-    BuilderReturnType,
-    BuilderSQL,
-    BuilderStateOf,
-    RuntimeSelectState,
-} from "../../src/index.js";
+import type { BuilderReturnType, BuilderSQL } from "../../src/index.js";
+import type { RuntimeSelectState } from "../../src/select/builder-types/builder.js";
+import type { BuilderStateOf } from "../../src/select/builder-types/validation.js";
 import type { BlogSchema, ECommerceSchema } from "../schema.js";
 
 // Basic builder usage with explicit column selection and WHERE clause

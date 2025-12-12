@@ -12,11 +12,11 @@ import { describe, expect, it } from "bun:test";
 import type {
     BuilderReturnType,
     BuilderSQL,
-} from "../../src/select/builder.js";
+} from "../../../src/select/builder-types/return-type.js";
 
-import type { AssertEqual, AssertExtends, RequireTrue } from "../helpers.js";
+import type { AssertEqual, RequireTrue } from "../../helpers.js";
 
-import { createSelectQuery } from "../../src/index.js";
+import { createSelectQuery } from "../../../src/index.js";
 
 // ============================================================================
 // Test Schema

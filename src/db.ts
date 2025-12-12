@@ -22,11 +22,11 @@
  */
 
 import type {
-    BuilderResultType,
     SelectQueryBuilder,
     UntypedSelectBuilder,
-    ValidateBuilder,
-} from "./select/builder.js";
+} from "./select/builder-types/builder.js";
+import type { BuilderResultType } from "./select/builder-types/state.js";
+import type { ValidateBuilder } from "./select/builder-types/validation.js";
 import type { DatabaseSchema, QueryResult } from "./select/matcher.js";
 import type { ValidateSelectSQL } from "./select/validator.js";
 

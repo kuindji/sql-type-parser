@@ -6,8 +6,8 @@
  */
 
 export type { ASTTestsPass } from "./ast.test.js";
-export type { BuilderComplexTestsPass } from "./builder-complex.test.js";
 export type { BuilderPhase2TestsPass } from "./builder.test.js";
+export type { BuilderComplexTestsPass } from "./builder/complex.test.js";
 export type { DynamicTestsPass } from "./dynamic.test.js";
 export type { MatcherComplexTestsPass } from "./matcher-complex.test.js";
 export type { MatcherTestsPass } from "./matcher.test.js";

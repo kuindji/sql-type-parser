@@ -10,23 +10,25 @@ import { describe, expect, it } from "bun:test";
  * faster for TypeScript to process than nested when() calls.
  */
 
+import type { SelectQueryBuilder } from "../../../src/select/builder-types/builder.js";
 import type {
     AnyBuilderSqlTag,
     AnyBuilderStateTag,
+} from "../../../src/select/builder-types/helpers.js";
+import type {
     BuilderReturnType,
     BuilderSQL,
-    SelectQueryBuilder,
-} from "../../src/select/builder.js";
+} from "../../../src/select/builder-types/return-type.js";
 
-import type { AssertEqual, AssertExtends, RequireTrue } from "../helpers.js";
+import type { AssertEqual, AssertExtends, RequireTrue } from "../../helpers.js";
 
 import {
     createConditionTree,
     createSelectQuery,
     createUntypedQuery,
-} from "../../src/index.js";
+} from "../../../src/index.js";
 
-import type { DatabaseSchema } from "../../src/common/schema.js";
+import type { DatabaseSchema } from "../../../src/common/schema.js";
 
 // ============================================================================
 // Test Schema

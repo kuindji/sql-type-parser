@@ -71,19 +71,22 @@ export type {
 } from "./validator.js";
 
 // Re-export builder types and runtime helpers (experimental)
+export type { UntypedSelectBuilder } from "./builder-types/builder.js";
+
 export type {
     BuilderReturnType,
     BuilderSQL,
+} from "./builder-types/return-type.js";
+export type {
     EmptyState as SelectEmptyState,
     ErrorState as SelectErrorState,
     SelectBuilderAnyState,
     SelectBuilderState,
-    UntypedSelectBuilder,
-    ValidateBuilder,
-} from "./builder.js";
+} from "./builder-types/state.js";
+export type { ValidateBuilder } from "./builder-types/validation.js";
 
+export { assembleSelectSQL } from "./builder-runtime/assemble-select-sql.js";
 export {
-    assembleSelectSQL,
     createSelectQuery,
     createUntypedQuery,
     createUntypedSelectQuery,
