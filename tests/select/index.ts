@@ -17,7 +17,7 @@ export type {
     ParserComplexTestsPass,
     UnionTestsPass,
 } from "./parser/index.js";
-export type { ValidatorTestsPass } from "./validator.test.js";
+export type { ValidatorTestsPass } from "./validator/index.js";
 
 /**
  * All SELECT tests pass if this type is true
