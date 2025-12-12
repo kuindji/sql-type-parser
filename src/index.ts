@@ -151,47 +151,40 @@ export type { ParamString, QueryParamValue } from "./common/index.js";
 
 // Re-export SELECT-specific types
 export type {
-    // Builder types
+    AnyBuilderSqlTag,
+    AnyBuilderStateTag,
     BuilderReturnType,
     BuilderSQL,
-    // Column types
     ColumnRef,
     ExistsExpr,
     ExtendedColumnRefType,
     IntervalExpr,
     LiteralExpr,
-    // Matcher/validator internals used by builder
     MatchSelectClause,
-    // Matcher types
     MatchSelectQuery,
-    // Fragment parsers used by the builder
     ParseOrderByItems,
     ParseWhereClause,
     QueryResult,
-    // Builder types / helpers
     SelectBuilderAnyState,
     SelectBuilderState,
-    // Select types
     SelectClause,
     SelectColumns,
     SelectEmptyState,
     SelectErrorState,
     SelectItem,
-    // SQL constants
+    SelectQueryBuilder,
     SQLConstantExpr,
     SQLConstantName,
-    // Query wrapper types
     SQLSelectQuery,
     SubqueryExpr,
-    // Union types
     UnionClause,
     UnionClauseAny,
     UnionOperatorType,
+    UntypedSelectBuilder,
     ValidateBuilder,
     ValidateQuery,
     ValidateSelectClause,
     ValidateSelectOptions,
-    // Validator types
     ValidateSelectSQL,
     ValidateSQL,
 } from "./select/index.js";

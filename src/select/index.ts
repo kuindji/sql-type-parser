@@ -71,7 +71,10 @@ export type {
 } from "./validator/index.js";
 
 // Re-export builder types and runtime helpers (experimental)
-export type { UntypedSelectBuilder } from "./builder-types/builder.js";
+export type {
+    SelectQueryBuilder,
+    UntypedSelectBuilder,
+} from "./builder-types/builder.js";
 
 export type {
     BuilderReturnType,
@@ -84,6 +87,11 @@ export type {
     SelectBuilderState,
 } from "./builder-types/state.js";
 export type { ValidateBuilder } from "./builder-types/validation.js";
+
+export type {
+    AnyBuilderSqlTag,
+    AnyBuilderStateTag,
+} from "./builder-types/helpers/state-tags.js";
 
 export { assembleSelectSQL } from "./builder-runtime/assemble-select-sql.js";
 export {
