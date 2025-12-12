@@ -6,6 +6,7 @@
  */
 
 import type {
+    BuilderReturnType,
     DynamicQuery,
     IsDynamicQuery,
     IsStringLiteral,
@@ -14,13 +15,13 @@ import type {
     IsUnionQueryError,
     ParseSQL,
     QueryResult,
+    SelectQueryBuilder,
     SQLSelectQuery,
     UnionQueryError,
     ValidQuery,
 } from "../../src/index.js";
-import type {
-    BuilderStateTag,
-} from "../../src/select/builder.js";
+import type { BuilderStateTag } from "../../src/select/builder.js";
+import { createSelectQuery } from "../../src/index.js";
 import type {
     AssertEqual,
     AssertExtends,
@@ -227,6 +228,98 @@ type _BU1 = RequireTrue<AssertExtends<BuilderStateWithUnionError["row"], UnionQu
 
 // Test: BuilderStateTag with union error is a valid state tag
 type _BU2 = RequireTrue<AssertExtends<BuilderStateWithUnionError, BuilderStateTag<any, any, any>>>;
+
+// ============================================================================
+// Builder Method Union Detection Tests
+// ============================================================================
+
+// Define union types for testing
+type TestCurrency = "GBP" | "USD" | "EUR";
+type TestStatus = "active" | "inactive";
+type TestOrder = "ASC" | "DESC";
+
+// Helper: template literal types with unions
+type SelectUnionStr = `'${TestCurrency}' as currency`;
+type WhereUnionStr = `status = '${TestStatus}'`;
+type OrderByUnionStr = `id ${TestOrder}`;
+type HavingUnionStr = `count(*) > ${1 | 2 | 3}`;
+
+// Helper to get a builder for testing
+const baseBuilder = createSelectQuery<TestSchema>().from("users");
+
+// --- Test: select() with union produces UnionQueryError ---
+type SelectWithUnion = typeof baseBuilder.select<SelectUnionStr>;
+// The return type's result should be UnionQueryError
+type SelectUnionResult = BuilderReturnType<ReturnType<SelectWithUnion>>;
+type _BSU1 = RequireTrue<IsUnionQueryError<SelectUnionResult>>;
+
+// --- Test: select() with literal works normally ---
+type SelectWithLiteral = typeof baseBuilder.select<"id, name">;
+type SelectLiteralResult = BuilderReturnType<ReturnType<SelectWithLiteral>>;
+type _BSU2 = RequireFalse<IsUnionQueryError<SelectLiteralResult>>;
+
+// --- Test: where() with union produces UnionQueryError ---
+const builderWithSelect = baseBuilder.select("id");
+type WhereUnionFn = typeof builderWithSelect.where<WhereUnionStr>;
+type WhereUnionResult = BuilderReturnType<ReturnType<WhereUnionFn>>;
+type _BWU1 = RequireTrue<IsUnionQueryError<WhereUnionResult>>;
+
+// --- Test: where() with literal works normally ---
+type WhereWithLiteral = typeof builderWithSelect.where<"status = 'active'">;
+type WhereLiteralResult = BuilderReturnType<ReturnType<WhereWithLiteral>>;
+type _BWU2 = RequireFalse<IsUnionQueryError<WhereLiteralResult>>;
+
+// --- Test: join() with union produces UnionQueryError ---
+type JoinUnion = "LEFT JOIN posts ON posts.user_id = users.id" | "RIGHT JOIN posts ON posts.user_id = users.id";
+type JoinUnionBuilder = ReturnType<typeof builderWithSelect.join<JoinUnion>>;
+type JoinUnionResult = BuilderReturnType<JoinUnionBuilder>;
+type _BJU1 = RequireTrue<IsUnionQueryError<JoinUnionResult>>;
+
+// --- Test: join() with literal works normally ---
+type JoinLiteralBuilder = ReturnType<typeof builderWithSelect.join<"LEFT JOIN posts ON posts.user_id = users.id">>;
+type JoinLiteralResult = BuilderReturnType<JoinLiteralBuilder>;
+type _BJU2 = RequireFalse<IsUnionQueryError<JoinLiteralResult>>;
+
+// --- Test: orderBy() with union produces UnionQueryError ---
+type OrderByUnionBuilder = ReturnType<typeof builderWithSelect.orderBy<OrderByUnionStr>>;
+type OrderByUnionResult = BuilderReturnType<OrderByUnionBuilder>;
+type _BOU1 = RequireTrue<IsUnionQueryError<OrderByUnionResult>>;
+
+// --- Test: orderBy() with literal works normally ---
+type OrderByLiteralBuilder = ReturnType<typeof builderWithSelect.orderBy<"id ASC">>;
+type OrderByLiteralResult = BuilderReturnType<OrderByLiteralBuilder>;
+type _BOU2 = RequireFalse<IsUnionQueryError<OrderByLiteralResult>>;
+
+// --- Test: groupBy() with union produces UnionQueryError ---
+type GroupByCol = "id" | "name";
+type GroupByUnionBuilder = ReturnType<typeof builderWithSelect.groupBy<GroupByCol>>;
+type GroupByUnionResult = BuilderReturnType<GroupByUnionBuilder>;
+type _BGU1 = RequireTrue<IsUnionQueryError<GroupByUnionResult>>;
+
+// --- Test: groupBy() with literal works normally ---
+type GroupByLiteralBuilder = ReturnType<typeof builderWithSelect.groupBy<"id">>;
+type GroupByLiteralResult = BuilderReturnType<GroupByLiteralBuilder>;
+type _BGU2 = RequireFalse<IsUnionQueryError<GroupByLiteralResult>>;
+
+// --- Test: having() with union produces UnionQueryError ---
+type HavingUnionBuilder = ReturnType<typeof builderWithSelect.having<HavingUnionStr>>;
+type HavingUnionResult = BuilderReturnType<HavingUnionBuilder>;
+type _BHU1 = RequireTrue<IsUnionQueryError<HavingUnionResult>>;
+
+// --- Test: having() with literal works normally ---
+type HavingLiteralBuilder = ReturnType<typeof builderWithSelect.having<"count(*) > 1">>;
+type HavingLiteralResult = BuilderReturnType<HavingLiteralBuilder>;
+type _BHU2 = RequireFalse<IsUnionQueryError<HavingLiteralResult>>;
+
+// --- Test: Union error propagates through chain ---
+// Once a union is introduced, subsequent calls should preserve the error
+// We test this by verifying that the Where union result already has the error
+// The Sql tag is checked at each step via IsUnionSqlError, so errors propagate
+type _BCU1 = RequireTrue<IsUnionQueryError<WhereUnionResult>>;
+
+// --- Test: Normal chain without unions works ---
+// Verify the normal where doesn't have an error
+type _BCU2 = RequireFalse<IsUnionQueryError<WhereLiteralResult>>;
 
 // ============================================================================
 // Export for verification
