@@ -659,10 +659,35 @@ class SelectQueryBuilderImpl<
     }
 
     getParams(): ReadonlyArray<QueryParamValue> {
-        // Return named params values in key order (same order as $N placeholders)
+        // Return named params values in order of first appearance in the SQL
+        // (same order as $N placeholders)
         const namedParams = this._state.namedParams;
         if (namedParams && Object.keys(namedParams).length > 0) {
-            return Object.values(namedParams);
+            // Build the combined SQL fragments string
+            const allSqlFragments = [
+                ...Object.values(this._state.cteSql),
+                ...Object.values(this._state.selectSql).flat(),
+                this._state.fromSql ?? "",
+                ...Object.values(this._state.joinSql),
+                ...Object.values(this._state.whereSql),
+                ...Object.values(this._state.groupBySql),
+                ...Object.values(this._state.havingSql),
+                ...Object.values(this._state.orderBySql),
+                this._state.unionSql ?? "",
+            ].join(" ");
+
+            // Find params in order of first appearance
+            const paramRegex = /:([a-zA-Z_][a-zA-Z0-9_]*)(?![a-zA-Z0-9_])/g;
+            const usedParams: string[] = [];
+            let match;
+            while ((match = paramRegex.exec(allSqlFragments)) !== null) {
+                const name = match[1];
+                if (name in namedParams && !usedParams.includes(name)) {
+                    usedParams.push(name);
+                }
+            }
+
+            return usedParams.map(name => namedParams[name]);
         }
         // Fallback to legacy positional params
         return this._state.params;

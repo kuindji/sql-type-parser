@@ -19,13 +19,10 @@ import type {
     SelectQueryBuilder,
 } from "../../../src/select/builder-types/builder.js";
 
-import type {
-    HasProperty,
-    RequireTrue,
-} from "../../helpers.js";
+import type { HasProperty, RequireTrue } from "../../helpers.js";
 
-import { createSelectQuery } from "../../../src/index.js";
 import type { DatabaseSchema } from "../../../src/common/schema.js";
+import { createSelectQuery } from "../../../src/index.js";
 
 describe("withParams()", () => {
     type User_id = string & { __type: "Users_Table.id"; };
@@ -118,5 +115,110 @@ describe("withParams()", () => {
         // Type-level: verify the row type is inferred correctly
         type _RowHasId = RequireTrue<HasProperty<ParamRow, "id">>;
         type _RowHasCreatedAt = RequireTrue<HasProperty<ParamRow, "createdAt">>;
+    });
+
+    it("handles whereIf with potentially undefined constants", () => {
+        // Simulate filter parameters that may or may not be provided
+        const userId: number | undefined = 42;
+        const status: string | undefined = "active";
+        const minTotal: number | false = false;
+        const isActive: boolean | undefined = true;
+        const createdAfter: string | undefined = "2024-01-01";
+        const deletedAt: string | undefined = undefined;
+
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select([ "u.id", "u.status", "u.active" ])
+            .withParams({
+                userId: userId!,
+                status: status!,
+                minTotal: minTotal!,
+                isActive: isActive!,
+                createdAfter: createdAfter!,
+                deletedAt: deletedAt!,
+            })
+            // Only add WHERE clauses when the filter value is defined
+            .whereIf(!!userId, `u.id = :userId`)
+            .whereIf(!!status, `u.status = :status`)
+            .whereIf(!!minTotal, `u.id > :minTotal`)
+            .whereIf(!!isActive, `u.active = :isActive`)
+            .whereIf(!!createdAfter, `u."createdAt" >= :createdAfter`)
+            .whereIf(!!deletedAt, `u."createdAt" <= :deletedAt`);
+
+        // Runtime: only conditions with defined values should be included
+        // - userId: 42 (defined) -> included
+        // - status: "active" (defined) -> included
+        // - minTotal: undefined -> excluded
+        // - isActive: true (defined) -> included
+        // - createdAfter: "2024-01-01" (defined) -> included
+        // - deletedAt: undefined -> excluded
+        const sql = builder.toString();
+        console.log("Generated SQL:", sql);
+
+        expect(sql).toBe(
+            `SELECT u.id, u.status, u.active FROM users u WHERE u.id = $1 AND u.status = $2 AND u.active = $3 AND u."createdAt" >= $4`,
+        );
+        expect(builder.getParams()).toEqual([
+            42,
+            "active",
+            true,
+            "2024-01-01",
+        ]);
+    });
+
+    it("handles whereIf with all undefined constants", () => {
+        // All filters are undefined
+        const userId: number | undefined = undefined;
+        const status: string | undefined = "active";
+        const active: boolean | undefined = undefined;
+
+        const builder = createSelectQuery<B_ParamSchema>()
+            .withParams({ userId: userId!, status: status!, active: active! })
+            .from("users u")
+            .select([ "u.id" ])
+            .whereIf(!!userId, `u.id = :userId`)
+            .whereIf(!!status, `u.status = :status`)
+            .whereIf(!!active, `u.active = :active`);
+
+        const sql = builder.toString();
+        console.log("Generated SQL (no filters):", sql);
+
+        expect(sql).toBe(`SELECT u.id FROM users u WHERE u.status = $1`);
+        expect(builder.getParams()).toEqual([ "active" ]);
+    });
+
+    it("handles whereIf with mixed constants and named params", () => {
+        // Mix of always-present and conditional params
+        const status: string = "active";
+        const searchTerm: string | undefined = "john";
+        const minId: number | undefined = undefined;
+        const maxId: number | undefined = 100;
+
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select([ "u.id", "u.status" ])
+            .withParams({
+                status,
+                searchTerm: searchTerm!,
+                minId: minId!,
+                maxId: maxId!,
+            })
+            .where("u.status = :status")
+            // Add conditional filters based on whether params are defined
+            .whereIf(!!searchTerm, `u.status ILIKE '%' || :searchTerm || '%'`)
+            .whereIf(!!minId, `u.id >= :minId`)
+            .whereIf(!!maxId, `u.id <= :maxId`);
+
+        const sql = builder.toString();
+        console.log("Generated SQL (mixed):", sql);
+
+        // status is always present -> $1
+        // searchTerm is defined -> $2
+        // minId is undefined -> excluded
+        // maxId is defined -> $3
+        expect(sql).toBe(
+            `SELECT u.id, u.status FROM users u WHERE u.status = $1 AND u.status ILIKE '%' || $2 || '%' AND u.id <= $3`,
+        );
+        expect(builder.getParams()).toEqual([ "active", "john", 100 ]);
     });
 });

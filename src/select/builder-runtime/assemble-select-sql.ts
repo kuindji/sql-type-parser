@@ -119,13 +119,25 @@ export function assembleSelectSQL(state: RuntimeSelectState): string {
     let sql = parts.join(" ");
 
     // Replace named parameters (:name) with positional placeholders ($N)
+    // Params are ordered by their first appearance in the SQL
     const namedParams = state.namedParams;
     if (namedParams && Object.keys(namedParams).length > 0) {
-        const paramNames = Object.keys(namedParams);
-        for (let i = 0; i < paramNames.length; i++) {
-            const name = paramNames[i];
+        // Find all param references in order of appearance
+        const paramRegex = /:([a-zA-Z_][a-zA-Z0-9_]*)(?![a-zA-Z0-9_])/g;
+        const usedParams: string[] = [];
+        let match;
+        while ((match = paramRegex.exec(sql)) !== null) {
+            const name = match[1];
+            // Only add if it's a known param and not already added
+            if (name in namedParams && !usedParams.includes(name)) {
+                usedParams.push(name);
+            }
+        }
+
+        // Replace each param with its positional placeholder
+        for (let i = 0; i < usedParams.length; i++) {
+            const name = usedParams[i];
             // Replace :name with $N (1-indexed)
-            // Use word boundary to avoid replacing :name inside :username
             const regex = new RegExp(`:${name}(?![a-zA-Z0-9_])`, "g");
             sql = sql.replace(regex, `$${i + 1}`);
         }

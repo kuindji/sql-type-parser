@@ -721,9 +721,14 @@ describe("withParams() with named parameters", () => {
         const builder = createSelectQuery<TestSchema>()
             .from("users")
             .select("id")
-            .withParams({ first: 1, second: "two", third: true });
+            .withParams({ first: 1, second: "two", third: true })
+            .where("id = :first")
+            .where("active = :third")
+            .where("name = :second")
+            .where("name = :second");
 
-        expect(builder.getParams()).toEqual([ 1, "two", true ]);
+        // Params are returned in key order, only if used in the query
+        expect(builder.getParams()).toEqual([ 1, true, "two" ]);
     });
 
     it("should handle multiple occurrences of same param", () => {
@@ -764,10 +769,11 @@ describe("withParams() with named parameters", () => {
             .select("o.total")
             .where("u.id = :userId");
 
+        // Params ordered by first appearance: minTotal (JOIN) -> userId (WHERE)
         expect(builder.toString()).toBe(
-            "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.userId = u.id AND o.total > $2 WHERE u.id = $1",
+            "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.userId = u.id AND o.total > $1 WHERE u.id = $2",
         );
-        expect(builder.getParams()).toEqual([ 123, 100 ]);
+        expect(builder.getParams()).toEqual([ 100, 123 ]);
     });
 
     it("should work with whereIf and other *If methods", () => {
