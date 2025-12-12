@@ -61,7 +61,7 @@ export type {
     QueryResult,
     ValidateQuery,
     ValidateSQL,
-} from "./matcher.js";
+} from "./matcher/index.js";
 
 // Re-export validator types
 export type {
