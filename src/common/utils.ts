@@ -293,3 +293,59 @@ export type IsDynamicQuery<T> = T extends DynamicQuery ? true : false
  */
 export type DynamicQueryResult = Record<string, unknown>
 
+// ============================================================================
+// Union Type Detection
+// ============================================================================
+
+/**
+ * Check if a type is a union type (has multiple members).
+ *
+ * Uses the distributive conditional type trick:
+ * - T extends T triggers distribution over union members
+ * - [U] extends [T] checks if the full union U extends each member T
+ * - For a single type, U === T so [U] extends [T] is true
+ * - For a union, U is larger than each T member, so [U] extends [T] is false
+ *
+ * @example
+ * type A = IsUnion<"a">              // false
+ * type B = IsUnion<"a" | "b">        // true
+ * type C = IsUnion<string>           // false (single type, just `string`)
+ * type D = IsUnion<"GBP" | "USD">    // true
+ */
+export type IsUnion<T, U = T> = T extends T
+  ? [U] extends [T]
+    ? false
+    : true
+  : never
+
+/**
+ * Check if a string type is a union of string literals.
+ *
+ * This is specifically for detecting cases like `"GBP" | "USD" | "EUR"`
+ * in template literals, which would cause exponential type computation.
+ *
+ * @example
+ * type A = IsStringUnion<"hello">           // false
+ * type B = IsStringUnion<"a" | "b">         // true
+ * type C = IsStringUnion<string>            // false (non-literal, not a union of literals)
+ */
+export type IsStringUnion<T extends string> =
+  // First check if it's a non-literal string (like `string` itself)
+  string extends T
+    ? false  // `string` is not a union of literals
+    : IsUnion<T>
+
+/**
+ * Error type for when a union type is passed where a single string literal is expected.
+ * This prevents exponential type computation from distributing over union types.
+ */
+export type UnionQueryError = {
+  readonly __unionError: true
+  readonly message: "Query contains a union type. Use a single string literal or cast the union to 'string' to bypass type checking."
+}
+
+/**
+ * Check if a type is a union query error
+ */
+export type IsUnionQueryError<T> = T extends UnionQueryError ? true : false
+

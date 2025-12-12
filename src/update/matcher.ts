@@ -24,6 +24,8 @@ import type {
   DynamicQuery,
   DynamicQueryResult,
   IsStringLiteral,
+  IsStringUnion,
+  UnionQueryError,
 } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
@@ -183,11 +185,14 @@ type BuildQualifiedRow<TableDef, Prefix extends "old" | "new"> = {
  * - Row type if RETURNING *
  * - Partial row type if RETURNING specific columns
  * - DynamicQueryResult for dynamic/non-literal queries
+ * - UnionQueryError for union types to prevent exponential type computation
  */
 export type UpdateResult<SQL extends string, Schema extends DatabaseSchema> =
-  IsStringLiteral<SQL> extends false
-    ? DynamicQueryResult
-    : MatchUpdateQuery<import("./parser.js").ParseUpdateSQL<SQL>, Schema>
+  IsStringUnion<SQL> extends true
+    ? UnionQueryError
+    : IsStringLiteral<SQL> extends false
+      ? DynamicQueryResult
+      : MatchUpdateQuery<import("./parser.js").ParseUpdateSQL<SQL>, Schema>
 
 /**
  * Check if an UPDATE result has errors

@@ -24,6 +24,8 @@ import type {
   DynamicQuery,
   DynamicQueryResult,
   IsStringLiteral,
+  IsStringUnion,
+  UnionQueryError,
 } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
@@ -145,11 +147,14 @@ type MatchReturningColumns<Cols extends UnboundColumnRef[], TableDef> = Cols ext
  * - Row type if RETURNING *
  * - Partial row type if RETURNING specific columns
  * - DynamicQueryResult for dynamic/non-literal queries
+ * - UnionQueryError for union types to prevent exponential type computation
  */
 export type InsertResult<SQL extends string, Schema extends DatabaseSchema> =
-  IsStringLiteral<SQL> extends false
-    ? DynamicQueryResult
-    : MatchInsertQuery<import("./parser.js").ParseInsertSQL<SQL>, Schema>
+  IsStringUnion<SQL> extends true
+    ? UnionQueryError
+    : IsStringLiteral<SQL> extends false
+      ? DynamicQueryResult
+      : MatchInsertQuery<import("./parser.js").ParseInsertSQL<SQL>, Schema>
 
 /**
  * Get the expected input type for an INSERT

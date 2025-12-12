@@ -16,6 +16,8 @@ import type {
   DynamicQuery,
   DynamicQueryResult,
   IsStringLiteral,
+  IsStringUnion,
+  UnionQueryError,
 } from "../common/utils.js"
 import type { DatabaseSchema, GetDefaultSchema } from "../common/schema.js"
 
@@ -131,11 +133,14 @@ type MatchReturningColumns<Cols extends UnboundColumnRef[], TableDef> = Cols ext
  * - Row type if RETURNING *
  * - Partial row type if RETURNING specific columns
  * - DynamicQueryResult for dynamic/non-literal queries
+ * - UnionQueryError for union types to prevent exponential type computation
  */
 export type DeleteResult<SQL extends string, Schema extends DatabaseSchema> =
-  IsStringLiteral<SQL> extends false
-    ? DynamicQueryResult
-    : MatchDeleteQuery<import("./parser.js").ParseDeleteSQL<SQL>, Schema>
+  IsStringUnion<SQL> extends true
+    ? UnionQueryError
+    : IsStringLiteral<SQL> extends false
+      ? DynamicQueryResult
+      : MatchDeleteQuery<import("./parser.js").ParseDeleteSQL<SQL>, Schema>
 
 /**
  * Check if a DELETE result has errors

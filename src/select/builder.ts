@@ -30,9 +30,11 @@ import type {
 import type {
     Decrement,
     Flatten,
+    IsUnion,
     MatchError,
     RemoveQuotes,
     Trim,
+    UnionQueryError,
 } from "../common/utils.js";
 
 import type {
@@ -115,6 +117,31 @@ export interface BuilderSqlTag<
  * Initial empty SQL tag: no clauses present.
  */
 export type EmptySqlState = BuilderSqlTag;
+
+/**
+ * Error SQL tag that marks the builder as having a union type error.
+ * This propagates through the builder chain and results in UnionQueryError
+ * when the final result type is extracted.
+ */
+export type UnionSqlError = BuilderSqlTag<
+    "__UNION_ERROR__",
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    readonly [],
+    undefined,
+    undefined
+>;
+
+/**
+ * Check if an SQL tag is a union error marker.
+ */
+type IsUnionSqlError<Sql extends AnyBuilderSqlTag> =
+    Sql["select"] extends "__UNION_ERROR__" ? true : false;
 
 /**
  * Initial lightweight builder state: no FROM table, no context, and an
@@ -541,7 +568,22 @@ type ColumnsToRow<
             : UnionToIntersection<ColumnRow<Schema, State, S>>
         : {};
 
-type AddColumnsForSchema<
+/**
+ * Error state for when union types are detected in column specifications.
+ * This prevents TypeScript from distributing over unions and causing
+ * exponential type computation.
+ */
+type UnionColumnsError = BuilderStateTag<
+    undefined,
+    UnionQueryError,
+    undefined
+>;
+
+/**
+ * Internal helper that adds columns to the builder state.
+ * Does not check for unions - use AddColumnsForSchema instead.
+ */
+type AddColumnsForSchemaInternal<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
     ColSpec extends string | readonly string[],
@@ -550,6 +592,24 @@ type AddColumnsForSchema<
     State["row"] & ColumnsToRow<Schema, State, ColSpec>,
     State["contextSQL"]
 >;
+
+/**
+ * Add columns to the builder state, with union type detection.
+ *
+ * When ColSpec is a union type (e.g., from template literals with union interpolations
+ * like `"GBP" | "USD"`), this returns UnionColumnsError early to prevent
+ * exponential type computation from TypeScript distributing over the union.
+ *
+ * Users should cast such values to `string` to bypass type checking, or use
+ * a single literal value.
+ */
+type AddColumnsForSchema<
+    Schema extends DatabaseSchema,
+    State extends BuilderStateTag<any, any, any>,
+    ColSpec extends string | readonly string[],
+> = IsUnion<ColSpec> extends true
+    ? UnionColumnsError
+    : AddColumnsForSchemaInternal<Schema, State, ColSpec>;
 
 // ---------------------------------------------------------------------------
 // Validation helpers (lightweight, per-fragment)
@@ -716,10 +776,10 @@ type UpdateSqlTag<
 >;
 
 /**
- * Add columns to the SELECT fragment in the SQL tag.
- * Optimized to use UpdateSqlTag helper.
+ * Internal: Add columns to the SELECT fragment in the SQL tag.
+ * Use WithSelectSql which includes union detection.
  */
-type WithSelectSql<
+type WithSelectSqlInternal<
     Sql extends AnyBuilderSqlTag,
     Cols extends string | readonly string[],
     Id extends string | undefined,
@@ -735,13 +795,22 @@ type WithSelectSql<
 }>;
 
 /**
- * Set or replace the FROM fragment in the SQL tag.
- * Optimized to use UpdateSqlTag helper.
- *
- * For subqueries we conservatively fall back to `string`, which will prevent
- * full SQL literal reconstruction but keeps types sound.
+ * Add columns to the SELECT fragment in the SQL tag.
+ * Returns UnionSqlError if Cols is a union type to prevent exponential computation.
  */
-type WithFromSql<
+type WithSelectSql<
+    Sql extends AnyBuilderSqlTag,
+    Cols extends string | readonly string[],
+    Id extends string | undefined,
+> = IsUnionSqlError<Sql> extends true ? Sql
+    : IsUnion<Cols> extends true ? UnionSqlError
+    : WithSelectSqlInternal<Sql, Cols, Id>;
+
+/**
+ * Internal: Set or replace the FROM fragment in the SQL tag.
+ * Use WithFromSql which includes union detection.
+ */
+type WithFromSqlInternal<
     Sql extends AnyBuilderSqlTag,
     Src,
 > = UpdateSqlTag<Sql, {
@@ -749,10 +818,24 @@ type WithFromSql<
 }>;
 
 /**
- * Append a JOIN fragment to the SQL tag.
- * Optimized to use UpdateSqlTag helper.
+ * Set or replace the FROM fragment in the SQL tag.
+ * Returns UnionSqlError if Src is a union type to prevent exponential computation.
+ *
+ * For subqueries we conservatively fall back to `string`, which will prevent
+ * full SQL literal reconstruction but keeps types sound.
  */
-type WithJoinSql<
+type WithFromSql<
+    Sql extends AnyBuilderSqlTag,
+    Src,
+> = IsUnionSqlError<Sql> extends true ? Sql
+    : IsUnion<Src> extends true ? UnionSqlError
+    : WithFromSqlInternal<Sql, Src>;
+
+/**
+ * Internal: Append a JOIN fragment to the SQL tag.
+ * Use WithJoinSql which includes union detection.
+ */
+type WithJoinSqlInternal<
     Sql extends AnyBuilderSqlTag,
     JoinSql extends string,
     Id extends string | undefined,
@@ -766,6 +849,18 @@ type WithJoinSql<
         >
     >;
 }>;
+
+/**
+ * Append a JOIN fragment to the SQL tag.
+ * Returns UnionSqlError if JoinSql is a union type to prevent exponential computation.
+ */
+type WithJoinSql<
+    Sql extends AnyBuilderSqlTag,
+    JoinSql extends string,
+    Id extends string | undefined,
+> = IsUnionSqlError<Sql> extends true ? Sql
+    : IsUnion<JoinSql> extends true ? UnionSqlError
+    : WithJoinSqlInternal<Sql, JoinSql, Id>;
 
 /**
  * Remove a SELECT fragment by ID.
@@ -812,10 +907,10 @@ type ConditionToSql<Cond> = Cond extends
     : string;
 
 /**
- * Append a WHERE fragment (combined with AND) to the SQL tag.
- * Optimized to use UpdateSqlTag helper.
+ * Internal: Append a WHERE fragment (combined with AND) to the SQL tag.
+ * Use WithWhereSql which includes union detection.
  */
-type WithWhereSql<
+type WithWhereSqlInternal<
     Sql extends AnyBuilderSqlTag,
     Cond,
 > = UpdateSqlTag<Sql, {
@@ -825,10 +920,21 @@ type WithWhereSql<
 }>;
 
 /**
- * Append a GROUP BY fragment (combined with commas) to the SQL tag.
- * Optimized to use UpdateSqlTag helper.
+ * Append a WHERE fragment (combined with AND) to the SQL tag.
+ * Returns UnionSqlError if Cond is a union type to prevent exponential computation.
  */
-type WithGroupBySql<
+type WithWhereSql<
+    Sql extends AnyBuilderSqlTag,
+    Cond,
+> = IsUnionSqlError<Sql> extends true ? Sql
+    : IsUnion<Cond> extends true ? UnionSqlError
+    : WithWhereSqlInternal<Sql, Cond>;
+
+/**
+ * Internal: Append a GROUP BY fragment (combined with commas) to the SQL tag.
+ * Use WithGroupBySql which includes union detection.
+ */
+type WithGroupBySqlInternal<
     Sql extends AnyBuilderSqlTag,
     Cols extends string | readonly string[],
     Id extends string | undefined,
@@ -839,10 +945,22 @@ type WithGroupBySql<
 }>;
 
 /**
- * Append a HAVING fragment (combined with AND) to the SQL tag.
- * Optimized to use UpdateSqlTag helper.
+ * Append a GROUP BY fragment (combined with commas) to the SQL tag.
+ * Returns UnionSqlError if Cols is a union type to prevent exponential computation.
  */
-type WithHavingSql<
+type WithGroupBySql<
+    Sql extends AnyBuilderSqlTag,
+    Cols extends string | readonly string[],
+    Id extends string | undefined,
+> = IsUnionSqlError<Sql> extends true ? Sql
+    : IsUnion<Cols> extends true ? UnionSqlError
+    : WithGroupBySqlInternal<Sql, Cols, Id>;
+
+/**
+ * Internal: Append a HAVING fragment (combined with AND) to the SQL tag.
+ * Use WithHavingSql which includes union detection.
+ */
+type WithHavingSqlInternal<
     Sql extends AnyBuilderSqlTag,
     Cond,
 > = UpdateSqlTag<Sql, {
@@ -852,10 +970,21 @@ type WithHavingSql<
 }>;
 
 /**
- * Append an ORDER BY fragment (combined with commas) to the SQL tag.
- * Optimized to use UpdateSqlTag helper.
+ * Append a HAVING fragment (combined with AND) to the SQL tag.
+ * Returns UnionSqlError if Cond is a union type to prevent exponential computation.
  */
-type WithOrderBySql<
+type WithHavingSql<
+    Sql extends AnyBuilderSqlTag,
+    Cond,
+> = IsUnionSqlError<Sql> extends true ? Sql
+    : IsUnion<Cond> extends true ? UnionSqlError
+    : WithHavingSqlInternal<Sql, Cond>;
+
+/**
+ * Internal: Append an ORDER BY fragment (combined with commas) to the SQL tag.
+ * Use WithOrderBySql which includes union detection.
+ */
+type WithOrderBySqlInternal<
     Sql extends AnyBuilderSqlTag,
     Cols extends string | readonly string[],
     Id extends string | undefined,
@@ -864,6 +993,18 @@ type WithOrderBySql<
         ? `${Sql["orderBy"]}, ${ColsToString<Cols>}`
         : ColsToString<Cols>;
 }>;
+
+/**
+ * Append an ORDER BY fragment (combined with commas) to the SQL tag.
+ * Returns UnionSqlError if Cols is a union type to prevent exponential computation.
+ */
+type WithOrderBySql<
+    Sql extends AnyBuilderSqlTag,
+    Cols extends string | readonly string[],
+    Id extends string | undefined,
+> = IsUnionSqlError<Sql> extends true ? Sql
+    : IsUnion<Cols> extends true ? UnionSqlError
+    : WithOrderBySqlInternal<Sql, Cols, Id>;
 
 /**
  * Set or replace the LIMIT fragment in the SQL tag.
@@ -2850,21 +2991,24 @@ type OptionalizeNewSelects<
  * enrich it with any additional columns that appear in the assembled SQL
  * fragments (for example, columns selected only inside `.when()` blocks),
  * using the existing `QueryResult` matcher.
+ *
+ * Returns UnionQueryError if a union type was detected during builder construction.
  */
 export type BuilderResultType<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
     Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
-> =
-    & Flatten<State["row"]>
-    & {
-        [
-            K in Exclude<
-                keyof BuilderFullRow<Schema, Sql>,
-                keyof Flatten<State["row"]>
-            >
-        ]: BuilderFullRow<Schema, Sql>[K] | undefined;
-    };
+> = IsUnionSqlError<Sql> extends true ? UnionQueryError
+    : State["row"] extends UnionQueryError ? UnionQueryError
+    : Flatten<State["row"]>
+        & {
+            [
+                K in Exclude<
+                    keyof BuilderFullRow<Schema, Sql>,
+                    keyof Flatten<State["row"]>
+                >
+            ]: BuilderFullRow<Schema, Sql>[K] | undefined;
+        };
 
 // ============================================================================
 // Builder-level SQL & validation helpers
@@ -3064,15 +3208,17 @@ type SelectListToRow<
 type BuilderFullRow<
     Schema extends DatabaseSchema,
     Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
-> = SelectClauseString<Sql> extends infer Sel extends string
-    ? SelectListToRow<Schema, Sel, ContextSqlFromTag<Sql>>
-    : {};
+> = IsUnionSqlError<Sql> extends true ? UnionQueryError
+    : SelectClauseString<Sql> extends infer Sel extends string
+        ? SelectListToRow<Schema, Sel, ContextSqlFromTag<Sql>>
+        : {};
 
 type BuilderReturnForParts<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
     Sql extends BuilderSqlTag<any, any, any, any, any, any, any, any, any, any, any>,
-> = BuilderTablesValid<Schema, Sql> extends true ? Flatten<State["row"]>
+> = IsUnionSqlError<Sql> extends true ? UnionQueryError
+    : BuilderTablesValid<Schema, Sql> extends true ? Flatten<State["row"]>
     : MatchError<BuilderTablesValid<Schema, Sql> & string>;
 
 /**
@@ -3103,12 +3249,15 @@ type LightweightTablesValid<
  *
  * Uses lightweight extraction of only the from/joins fields needed for
  * table validation, avoiding deep type instantiation of complex Sql tags.
+ *
+ * Returns UnionQueryError if the Sql tag indicates a union type was detected.
  */
 export type BuilderReturnType<B> = B extends SelectQueryBuilder<
     infer Schema extends DatabaseSchema,
     infer State extends BuilderStateTag<any, any, any>,
     infer Sql extends AnyBuilderSqlTag
-> ? LightweightTablesValid<Schema, Sql["from"], Sql["joins"]> extends true
+> ? IsUnionSqlError<Sql> extends true ? UnionQueryError
+    : LightweightTablesValid<Schema, Sql["from"], Sql["joins"]> extends true
         ? Flatten<State["row"]>
         : MatchError<LightweightTablesValid<Schema, Sql["from"], Sql["joins"]> & string>
     : never;

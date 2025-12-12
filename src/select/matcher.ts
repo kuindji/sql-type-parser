@@ -44,7 +44,9 @@ import type {
     Flatten,
     IsMatchError,
     IsStringLiteral,
+    IsStringUnion,
     MatchError,
+    UnionQueryError,
 } from "../common/utils.js";
 
 // ============================================================================
@@ -862,12 +864,16 @@ type UnionToIntersection<U> = (
  * For dynamic queries (non-literal strings or those containing template interpolations),
  * returns DynamicQueryResult which allows any property access.
  *
+ * For union types (e.g., queries containing `"GBP" | "USD"` in template literals),
+ * returns UnionQueryError to prevent exponential type computation.
+ *
  * For comprehensive validation, use ValidateSQL from ./validator.js
  */
 export type QueryResult<
     SQL extends string,
     Schema extends DatabaseSchema,
-> = IsStringLiteral<SQL> extends false ? DynamicQueryResult
+> = IsStringUnion<SQL> extends true ? UnionQueryError
+    : IsStringLiteral<SQL> extends false ? DynamicQueryResult
     : MatchSelectQuery<import("./parser.js").ParseSelectSQL<SQL>, Schema>;
 
 // ============================================================================

@@ -34,12 +34,17 @@ export type {
     IsParseError,
     // Dynamic query support
     IsStringLiteral,
+    // Union type detection
+    IsStringUnion,
+    IsUnion,
+    IsUnionQueryError,
     Join,
     MatchError,
     ParseError,
     RemoveQuotes,
     ToUpperCase,
     Trim,
+    UnionQueryError,
 } from "./utils.js";
 
 // Re-export common builder utilities

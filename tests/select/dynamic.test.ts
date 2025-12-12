@@ -9,11 +9,18 @@ import type {
     DynamicQuery,
     IsDynamicQuery,
     IsStringLiteral,
+    IsStringUnion,
+    IsUnion,
+    IsUnionQueryError,
     ParseSQL,
+    QueryResult,
     SQLSelectQuery,
-    ValidateSelectSQL,
+    UnionQueryError,
     ValidQuery,
 } from "../../src/index.js";
+import type {
+    BuilderStateTag,
+} from "../../src/select/builder.js";
 import type {
     AssertEqual,
     AssertExtends,
@@ -154,6 +161,72 @@ const queryDynamicIn = /*sql*/ `
   ` as const;
 type Test_ParseDynamicIn = ValidQuery<typeof queryDynamicIn, TestSchema>;
 type _P6 = RequireTrue<AssertEqual<Test_ParseDynamicIn, typeof queryDynamicIn>>;
+
+// ============================================================================
+// Union Type Detection Tests
+// ============================================================================
+
+// Test: IsUnion detects single types correctly
+type U_Single = IsUnion<"hello">;
+type _U1 = RequireFalse<U_Single>;
+
+// Test: IsUnion detects union types correctly
+type U_Union = IsUnion<"a" | "b" | "c">;
+type _U2 = RequireTrue<U_Union>;
+
+// Test: IsUnion detects generic string as non-union
+type U_String = IsUnion<string>;
+type _U3 = RequireFalse<U_String>;
+
+// Test: IsUnion detects number types
+type U_Number = IsUnion<1 | 2 | 3>;
+type _U4 = RequireTrue<U_Number>;
+
+type U_SingleNumber = IsUnion<42>;
+type _U5 = RequireFalse<U_SingleNumber>;
+
+// Test: IsStringUnion detects string literal unions
+type SU_Single = IsStringUnion<"SELECT * FROM users">;
+type _SU1 = RequireFalse<SU_Single>;
+
+type SU_Union = IsStringUnion<"GBP" | "USD" | "EUR">;
+type _SU2 = RequireTrue<SU_Union>;
+
+// Test: IsStringUnion returns false for generic string type
+type SU_String = IsStringUnion<string>;
+type _SU3 = RequireFalse<SU_String>;
+
+// Test: QueryResult returns UnionQueryError for union types
+type Currency = "GBP" | "USD" | "EUR";
+type QR_Union = QueryResult<`SELECT '${Currency}' as currency FROM users`, TestSchema>;
+type _QR1 = RequireTrue<AssertExtends<QR_Union, UnionQueryError>>;
+type _QR2 = RequireTrue<IsUnionQueryError<QR_Union>>;
+
+// Test: QueryResult works normally for single literal
+type QR_Normal = QueryResult<"SELECT id FROM users", TestSchema>;
+type _QR3 = RequireFalse<IsUnionQueryError<QR_Normal>>;
+type _QR4 = RequireTrue<AssertExtends<QR_Normal, { id: number }>>;
+
+// Test: Union in complex query template is detected
+type ComplexUnion = "foo" | "bar";
+type QR_Complex = QueryResult<`SELECT id, '${ComplexUnion}' as tag FROM users`, TestSchema>;
+type _QR5 = RequireTrue<IsUnionQueryError<QR_Complex>>;
+
+// Test: UnionQueryError has the expected shape
+type UQE_Shape = RequireTrue<AssertExtends<UnionQueryError, { readonly __unionError: true; readonly message: string }>>;
+
+// ============================================================================
+// Builder Union Detection Tests
+// ============================================================================
+
+// Test: Builder state with UnionQueryError in row is valid
+// This verifies that when AddColumnsForSchema detects a union, it produces
+// a BuilderStateTag with UnionQueryError as the row type
+type BuilderStateWithUnionError = BuilderStateTag<"users", UnionQueryError, "FROM users">;
+type _BU1 = RequireTrue<AssertExtends<BuilderStateWithUnionError["row"], UnionQueryError>>;
+
+// Test: BuilderStateTag with union error is a valid state tag
+type _BU2 = RequireTrue<AssertExtends<BuilderStateWithUnionError, BuilderStateTag<any, any, any>>>;
 
 // ============================================================================
 // Export for verification

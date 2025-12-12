@@ -87,6 +87,10 @@ export type {
     IsParseError,
     // Dynamic query support
     IsStringLiteral,
+    // Union type detection
+    IsStringUnion,
+    IsUnion,
+    IsUnionQueryError,
     JoinClause,
     JoinType,
     LiteralValue,
@@ -123,6 +127,7 @@ export type {
     // Utils
     Trim,
     UnboundColumnRef,
+    UnionQueryError,
     UnparsedExpr,
     ValidatableColumnRef,
     WhereExpr,
