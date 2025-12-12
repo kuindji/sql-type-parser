@@ -12,9 +12,11 @@ export type {
     MatcherComplexTestsPass,
     MatcherTestsPass,
 } from "./matcher/index.js";
-export type { ParserTestsPass } from "./parser.test.js";
-export type { ParserComplexTestsPass } from "./parser/complex.test.js";
-export type { UnionTestsPass } from "./parser/union.test.js";
+export type {
+    ParserTestsPass,
+    ParserComplexTestsPass,
+    UnionTestsPass,
+} from "./parser/index.js";
 export type { ValidatorTestsPass } from "./validator.test.js";
 
 /**
