@@ -18,15 +18,15 @@ import type {
     SQLSelectQuery,
     UnionQueryError,
     ValidQuery,
-} from "../../src/index.js";
-import { createSelectQuery } from "../../src/index.js";
-import type { BuilderStateTag } from "../../src/select/builder-types/helpers.js";
+} from "../../../src/index.js";
+import { createSelectQuery } from "../../../src/index.js";
+import type { BuilderStateTag } from "../../../src/select/builder-types/helpers.js";
 import type {
     AssertEqual,
     AssertExtends,
     RequireFalse,
     RequireTrue,
-} from "../helpers.js";
+} from "../../helpers.js";
 
 type TestSchema = {
     defaultSchema: "public";

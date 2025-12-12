@@ -9,6 +9,7 @@
 
 import type { QueryResult, ValidateSQL } from "../../../src/index.js";
 import type { AssertEqual, AssertExtends, RequireTrue } from "../../helpers.js";
+import type { TestSchema as MainTestSchema } from "./schemas.js";
 
 // ============================================================================
 // Test Schema
@@ -474,7 +475,48 @@ type V_FloorValid = ValidateSQL<
 type _VRF1 = RequireTrue<AssertEqual<V_FloorValid, true>>;
 
 // ============================================================================
+// Complex Query Tests (from original matcher.test.ts)
+// ============================================================================
+
+// Test: Full complex query with all features
+type M_Complex = QueryResult<
+    `
+WITH user_stats AS (
+  SELECT author_id, COUNT ( * ) AS post_count, SUM ( views ) AS total_views
+  FROM posts
+  WHERE status = 'published'
+  GROUP BY author_id
+)
+SELECT
+  u.id,
+  u.name,
+  u.email,
+  us.post_count,
+  us.total_views
+FROM users AS u
+LEFT JOIN user_stats AS us ON u.id = us.author_id
+WHERE u.is_active = TRUE
+ORDER BY us.total_views DESC
+LIMIT 100
+`,
+    MainTestSchema
+>;
+type _M44 = RequireTrue<
+    AssertEqual<
+        M_Complex,
+        {
+            id: number;
+            name: string;
+            email: string;
+            post_count: number;
+            total_views: number;
+        }
+    >
+>;
+
+// ============================================================================
 // Export for verification
 // ============================================================================
 
 export type MatcherComplexTestsPass = true;
+export type ComplexTestsPass = true;

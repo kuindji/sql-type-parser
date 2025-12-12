@@ -17,7 +17,6 @@ export type {
 // SELECT query tests
 export type {
     ASTTestsPass,
-    DynamicTestsPass,
     MatcherTestsPass,
     ParserTestsPass,
     SelectTestsPass,
