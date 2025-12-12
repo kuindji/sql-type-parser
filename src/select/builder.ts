@@ -266,8 +266,19 @@ type NormalizeCastTarget<S extends string> = Lowercase<
     StripCastParams<FirstToken<StripAliasFromCast<TrimStr<S>>>>
 >;
 
-type CastTarget<Expr extends string> = Expr extends `${string}::${infer Cast}`
-    ? NormalizeCastTarget<Cast>
+/**
+ * Extract the final (outermost) cast type from an expression.
+ * The naive pattern `${string}::${infer Cast}` matches the FIRST ::,
+ * but we need the LAST one for expressions like `sum(x::int)::float8`.
+ */
+type ExtractFinalCast<S extends string> = S extends `${string}::${infer After}`
+    ? After extends `${string}::${infer _Deeper}`
+        ? ExtractFinalCast<After>
+        : After
+    : undefined;
+
+type CastTarget<Expr extends string> = ExtractFinalCast<Expr> extends
+    infer Cast extends string ? NormalizeCastTarget<Cast>
     : Expr extends `CAST(${string} AS ${infer Cast})${string}`
         ? NormalizeCastTarget<Cast>
     : undefined;
@@ -501,7 +512,7 @@ type ExpressionType<
     Schema extends DatabaseSchema,
     State extends BuilderStateTag<any, any, any>,
     Expr extends string,
-> = Expr extends `${string}::${infer Cast}`
+> = ExtractFinalCast<Expr> extends infer Cast extends string
     ? CastReturnType<NormalizeCastTarget<Cast>>
     : Expr extends `CAST(${string} AS ${infer Cast})${string}`
         ? CastReturnType<NormalizeCastTarget<Cast>>

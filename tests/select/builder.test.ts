@@ -371,6 +371,66 @@ describe("basic query building", () => {
         >;
     });
 
+    it("should use outermost cast type with nested casts", () => {
+        // When an expression contains nested casts like `(x::numeric)::float8`,
+        // the outermost cast (float8) should determine the result type.
+
+        type B_NestedCastSchema = {
+            defaultSchema: "public";
+            schemas: {
+                public: {
+                    users: {
+                        id: number;
+                        amount: string;
+                    };
+                };
+            };
+        };
+
+        const nestedCastBuilder = createSelectQuery<B_NestedCastSchema>()
+            .from("users")
+            .select(/*sql*/ `sum(
+                    convert_currency(
+                        p."amount"::numeric,
+                        'USD'::text,
+                        'GBP'::text,
+                        p."createdAt"::date
+                    ) +
+                    convert_currency(
+                        p."vat"::numeric,
+                        'USD'::text,
+                        'EUR'::text,
+                        p."createdAt"::date
+                    )
+                )::float8 as "total"`);
+
+        const nestedCastSql = nestedCastBuilder.toString();
+
+        expect(nestedCastSql).toBe(
+            `SELECT sum(
+                    convert_currency(
+                        p."amount"::numeric,
+                        'USD'::text,
+                        'GBP'::text,
+                        p."createdAt"::date
+                    ) +
+                    convert_currency(
+                        p."vat"::numeric,
+                        'USD'::text,
+                        'EUR'::text,
+                        p."createdAt"::date
+                    )
+                )::float8 as "total" FROM users`,
+        );
+
+        type NestedCastResult = BuilderReturnType<typeof nestedCastBuilder>;
+        type _NestedCastIsNumber = RequireTrue<
+            AssertEqual<NestedCastResult, {
+                total: number;
+            }>
+        >;
+    });
+
     it("supports limit with offset and preserves ordering", () => {
         type B_OffsetSchema = {
             defaultSchema: "public";
