@@ -89,6 +89,15 @@ type Prettify<T> =
     & {};
 
 /**
+ * Merge result type with user-provided overrides.
+ * Overrides take precedence over inferred types.
+ * Short-circuits when Overrides is empty for zero performance cost.
+ */
+export type MergeOverrides<Result, Overrides> = keyof Overrides extends never
+    ? Result
+    : Prettify<Omit<Result, keyof Overrides> & Overrides>;
+
+/**
  * Result type for a SELECT query builder (flattened for better IDE display)
  */
 export type SelectBuilderResult<
@@ -128,6 +137,7 @@ export type QueryHandler = (query: string, params?: unknown[]) => unknown;
  * The returned function:
  * - Validates the query at compile time (invalid queries won't compile)
  * - Infers the result type from the query
+ * - Optionally merges user-provided type overrides into the result
  *
  * @example
  * ```typescript
@@ -151,19 +161,32 @@ export type QueryHandler = (query: string, params?: unknown[]) => unknown;
  * const users = await select("SELECT id, name FROM users WHERE active = $1", [true])
  * // users: Array<{ id: number; name: string }>
  *
+ * // With type overrides (e.g., when inference isn't precise enough)
+ * type Overrides = { created_at: Date }  // Override timestamp string → Date
+ * const selectWithOverrides = createSelectFn<Schema, Overrides>((sql, params) =>
+ *   db.query(sql, params)
+ * )
+ * const users2 = await selectWithOverrides("SELECT id, created_at FROM users")
+ * // users2: Array<{ id: number; created_at: Date }>
+ *
  * // Invalid queries cause compile errors
  * const bad = await select("SELECT unknown FROM users")
  * // Error: Argument of type '"SELECT unknown FROM users"' is not assignable...
  * ```
  */
-export function createSelectFn<Schema extends DatabaseSchema>(
+export function createSelectFn<
+    Schema extends DatabaseSchema,
+    Overrides extends Record<string, unknown> = {},
+>(
     handler: QueryHandler,
 ) {
     // String query overload (validated against schema)
     function select<Q extends string>(
         query: ValidQuery<Q, Schema>,
         params?: unknown[],
-    ): Promise<SelectResultArray<Q, Schema>>;
+    ): Promise<
+        MergeOverrides<SelectResultArray<Q, Schema>[number], Overrides>[]
+    >;
 
     // Untyped builder overload - MUST come before typed builder to avoid
     // deep type instantiation when TypeScript tries to match against
@@ -171,13 +194,13 @@ export function createSelectFn<Schema extends DatabaseSchema>(
     function select<Result>(
         query: UntypedSelectBuilder<Result>,
         params?: unknown[],
-    ): Promise<Result[]>;
+    ): Promise<MergeOverrides<Result, Overrides>[]>;
 
     // Typed builder overload (validated against schema)
     function select<B extends SelectQueryBuilder<Schema, any, any>>(
         query: ValidQueryBuilder<Schema, B>,
         params?: unknown[],
-    ): Promise<SelectBuilderResultArray<B>>;
+    ): Promise<MergeOverrides<SelectBuilderResult<B>, Overrides>[]>;
 
     function select(
         query:

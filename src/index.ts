@@ -300,6 +300,7 @@ export type {
 export { createSelectFn } from "./db.js";
 export type {
     IsValidSelect,
+    MergeOverrides,
     SelectBuilderResult,
     SelectBuilderResultArray,
     SelectResult,
