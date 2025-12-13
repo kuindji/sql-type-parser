@@ -96,40 +96,28 @@ export type ExtractAliasFromFrom<
 
 /**
  * Get table spec before next SQL keyword (JOIN, WHERE, etc.)
- * Handles both uppercase and lowercase keywords.
+ * Input is expected to be normalized (keywords uppercased).
  */
 export type ExtractTableSpecBeforeKeyword<S extends string> = S extends
     `${infer Before} INNER JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} inner join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} LEFT JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} left join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} RIGHT JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} right join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} FULL JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} full join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} CROSS JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} cross join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} WHERE ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} where ${string}` ? TrimStr<Before>
     : S extends `${infer Before} GROUP ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} group ${string}` ? TrimStr<Before>
     : S extends `${infer Before} ORDER ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} order ${string}` ? TrimStr<Before>
     : S extends `${infer Before} LIMIT ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} limit ${string}` ? TrimStr<Before>
     : S extends `${infer Before} OFFSET ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} offset ${string}` ? TrimStr<Before>
     : S extends `${infer Before} HAVING ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} having ${string}` ? TrimStr<Before>
     : S extends `${infer Before} UNION ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} union ${string}` ? TrimStr<Before>
     : TrimStr<S>;
 
 /**
  * Parse "users u" or "users AS u" or "schema.users u" to extract table for alias.
  * Returns the actual table name if the alias matches.
+ * Input is expected to be normalized (AS keyword uppercased).
  */
 export type ParseTableAlias<
     Spec extends string,
@@ -139,11 +127,6 @@ export type ParseTableAlias<
     TrimStr<Spec> extends `${infer Table} AS ${infer FoundAlias}`
         ? TrimStr<FoundAlias> extends Alias ? ExtractTableName<TrimStr<Table>>
         : never
-        // Handle "table as alias" format (lowercase)
-        : TrimStr<Spec> extends `${infer Table} as ${infer FoundAlias}`
-            ? TrimStr<FoundAlias> extends Alias
-                ? ExtractTableName<TrimStr<Table>>
-            : never
         // Handle "table alias" format (space-separated, match last token as alias)
         : TrimStr<Spec> extends `${infer Table} ${infer FoundAlias}`
             ? TrimStr<FoundAlias> extends Alias
@@ -160,19 +143,13 @@ export type ExtractTableName<S extends string> = S extends
 
 /**
  * Search JOINs in the context for alias.
- * Handles both uppercase and lowercase JOIN/ON keywords.
+ * Input is expected to be normalized (JOIN/ON keywords uppercased).
  */
 export type ExtractAliasFromJoins<
     Context extends string,
     Alias extends string,
 > = Context extends `${string}JOIN ${infer JoinContent} ON ${infer AfterOn}`
     ? ExtractJoinAliasMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}join ${infer JoinContent} ON ${infer AfterOn}`
-        ? ExtractJoinAliasMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}JOIN ${infer JoinContent} on ${infer AfterOn}`
-        ? ExtractJoinAliasMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}join ${infer JoinContent} on ${infer AfterOn}`
-        ? ExtractJoinAliasMatch<JoinContent, AfterOn, Alias>
     : never;
 
 /**
@@ -214,39 +191,23 @@ type IsAliasMatch<T> = [T] extends [never] ? false : true;
 /**
  * Internal helper to check join nullability.
  * Searches for patterns like "LEFT JOIN table alias" or "LEFT JOIN table AS alias".
- * Handles uppercase, lowercase, and mixed case keywords.
+ * Input is expected to be normalized (keywords uppercased).
  */
 type CheckJoinNullability<
     Context extends string,
     Alias extends string,
 > =
-    // LEFT OUTER JOIN variants
+    // LEFT OUTER JOIN
     Context extends `${string}LEFT OUTER JOIN ${infer JoinContent} ON ${infer AfterOn}`
         ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}left outer join ${infer JoinContent} ON ${infer AfterOn}`
-        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}left outer join ${infer JoinContent} on ${infer AfterOn}`
-        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    // LEFT JOIN variants
+    // LEFT JOIN
     : Context extends `${string}LEFT JOIN ${infer JoinContent} ON ${infer AfterOn}`
         ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}left join ${infer JoinContent} ON ${infer AfterOn}`
-        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}left join ${infer JoinContent} on ${infer AfterOn}`
-        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    // FULL OUTER JOIN variants
+    // FULL OUTER JOIN
     : Context extends `${string}FULL OUTER JOIN ${infer JoinContent} ON ${infer AfterOn}`
         ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}full outer join ${infer JoinContent} ON ${infer AfterOn}`
-        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}full outer join ${infer JoinContent} on ${infer AfterOn}`
-        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    // FULL JOIN variants
+    // FULL JOIN
     : Context extends `${string}FULL JOIN ${infer JoinContent} ON ${infer AfterOn}`
-        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}full join ${infer JoinContent} ON ${infer AfterOn}`
-        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
-    : Context extends `${string}full join ${infer JoinContent} on ${infer AfterOn}`
         ? CheckJoinMatch<JoinContent, AfterOn, Alias>
     : false;
 

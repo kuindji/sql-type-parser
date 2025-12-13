@@ -5,6 +5,7 @@
  */
 
 import type { DatabaseSchema } from "../../../common/schema.js";
+import type { NormalizeSQL } from "../../../common/tokenizer.js";
 import type { ParseTableRef } from "../../parser.js";
 import type { SelectQueryBuilder } from "../builder.js";
 import type { TableNameOf } from "./schema-utils.js";
@@ -24,22 +25,22 @@ export type WithFromForSchema<
             ? T extends TableNameOf<Schema> ? BuilderStateTag<
                     T,
                     State["row"],
-                    `FROM ${Src}`
+                    `FROM ${NormalizeSQL<Src>}`
                 >
             : BuilderStateTag<
                 State["fromTable"],
                 State["row"],
-                `FROM ${Src}`
+                `FROM ${NormalizeSQL<Src>}`
             >
         : BuilderStateTag<
             State["fromTable"],
             State["row"],
-            `FROM ${Src}`
+            `FROM ${NormalizeSQL<Src>}`
         >
     : BuilderStateTag<
         State["fromTable"],
         State["row"],
-        `FROM ${Src}`
+        `FROM ${NormalizeSQL<Src>}`
     >
     // FROM (subquery) - the subquery SQL is not visible at the type level
     // (only `string` from toString), so we conservatively leave contextSQL
@@ -66,6 +67,6 @@ export type WithJoinContext<
 > = BuilderStateTag<
     State["fromTable"],
     State["row"],
-    State["contextSQL"] extends string ? `${State["contextSQL"]} ${JoinSql}`
-        : JoinSql
+    State["contextSQL"] extends string ? `${State["contextSQL"]} ${NormalizeSQL<JoinSql>}`
+        : NormalizeSQL<JoinSql>
 >;

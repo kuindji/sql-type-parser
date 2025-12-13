@@ -5,6 +5,7 @@
  * insertion, replacement, and removal.
  */
 
+import type { NormalizeSQL } from "../../../common/tokenizer.js";
 import type { AnyBuilderSqlTag, ClauseList, SqlClausePart } from "./state-tags.js";
 import type { ToStringArray } from "./string-utils.js";
 
@@ -131,11 +132,16 @@ export type JoinClauseString<
 // Context SQL Assembly
 // ============================================================================
 
+/**
+ * Build a normalized context SQL string from the SQL tag's FROM and JOIN clauses.
+ * The output is normalized (keywords uppercased) to simplify pattern matching
+ * in schema-utils.ts for alias resolution and nullability detection.
+ */
 export type ContextSqlFromTag<
     Sql extends AnyBuilderSqlTag,
 > = Sql["from"] extends infer From extends string
     ? JoinClauseString<Sql> extends infer Joins extends string
-        ? Joins extends "" ? `FROM ${From}` : `FROM ${From} ${Joins}`
-    : `FROM ${From}`
-    : JoinClauseString<Sql> extends infer Joins extends string ? Joins
+        ? Joins extends "" ? `FROM ${NormalizeSQL<From>}` : NormalizeSQL<`FROM ${From} ${Joins}`>
+    : `FROM ${NormalizeSQL<From>}`
+    : JoinClauseString<Sql> extends infer Joins extends string ? NormalizeSQL<Joins>
     : undefined;
