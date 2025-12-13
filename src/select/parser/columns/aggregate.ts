@@ -2,7 +2,11 @@
  * Aggregate function parsing (COUNT, SUM, AVG, MIN, MAX)
  */
 
-import type { AggregateExpr, AggregateFunc } from "../../../common/ast.js";
+import type {
+    AggregateExpr,
+    AggregateFunc,
+    ComplexExpr,
+} from "../../../common/ast.js";
 import type {
     Decrement,
     Increment,
@@ -89,6 +93,28 @@ type ParseAggregateRemainder<
 
 /**
  * Parse aggregate function argument
+ * For simple column references, parse them properly.
+ * For complex expressions (function calls, arithmetic), wrap in ComplexExpr.
  */
-type ParseAggregateArg<T extends string> = Trim<T> extends "*" ? "*"
-    : ParseColumnRefType<Trim<T>>;
+type ParseAggregateArg<T extends string> = Trim<T> extends "*"
+    ? "*"
+    : IsComplexAggregateArg<Trim<T>> extends true
+        ? ComplexExpr<[], undefined, Trim<T>> // Complex expression - wrap in ComplexExpr
+        : ParseColumnRefType<Trim<T>>;
+
+/**
+ * Check if aggregate argument is a complex expression
+ * (contains operators, function calls, etc.)
+ */
+type IsComplexAggregateArg<T extends string> =
+    // Function calls: identifier (
+    T extends `${string} ( ${string}` ? true
+    // Arithmetic operators
+    : T extends `${string} + ${string}` ? true
+    : T extends `${string} - ${string}` ? true
+    : T extends `${string} * ${string}` ? true
+    : T extends `${string} / ${string}` ? true
+    : T extends `${string} % ${string}` ? true
+    // Parenthesized expressions
+    : T extends `( ${string}` ? true
+    : false;

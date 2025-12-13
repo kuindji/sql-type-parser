@@ -118,11 +118,19 @@ type _M46 = RequireTrue<
 
 // --- Test: Aggregation functions with type casts and dynamic field names
 type AG1_Valid = ValidateSQL<
-    `SELECT SUM(convert_currency(${string}, 'USD', 'GBP'))::float8 as "s" FROM users`,
+    `SELECT 
+        SUM(
+            convert_currency(${string}::numeric, u.currency::text, 'GBP'::text) + 
+            convert_currency(${string}::numeric, u.currency::text, 'GBP'::text)
+        )::float8 as "s" FROM users u`,
     TestSchema
 >;
 type AG1_QueryResult = QueryResult<
-    `SELECT SUM(convert_currency(${string}, 'USD', 'GBP') + convert_currency(${string}, 'USD', 'GBP'))::float8 as "s" FROM users`,
+    `SELECT 
+        SUM(
+            convert_currency(${string}::numeric, u.currency::text, 'GBP'::text) + 
+            convert_currency(${string}::numeric, u.currency::text, 'GBP'::text)
+        )::float8 as "s" FROM users u`,
     TestSchema
 >;
 type _AG1 = RequireTrue<AssertEqual<AG1_Valid, true>>;

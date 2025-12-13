@@ -14,6 +14,7 @@ export type TestSchema = {
                 is_active: boolean;
                 created_at: string;
                 deleted_at: string | null;
+                currency: "USD" | "GBP" | "EUR";
             };
             posts: {
                 id: number;
