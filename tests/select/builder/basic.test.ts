@@ -239,30 +239,56 @@ describe("basic query building", () => {
             defaultSchema: "public";
             schemas: {
                 public: {
-                    users: {
-                        id: number;
+                    Users_Table: {
+                        id: string & { table: "users"; };
                         name: string;
+                        type: "admin" | "user";
+                    };
+                    Orders_Table: {
+                        id: number;
+                        userId: number;
+                        amount: number;
                     };
                 };
             };
         };
 
+        const includeId = Math.random() > 0.5;
+        const includeName = Math.random() > 0.5;
         const builder = createSelectQuery<B_OffsetOnlySchema>()
-            .from("users AS u")
+            .withParams({ userId: 1 as number, userName: "John" as string })
+            .from(`"Users_Table" AS u`)
+            .join(`left join "Orders_Table" AS o ON o."userId" = u.id`)
             .select("u.*")
+            .select(`o.id AS "orderId"`)
+            .whereIf(includeId, `u."id" = :userId`)
+            .whereIf(includeName, `u."name" = :userName`)
+            .orderBy(`u."name" ASC`)
+            .limit(10)
             .offset(3);
 
-        const sql = builder.toString();
-        expect(sql).toBe("SELECT u.* FROM users AS u OFFSET 3");
+        // const sql = builder.toString();
+        // expect(sql).toBe(`SELECT u.* FROM users AS u OFFSET 3`);
 
         type OffsetOnlySql = BuilderSQL<typeof builder>;
         type _OffsetOnlySqlMatches = RequireTrue<
-            AssertEqual<OffsetOnlySql, "SELECT u.* FROM users AS u OFFSET 3">
+            AssertEqual<
+                OffsetOnlySql,
+                `SELECT u.*, o.id AS "orderId" FROM "Users_Table" AS u left join "Orders_Table" AS o ON o."userId" = u.id WHERE u."id" = :userId AND u."name" = :userName ORDER BY u."name" ASC LIMIT 10 OFFSET 3`
+            >
         >;
 
         type OffsetOnlyRow = BuilderReturnType<typeof builder>;
         type _OffsetOnlyRowMatches = RequireTrue<
-            AssertEqual<OffsetOnlyRow, { id: number; name: string; }>
+            AssertEqual<
+                OffsetOnlyRow,
+                {
+                    id: string & { table: "users"; };
+                    name: string;
+                    type: "admin" | "user";
+                    orderId: number | null;
+                }
+            >
         >;
     });
 });

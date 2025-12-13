@@ -73,7 +73,7 @@ describe("clause assembly and typing", () => {
             AssertEqual<FullRow, {
                 id: number;
                 name: string;
-                total: number;
+                total: number | null;
             }>
         >;
     });

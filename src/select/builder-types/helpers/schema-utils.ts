@@ -96,21 +96,35 @@ export type ExtractAliasFromFrom<
 
 /**
  * Get table spec before next SQL keyword (JOIN, WHERE, etc.)
+ * Handles both uppercase and lowercase keywords.
  */
 export type ExtractTableSpecBeforeKeyword<S extends string> = S extends
     `${infer Before} INNER JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} inner join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} LEFT JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} left join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} RIGHT JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} right join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} FULL JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} full join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} CROSS JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} cross join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} JOIN ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} join ${string}` ? TrimStr<Before>
     : S extends `${infer Before} WHERE ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} where ${string}` ? TrimStr<Before>
     : S extends `${infer Before} GROUP ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} group ${string}` ? TrimStr<Before>
     : S extends `${infer Before} ORDER ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} order ${string}` ? TrimStr<Before>
     : S extends `${infer Before} LIMIT ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} limit ${string}` ? TrimStr<Before>
     : S extends `${infer Before} OFFSET ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} offset ${string}` ? TrimStr<Before>
     : S extends `${infer Before} HAVING ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} having ${string}` ? TrimStr<Before>
     : S extends `${infer Before} UNION ${string}` ? TrimStr<Before>
+    : S extends `${infer Before} union ${string}` ? TrimStr<Before>
     : TrimStr<S>;
 
 /**
@@ -146,17 +160,107 @@ export type ExtractTableName<S extends string> = S extends
 
 /**
  * Search JOINs in the context for alias.
+ * Handles both uppercase and lowercase JOIN/ON keywords.
  */
 export type ExtractAliasFromJoins<
     Context extends string,
     Alias extends string,
 > = Context extends `${string}JOIN ${infer JoinContent} ON ${infer AfterOn}`
-    ? ExtractTableSpecBeforeKeyword<JoinContent> extends
-        infer JoinSpec extends string
-        ? ParseTableAlias<JoinSpec, Alias> extends infer T extends string ? T
-        : ExtractAliasFromJoins<`JOIN ${AfterOn}`, Alias>
-    : ExtractAliasFromJoins<`JOIN ${AfterOn}`, Alias>
+    ? ExtractJoinAliasMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}join ${infer JoinContent} ON ${infer AfterOn}`
+        ? ExtractJoinAliasMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}JOIN ${infer JoinContent} on ${infer AfterOn}`
+        ? ExtractJoinAliasMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}join ${infer JoinContent} on ${infer AfterOn}`
+        ? ExtractJoinAliasMatch<JoinContent, AfterOn, Alias>
     : never;
+
+/**
+ * Helper for ExtractAliasFromJoins to reduce duplication.
+ */
+type ExtractJoinAliasMatch<
+    JoinContent extends string,
+    AfterOn extends string,
+    Alias extends string,
+> = ExtractTableSpecBeforeKeyword<JoinContent> extends infer JoinSpec extends string
+    ? ParseTableAlias<JoinSpec, Alias> extends infer T extends string ? T
+    : ExtractAliasFromJoins<`JOIN ${AfterOn}`, Alias>
+    : ExtractAliasFromJoins<`JOIN ${AfterOn}`, Alias>;
+
+/**
+ * Join types that produce nullable columns.
+ * LEFT/FULL joins can produce NULL when there's no matching row.
+ */
+type NullableJoinKeyword = "LEFT JOIN" | "LEFT OUTER JOIN" | "FULL JOIN" | "FULL OUTER JOIN";
+
+/**
+ * Check if an alias comes from a nullable join (LEFT/FULL) in the context.
+ * Searches through JOIN clauses to find a match for the alias and checks
+ * if it's preceded by LEFT or FULL.
+ */
+export type IsNullableJoinAlias<
+    Context extends string | undefined,
+    Alias extends string,
+> = Context extends string
+    ? CheckJoinNullability<Context, Alias>
+    : false;
+
+/**
+ * Internal helper to check if ParseTableAlias found a match (not never).
+ * Using [T] extends [never] pattern to avoid distributive conditional type issues.
+ */
+type IsAliasMatch<T> = [T] extends [never] ? false : true;
+
+/**
+ * Internal helper to check join nullability.
+ * Searches for patterns like "LEFT JOIN table alias" or "LEFT JOIN table AS alias".
+ * Handles uppercase, lowercase, and mixed case keywords.
+ */
+type CheckJoinNullability<
+    Context extends string,
+    Alias extends string,
+> =
+    // LEFT OUTER JOIN variants
+    Context extends `${string}LEFT OUTER JOIN ${infer JoinContent} ON ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}left outer join ${infer JoinContent} ON ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}left outer join ${infer JoinContent} on ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    // LEFT JOIN variants
+    : Context extends `${string}LEFT JOIN ${infer JoinContent} ON ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}left join ${infer JoinContent} ON ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}left join ${infer JoinContent} on ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    // FULL OUTER JOIN variants
+    : Context extends `${string}FULL OUTER JOIN ${infer JoinContent} ON ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}full outer join ${infer JoinContent} ON ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}full outer join ${infer JoinContent} on ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    // FULL JOIN variants
+    : Context extends `${string}FULL JOIN ${infer JoinContent} ON ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}full join ${infer JoinContent} ON ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : Context extends `${string}full join ${infer JoinContent} on ${infer AfterOn}`
+        ? CheckJoinMatch<JoinContent, AfterOn, Alias>
+    : false;
+
+/**
+ * Helper to check if join content matches the alias and recurse if not.
+ */
+type CheckJoinMatch<
+    JoinContent extends string,
+    AfterOn extends string,
+    Alias extends string,
+> = ExtractTableSpecBeforeKeyword<JoinContent> extends infer JoinSpec extends string
+    ? IsAliasMatch<ParseTableAlias<JoinSpec, Alias>> extends true ? true
+    : CheckJoinNullability<`JOIN ${AfterOn}`, Alias>
+    : CheckJoinNullability<`JOIN ${AfterOn}`, Alias>;
 
 /**
  * Best-effort extraction of the primary FROM table.
@@ -194,6 +298,17 @@ export type ResolveTableForQualifiedColumn<
 // Column Type Resolution
 // ============================================================================
 
+/**
+ * Apply nullability to a column type if the alias comes from a LEFT/FULL JOIN.
+ */
+type ApplyJoinNullability<
+    State extends AnyBuilderStateTag,
+    TableOrAlias extends string,
+    ColType,
+> = IsNullableJoinAlias<State["contextSQL"], TableOrAlias> extends true
+    ? ColType | null
+    : ColType;
+
 /** Compute the result type for a simple column expression. */
 export type ColumnTypeForExpr<
     Schema extends DatabaseSchema,
@@ -216,7 +331,7 @@ export type ColumnTypeForExpr<
                         Schema,
                         ExtractColumnIdentifier<Expr>
                     >
-                : ColType
+                : ApplyJoinNullability<State, StripIdentifierQuotes<TableOrAlias>, ColType>
             : unknown
         : ColumnTypeFromSchema<Schema, ExtractColumnIdentifier<Expr>>
     : PrimaryTable<Schema, State> extends infer From extends string
