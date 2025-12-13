@@ -244,19 +244,61 @@ export type ExpressionType<
     : ColumnTypeForExpr<Schema, State, Expr> extends never ? unknown
     : ColumnTypeForExpr<Schema, State, Expr>;
 
+/**
+ * Expand all columns from a table given its resolved name.
+ * Returns all columns from the table in the default schema.
+ */
+export type ExpandTableColumns<
+    Schema extends DatabaseSchema,
+    TableName extends string,
+> = TableName extends keyof SchemaTables<Schema>
+    ? SchemaTables<Schema>[TableName]
+    : {};
+
+/**
+ * Expand alias.* wildcard to all columns from the aliased table.
+ * Resolves the alias using contextSQL, then expands all columns.
+ */
+export type ExpandAliasWildcard<
+    Schema extends DatabaseSchema,
+    State extends AnyBuilderStateTag,
+    Alias extends string,
+> = ResolveAliasToTable<
+    State["contextSQL"],
+    StripIdentifierQuotes<Alias>
+> extends infer ResolvedTable extends string
+    ? ExpandTableColumns<Schema, ResolvedTable>
+    : StripIdentifierQuotes<Alias> extends keyof SchemaTables<Schema>
+        ? SchemaTables<Schema>[StripIdentifierQuotes<Alias>]
+    : {};
+
+/**
+ * Expand * wildcard to all columns from the primary FROM table.
+ */
+export type ExpandAllWildcard<
+    Schema extends DatabaseSchema,
+    State extends AnyBuilderStateTag,
+> = PrimaryTable<Schema, State> extends infer FromTable extends string
+    ? ExpandTableColumns<Schema, FromTable>
+    : {};
+
 export type ColumnRow<
     Schema extends DatabaseSchema,
     State extends AnyBuilderStateTag,
     Col extends string,
-> = SplitAlias<Col> extends [
-    infer Expr extends string,
-    infer Alias extends string | undefined,
-] ? {
-        [
-            K in Alias extends string ? StripIdentifierQuotes<Alias>
-                : ExtractColumnIdentifier<Expr>
-        ]: ExpressionType<Schema, State, Expr>;
-    }
+> = TrimStr<Col> extends "*"
+    ? ExpandAllWildcard<Schema, State>
+    : TrimStr<Col> extends `${infer Alias}.*`
+        ? ExpandAliasWildcard<Schema, State, Alias>
+    : SplitAlias<Col> extends [
+        infer Expr extends string,
+        infer Alias extends string | undefined,
+    ] ? {
+            [
+                K in Alias extends string ? StripIdentifierQuotes<Alias>
+                    : ExtractColumnIdentifier<Expr>
+            ]: ExpressionType<Schema, State, Expr>;
+        }
     : {
         [K in ExtractColumnIdentifier<Col>]: ExpressionType<
             Schema,

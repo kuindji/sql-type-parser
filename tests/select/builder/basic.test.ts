@@ -233,4 +233,36 @@ describe("basic query building", () => {
             AssertEqual<OffsetOnlyRow, { id: number; }>
         >;
     });
+
+    it("supports alias.*", () => {
+        type B_OffsetOnlySchema = {
+            defaultSchema: "public";
+            schemas: {
+                public: {
+                    users: {
+                        id: number;
+                        name: string;
+                    };
+                };
+            };
+        };
+
+        const builder = createSelectQuery<B_OffsetOnlySchema>()
+            .from("users AS u")
+            .select("u.*")
+            .offset(3);
+
+        const sql = builder.toString();
+        expect(sql).toBe("SELECT u.* FROM users AS u OFFSET 3");
+
+        type OffsetOnlySql = BuilderSQL<typeof builder>;
+        type _OffsetOnlySqlMatches = RequireTrue<
+            AssertEqual<OffsetOnlySql, "SELECT u.* FROM users AS u OFFSET 3">
+        >;
+
+        type OffsetOnlyRow = BuilderReturnType<typeof builder>;
+        type _OffsetOnlyRowMatches = RequireTrue<
+            AssertEqual<OffsetOnlyRow, { id: number; name: string; }>
+        >;
+    });
 });
