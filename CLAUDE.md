@@ -251,3 +251,57 @@ type IsMatchError<T> = T extends { __error: true; message: string; } ? true
 - **TypeScript ^5.0.0** - Required for advanced type features
 - **@types/bun** - Bun runtime types (dev)
 - No runtime dependencies (pure type-level library)
+
+## Conditional SQL Feature
+
+The library includes a conditional SQL processing system that combines type-level and runtime processing:
+
+### Syntax
+
+```sql
+SELECT id, name
+/*if:includeEmail*/, email/*endif*/
+FROM users
+/*if:withOrders*/LEFT JOIN orders o ON o.user_id = users.id/*endif*/
+WHERE id = :userId
+/*if:activeOnly*/AND active = true/*endif*/
+```
+
+### Usage
+
+```typescript
+import { createConditionalQuery } from '@kuindji/sql-type-parser'
+
+const query = createConditionalQuery<MySchema>()
+
+const { sql, params } = query(
+  `SELECT id, name /*if:extra*/, email/*endif*/ FROM users WHERE id = :userId`,
+  { extra: true },       // conditions - use `as const` for type inference
+  { userId: 123 }        // named params
+)
+// sql: "SELECT id, name, email FROM users WHERE id = $1"
+// params: [123]
+// Result type: { id: number; name: string; email: string | undefined }
+```
+
+### Type Inference
+
+- Columns in conditional blocks get `| undefined` in the result type
+- LEFT/FULL JOIN columns get `| null` in the result type
+- Conditional LEFT JOINs get both: `T | null | undefined`
+- Validation uses the "all conditions true" variant to ensure all possible code paths are valid
+- Named params (`:paramName`) are converted to positional placeholders (`$N`)
+
+## LEFT JOIN Nullability
+
+LEFT JOIN and FULL JOIN columns are automatically typed as nullable:
+
+```typescript
+type Result = QueryResult<
+  "SELECT u.name, p.bio FROM users u LEFT JOIN profiles p ON p.user_id = u.id",
+  Schema
+>;
+// Result: { name: string; bio: string | null }
+```
+
+Note: RIGHT JOIN is NOT fully supported for nullability (the FROM table should be nullable, but this requires tracking nullable aliases separately).

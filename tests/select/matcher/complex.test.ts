@@ -501,6 +501,7 @@ LIMIT 100
 `,
     MainTestSchema
 >;
+// LEFT JOIN makes user_stats columns nullable
 type _M44 = RequireTrue<
     AssertEqual<
         M_Complex,
@@ -508,8 +509,8 @@ type _M44 = RequireTrue<
             id: number;
             name: string;
             email: string;
-            post_count: number;
-            total_views: number;
+            post_count: number | null;
+            total_views: number | null;
         }
     >
 >;

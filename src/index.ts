@@ -308,3 +308,37 @@ export type {
     ValidQuery,
     ValidQueryBuilder,
 } from "./db.js";
+
+// ============================================================================
+// Conditional SQL
+// ============================================================================
+
+export {
+    conditionalSQL,
+    createConditionalQuery,
+    normalizeWhitespace,
+    processConditionalSQL,
+    processParams,
+    withConditions,
+} from "./conditional/index.js";
+
+export type {
+    AllConditionsFalse,
+    AllConditionsTrue,
+    ConditionalColumn,
+    ConditionalLeftJoinColumn,
+    ConditionalQueryResult,
+    ConditionalSQLOptions,
+    ConditionalSQLOutput,
+    EvalCondition,
+    ExtractParamNames,
+    ExtractResultType,
+    GetPath,
+    IsTruthy,
+    ProcessConditionalSQL,
+    ProcessedSQL,
+    TypedConditionalSQLOutput,
+    ValidateConditionalSQL,
+    ValidateParams,
+    ValidConditionalQuery,
+} from "./conditional/index.js";

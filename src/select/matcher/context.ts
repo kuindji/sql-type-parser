@@ -199,9 +199,33 @@ export type ResolveDerivedTable<
 // ============================================================================
 
 /**
+ * Nullify all columns in a table context for outer joins.
+ * For { alias: { col1: T1, col2: T2 } } → { alias: { col1: T1 | null, col2: T2 | null } }
+ */
+type NullifyTableColumns<T> = {
+    [Alias in keyof T]: {
+        [Col in keyof T[Alias]]: T[Alias][Col] | null;
+    };
+};
+
+/**
+ * Join types that produce nullable columns on the joined table.
+ * - LEFT JOIN: joined (right) table columns may be null when no match
+ * - FULL JOIN: both sides may be null, we can only apply to joined table here
+ *
+ * Note: RIGHT JOIN should make the FROM table nullable, not the joined table.
+ * This requires a different approach (tracking nullable aliases separately).
+ * For now, RIGHT JOIN is treated like INNER JOIN for nullability purposes.
+ */
+type NullableJoinType = "LEFT" | "LEFT OUTER" | "FULL" | "FULL OUTER";
+
+/**
  * Merge JOIN tables into the context
  * Note: We don't flatten during recursion to reduce type depth.
  * The intersection is only flattened once at the end.
+ *
+ * For LEFT and FULL joins, columns from the joined table are marked as nullable
+ * because they may be NULL when there's no matching row.
  */
 export type MergeJoinContexts<
     Context,
@@ -209,10 +233,20 @@ export type MergeJoinContexts<
     Schema extends DatabaseSchema,
     CTEContext = {},
 > = Joins extends [ infer First, ...infer Rest ]
-    ? First extends JoinClause<infer _Type, infer JoinTable, infer _On>
+    ? First extends JoinClause<infer Type, infer JoinTable, infer _On>
         ? ResolveTableSource<JoinTable, Schema, CTEContext> extends
             infer JoinContext
             ? JoinContext extends MatchError<string> ? JoinContext
+            // Apply nullability for LEFT/FULL joins
+            : Type extends NullableJoinType
+                ? Rest extends JoinClause[] ? MergeJoinContexts<
+                        Context & NullifyTableColumns<JoinContext>,
+                        Rest,
+                        Schema,
+                        CTEContext
+                    >
+                : Context & NullifyTableColumns<JoinContext>
+            // INNER, CROSS, RIGHT - no nullification (RIGHT is a limitation)
             : Rest extends JoinClause[] ? MergeJoinContexts<
                     Context & JoinContext,
                     Rest,

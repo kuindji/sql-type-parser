@@ -46,13 +46,13 @@ type M_Join = QueryResult<
 >;
 type _M16 = RequireTrue<AssertEqual<M_Join, { name: string; title: string; }>>;
 
-// Test: LEFT JOIN
+// Test: LEFT JOIN - joined table columns are nullable
 type M_LeftJoin = QueryResult<
     "SELECT u.name, p.title FROM users AS u LEFT JOIN posts AS p ON u.id = p.author_id",
     TestSchema
 >;
 type _M17 = RequireTrue<
-    AssertEqual<M_LeftJoin, { name: string; title: string; }>
+    AssertEqual<M_LeftJoin, { name: string; title: string | null; }>
 >;
 
 // Test: Multiple JOINs
