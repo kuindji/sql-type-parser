@@ -116,6 +116,20 @@ type _M46 = RequireTrue<
     AssertEqual<M_SameColTwice, { id1: number; id2: number; }>
 >;
 
+// --- Test: Aggregation functions with type casts and dynamic field names
+type AG1_Valid = ValidateSQL<
+    `SELECT SUM(convert_currency(${string}, 'USD', 'GBP'))::float8 as "s" FROM users`,
+    TestSchema
+>;
+type AG1_QueryResult = QueryResult<
+    `SELECT SUM(convert_currency(${string}, 'USD', 'GBP') + convert_currency(${string}, 'USD', 'GBP'))::float8 as "s" FROM users`,
+    TestSchema
+>;
+type _AG1 = RequireTrue<AssertEqual<AG1_Valid, true>>;
+type _AG2 = RequireTrue<
+    AssertEqual<AG1_QueryResult, { s: number; }>
+>;
+
 // ============================================================================
 // Export for verification
 // ============================================================================
