@@ -568,6 +568,81 @@ describe("Complex combined patterns in builder", () => {
             "SELECT id, amount, (CASE WHEN commission > 0 THEN commission - COALESCE(commission * rate, 0) ELSE 0 END)::float8 AS revenue FROM orders",
         );
     });
+
+    it("builds query with conditional complex expression", () => {
+        type UserAnalyticsSchema = {
+            defaultSchema: "public";
+            schemas: {
+                public: {
+                    User_Analytics: {
+                        id: string & { table: "User_Analytics"; };
+                        userId: string & { table: "User"; };
+                        isPSEAdopted: boolean;
+                        isPSEPartiallyAdopted: boolean;
+                        isPSEActive: boolean;
+                    };
+                    User: {
+                        id: string & { table: "User"; };
+                        email: string;
+                        phone: string;
+                        givenName: string;
+                        familyName: string;
+                        createdAt: string;
+                        firstLoggedIn: string;
+                        lastLoggedIn: string;
+                        groups: string;
+                    };
+                    PSEApplication: {
+                        id: string & { table: "PSEApplication"; };
+                        userId: string & { table: "User"; };
+                    };
+                };
+            };
+        };
+
+        const adopted = "adopted" as "adopted" | "partially" | "not";
+        const active = true as boolean;
+
+        const builder = createSelectQuery<UserAnalyticsSchema>()
+            .from(/*sql*/ `"User_Analytics" ua`)
+            .join(/*sql*/ `join "User" u on u.id = ua."userId"`)
+            .join(
+                /*sql*/ `left join "PSEApplication" pa on pa."userId" = ua."userId"`,
+            )
+            .select(/*sql*/ `u.email`)
+            .select(/*sql*/ `u.phone`)
+            .select(/*sql*/ `u."givenName"`)
+            .select(/*sql*/ `u."familyName"`)
+            .select(/*sql*/ `u."createdAt"`)
+            .select(/*sql*/ `u."firstLoggedIn"`)
+            .select(/*sql*/ `u."lastLoggedIn"`)
+            .select(/*sql*/ `u."groups"`)
+            .select(/*sql*/ `pa.id as "pseApplicationId"`)
+            .select(/*sql*/ `ua.*`)
+            .where(
+                /*sql*/ `(u."groups" like '%FRI%' or u."groups" like '%GPS%')`,
+            )
+            .whereIf(adopted === "adopted", /*sql*/ `ua."isPSEAdopted" = true`)
+            .whereIf(
+                adopted === "partially",
+                /*sql*/ `(ua."isPSEAdopted" = false and ua."isPSEPartiallyAdopted" = true)`,
+            )
+            .whereIf(
+                adopted === "not",
+                /*sql*/ `(ua."isPSEAdopted" = false and ua."isPSEPartiallyAdopted" = false)`,
+            )
+            .whereIf(active === true, /*sql*/ `ua."isPSEActive" = true`)
+            .whereIf(active === false, /*sql*/ `ua."isPSEActive" = false`);
+
+        const sql = builder.toString();
+        // At runtime: adopted === "adopted" is true, adopted === "partially" is false, active === true is true
+        // So we only get: ua."isPSEAdopted" = true AND ua."isPSEActive" = true
+        expect(sql).toBe(
+            'SELECT u.email, u.phone, u."givenName", u."familyName", u."createdAt", u."firstLoggedIn", u."lastLoggedIn", u."groups", pa.id as "pseApplicationId", ua.* FROM "User_Analytics" ua join "User" u on u.id = ua."userId" left join "PSEApplication" pa on pa."userId" = ua."userId" WHERE (u."groups" like \'%FRI%\' or u."groups" like \'%GPS%\') AND ua."isPSEAdopted" = true AND ua."isPSEActive" = true',
+        );
+
+        type ReturnType = BuilderReturnType<typeof builder>;
+    });
 });
 
 // ============================================================================

@@ -97,14 +97,21 @@ export type ExtractAliasFromFrom<
 /**
  * Get table spec before next SQL keyword (JOIN, WHERE, etc.)
  * Input is expected to be normalized (keywords uppercased).
+ *
+ * The challenge with JOIN clauses is that we need to handle both:
+ * - "table JOIN ..." (plain join)
+ * - "table LEFT JOIN ..." (compound join)
+ * - "table JOIN ... LEFT JOIN ..." (multiple joins)
+ *
+ * TypeScript's template literal matching finds the FIRST occurrence of the
+ * pattern. So we first match on ` JOIN ` which catches ANY join keyword at
+ * its earliest occurrence. If the result ends with a join modifier (LEFT,
+ * INNER, etc.), we strip it using TrimJoinModifier.
  */
-export type ExtractTableSpecBeforeKeyword<S extends string> = S extends
-    `${infer Before} INNER JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} LEFT JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} RIGHT JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} FULL JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} CROSS JOIN ${string}` ? TrimStr<Before>
-    : S extends `${infer Before} JOIN ${string}` ? TrimStr<Before>
+export type ExtractTableSpecBeforeKeyword<S extends string> =
+    // Match any JOIN first (catches earliest join in the string)
+    S extends `${infer Before} JOIN ${string}` ? TrimJoinModifier<TrimStr<Before>>
+    // Non-join terminators
     : S extends `${infer Before} WHERE ${string}` ? TrimStr<Before>
     : S extends `${infer Before} GROUP ${string}` ? TrimStr<Before>
     : S extends `${infer Before} ORDER ${string}` ? TrimStr<Before>
@@ -113,6 +120,20 @@ export type ExtractTableSpecBeforeKeyword<S extends string> = S extends
     : S extends `${infer Before} HAVING ${string}` ? TrimStr<Before>
     : S extends `${infer Before} UNION ${string}` ? TrimStr<Before>
     : TrimStr<S>;
+
+/**
+ * Strip trailing join modifiers (LEFT, INNER, RIGHT, FULL, CROSS, OUTER)
+ * from a string. These appear when matching `${Before} JOIN` on compound
+ * joins like "table LEFT JOIN" where Before = "table LEFT".
+ */
+type TrimJoinModifier<S extends string> =
+    S extends `${infer Rest} LEFT` ? TrimStr<Rest>
+    : S extends `${infer Rest} INNER` ? TrimStr<Rest>
+    : S extends `${infer Rest} RIGHT` ? TrimStr<Rest>
+    : S extends `${infer Rest} FULL` ? TrimStr<Rest>
+    : S extends `${infer Rest} CROSS` ? TrimStr<Rest>
+    : S extends `${infer Rest} OUTER` ? TrimStr<Rest>
+    : S;
 
 /**
  * Parse "users u" or "users AS u" or "schema.users u" to extract table for alias.
