@@ -17,11 +17,12 @@ import type {
 import type { AssertEqual, RequireTrue } from "../../helpers.js";
 
 import {
-    AnyBuilderSqlTag,
-    AnyBuilderStateTag,
+    type AnyBuilderSqlTag,
+    type AnyBuilderStateTag,
+    createSelectFn,
     createSelectQuery,
-    DatabaseSchema,
-    SelectQueryBuilder,
+    type DatabaseSchema,
+    type SelectQueryBuilder,
 } from "../../../src/index.js";
 
 // ============================================================================
@@ -849,6 +850,175 @@ describe("Complex combined patterns in builder", () => {
             ]);
 
         type ReturnType = BuilderReturnType<typeof q>;
+        const select = createSelectFn<MainDatabase>(() => Promise.resolve([]));
+        select(q).then(_result => {
+            // Type test only - verifies result type is correct
+        });
+    });
+
+    it("builds query with conditional complex expression", () => {
+        type MainDatabase = {
+            defaultSchema: "public";
+            schemas: {
+                public: {
+                    User_ApprovedPayment: {
+                        id: string & { table: "User_ApprovedPayment"; };
+                        userId: string & { table: "User"; };
+                        status: string;
+                        networkOrderId: string;
+                        revolutDraftId: string | null;
+                        createdAt: string;
+                        currency: string;
+                        amount: number;
+                        vat: number;
+                    };
+                    User: {
+                        id: string & { table: "User"; };
+                        givenName: string;
+                        familyName: string;
+                    };
+                    Revolut_Counterparty: {
+                        id: string & { table: "Revolut_Counterparty"; };
+                        userId: string & { table: "User"; };
+                    };
+                    Revolut_PaymentDraft: {
+                        id: string & { table: "Revolut_PaymentDraft"; };
+                        userId: string & { table: "User"; };
+                        createdAt: string;
+                        amount: number;
+                        vat: number;
+                    };
+                    Network_Order_CJ_Item: {
+                        id: string & { table: "Network_Order_CJ_Item"; };
+                        sku: string;
+                    };
+                    Network_Order_Partnerize_Item: {
+                        id: string & {
+                            table: "Network_Order_Partnerize_Item";
+                        };
+                        sku: string;
+                        name: string;
+                    };
+                    Network_Order_Rakuten_Item: {
+                        id: string & { table: "Network_Order_Rakuten_Item"; };
+                        sku: string;
+                        product: string;
+                    };
+                    Network_Order: {
+                        id: string & { table: "Network_Order"; };
+                        orderId: string & { table: "Network_Order"; };
+                        advertiser: string & { table: "Network_Order"; };
+                        cjItemId: string | null;
+                        partnerizeItemId: string | null;
+                        rakutenItemId: string | null;
+                    };
+                    User_ApprovedPayment_Item: {
+                        id: string & { table: "User_ApprovedPayment_Item"; };
+                        userApprovedPaymentId: string & {
+                            table: "User_ApprovedPayment";
+                        };
+                        amount: number;
+                        vat: number;
+                        cjItemId: string | null;
+                        partnerizeItemId: string | null;
+                        rakutenItemId: string | null;
+                    };
+                };
+            };
+        };
+        const limit = (Math.random() > 0.5 ? 100 : undefined) as
+            | number
+            | undefined
+            | false;
+        const offset = (Math.random() > 0.5 ? 10 : undefined) as
+            | number
+            | undefined;
+        const approvedPaymentId = (Math.random() > 0.5 ? "123" : null) as
+            | string
+            | string[]
+            | undefined;
+        const convertToGBP = (
+            field: string,
+            date: string | null = `uap."createdAt"::date`,
+            currency: string = `uap."currency"`,
+        ) => {
+            return /*sql*/ `convert_currency(
+                (${field})::numeric, 
+                ${currency}, 
+                'GBP'::text,
+                ${date}
+            )`;
+        };
+
+        const q = createSelectQuery<MainDatabase>()
+            .withParams({ approvedPaymentId })
+            .from(/*sql*/ `"User_ApprovedPayment_Item" uapi`)
+            .join(
+                /*sql*/ `join "User_ApprovedPayment" uap on uap.id = uapi."userApprovedPaymentId"`,
+            )
+            .join(
+                /*sql*/ `left join "Network_Order_CJ_Item" ci on ci.id = uapi."cjItemId"`,
+            )
+            .join(
+                /*sql*/ `left join "Network_Order_Partnerize_Item" pi on pi.id = uapi."partnerizeItemId"`,
+            )
+            .join(
+                /*sql*/ `left join "Network_Order_Rakuten_Item" ri on ri.id = uapi."rakutenItemId"`,
+            )
+            .join(
+                /*sql*/ `left join "Network_Order" o on o.id = uap."networkOrderId"`,
+            )
+            .whereIf(
+                !!approvedPaymentId && Array.isArray(approvedPaymentId),
+                `uapi."userApprovedPaymentId" in (:approvedPaymentId)`,
+            )
+            .whereIf(
+                !!approvedPaymentId && !Array.isArray(approvedPaymentId),
+                `uapi."userApprovedPaymentId" = :approvedPaymentId`,
+            )
+            .limitIf(limit !== undefined && limit !== false, limit as number)
+            .offsetIf(offset !== undefined, offset as number)
+            .select([
+                /*sql*/ `uapi.*`,
+                /*sql*/ `(uapi.amount + uapi.vat)::float8 as "total"`,
+                /*sql*/ `uap."createdAt"`,
+                /*sql*/ `o."orderId"`,
+                /*sql*/ `coalesce(ci.sku, ri.sku, pi.sku)::text as "sku"`,
+                /*sql*/ `coalesce(ri.product, pi.name)::text as "name"`,
+                /*sql*/ `o."advertiser" as "retailer"`,
+            ]);
+
+        type ReturnType = BuilderReturnType<typeof q>;
+        type _ReturnMatches = RequireTrue<
+            AssertEqual<
+                ReturnType,
+                {
+                    // From uapi.*
+                    id: string & {
+                        table: "User_ApprovedPayment_Item";
+                    };
+                    userApprovedPaymentId: string & {
+                        table: "User_ApprovedPayment";
+                    };
+                    amount: number;
+                    vat: number;
+                    cjItemId: string | null;
+                    partnerizeItemId: string | null;
+                    rakutenItemId: string | null;
+                    // Explicit columns
+                    total: number;
+                    createdAt: string;
+                    orderId: (string & { table: "Network_Order"; }) | null;
+                    sku: string;
+                    name: string;
+                    retailer: (string & { table: "Network_Order"; }) | null;
+                }
+            >
+        >;
+        const select = createSelectFn<MainDatabase>(() => Promise.resolve([]));
+        select(q).then(_result => {
+            // Type test only - verifies result type is correct
+        });
     });
 });
 

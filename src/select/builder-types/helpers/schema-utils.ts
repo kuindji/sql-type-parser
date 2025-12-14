@@ -175,15 +175,25 @@ export type ExtractAliasFromJoins<
 
 /**
  * Helper for ExtractAliasFromJoins to reduce duplication.
+ *
+ * Note: We recurse on `AfterOn` directly (not `JOIN ${AfterOn}`) because
+ * `AfterOn` already contains any subsequent joins (e.g., "... LEFT JOIN ... ON ...").
+ * Prepending "JOIN " would incorrectly include the ON condition as join content.
+ *
+ * Important: We must use [T] extends [never] pattern because `never extends string`
+ * is true, and `infer T extends string` would infer T as `never` instead of failing.
  */
 type ExtractJoinAliasMatch<
     JoinContent extends string,
     AfterOn extends string,
     Alias extends string,
 > = ExtractTableSpecBeforeKeyword<JoinContent> extends infer JoinSpec extends string
-    ? ParseTableAlias<JoinSpec, Alias> extends infer T extends string ? T
-    : ExtractAliasFromJoins<`JOIN ${AfterOn}`, Alias>
-    : ExtractAliasFromJoins<`JOIN ${AfterOn}`, Alias>;
+    ? ParseTableAlias<JoinSpec, Alias> extends infer T
+        ? [T] extends [never] ? ExtractAliasFromJoins<AfterOn, Alias>
+        : T extends string ? T
+        : ExtractAliasFromJoins<AfterOn, Alias>
+    : ExtractAliasFromJoins<AfterOn, Alias>
+    : ExtractAliasFromJoins<AfterOn, Alias>;
 
 /**
  * Join types that produce nullable columns.
@@ -234,6 +244,9 @@ type CheckJoinNullability<
 
 /**
  * Helper to check if join content matches the alias and recurse if not.
+ *
+ * Note: We recurse on `AfterOn` directly (not `JOIN ${AfterOn}`) because
+ * `AfterOn` already contains any subsequent joins (e.g., "... LEFT JOIN ... ON ...").
  */
 type CheckJoinMatch<
     JoinContent extends string,
@@ -241,8 +254,8 @@ type CheckJoinMatch<
     Alias extends string,
 > = ExtractTableSpecBeforeKeyword<JoinContent> extends infer JoinSpec extends string
     ? IsAliasMatch<ParseTableAlias<JoinSpec, Alias>> extends true ? true
-    : CheckJoinNullability<`JOIN ${AfterOn}`, Alias>
-    : CheckJoinNullability<`JOIN ${AfterOn}`, Alias>;
+    : CheckJoinNullability<AfterOn, Alias>
+    : CheckJoinNullability<AfterOn, Alias>;
 
 /**
  * Best-effort extraction of the primary FROM table.

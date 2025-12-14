@@ -25,7 +25,7 @@ import type {
     SelectQueryBuilder,
     UntypedSelectBuilder,
 } from "./select/builder-types/builder.js";
-import type { BuilderResultType } from "./select/builder-types/state.js";
+import type { BuilderReturnType } from "./select/builder-types/return-type.js";
 import type { ValidateBuilder } from "./select/builder-types/validation.js";
 import type { DatabaseSchema, QueryResult } from "./select/matcher/index.js";
 import type { ValidateSelectSQL } from "./select/validator/index.js";
@@ -117,12 +117,7 @@ export type MergeOverrides<Result, Overrides> = keyof Overrides extends never
  */
 export type SelectBuilderResult<
     B extends SelectQueryBuilder<any, any, any>,
-> = B extends SelectQueryBuilder<
-    infer Schema extends DatabaseSchema,
-    infer State,
-    infer Sql
-> ? Prettify<BuilderResultType<Schema, State, Sql>>
-    : never;
+> = Prettify<BuilderReturnType<B>>;
 
 /**
  * Array of result rows for a query builder (flattened for better IDE display)
