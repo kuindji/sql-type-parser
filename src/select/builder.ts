@@ -1,5 +1,6 @@
 import type {
     ConditionTreeBuilder,
+    QueryParamInput,
     QueryParamValue,
 } from "../common/builder.js";
 import type { DatabaseSchema } from "../common/schema.js";
@@ -608,7 +609,7 @@ class SelectQueryBuilderImpl<
         >;
     }
 
-    withParams<P extends Record<string, QueryParamValue>>(
+    withParams<P extends Record<string, QueryParamInput>>(
         params: P,
     ): SelectQueryBuilder<Schema, State, Sql> {
         const nextState = this.clone({
@@ -663,6 +664,7 @@ class SelectQueryBuilderImpl<
     getParams(): ReadonlyArray<QueryParamValue> {
         // Return named params values in order of first appearance in the SQL
         // (same order as $N placeholders)
+        // Array values are flattened to match expanded placeholders
         const namedParams = this._state.namedParams;
         if (namedParams && Object.keys(namedParams).length > 0) {
             // Build the combined SQL fragments string
@@ -689,7 +691,18 @@ class SelectQueryBuilderImpl<
                 }
             }
 
-            return usedParams.map(name => namedParams[name]);
+            // Flatten array values to match expanded placeholders
+            const result: QueryParamValue[] = [];
+            for (const name of usedParams) {
+                const value = namedParams[name];
+                if (Array.isArray(value)) {
+                    result.push(...value);
+                }
+                else {
+                    result.push(value as QueryParamValue);
+                }
+            }
+            return result;
         }
         // Fallback to legacy positional params
         return this._state.params;

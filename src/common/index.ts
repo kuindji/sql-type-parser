@@ -56,7 +56,7 @@ export {
     whenRuntime,
 } from "./builder.js";
 
-export type { ParamString, QueryParamValue } from "./builder.js";
+export type { ParamString, QueryParamInput, QueryParamValue } from "./builder.js";
 
 // Re-export schema types
 export type {

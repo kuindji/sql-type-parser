@@ -120,6 +120,7 @@ export function assembleSelectSQL(state: RuntimeSelectState): string {
 
     // Replace named parameters (:name) with positional placeholders ($N)
     // Params are ordered by their first appearance in the SQL
+    // Array params are expanded: :ids with [1,2,3] becomes "$1, $2, $3"
     const namedParams = state.namedParams;
     if (namedParams && Object.keys(namedParams).length > 0) {
         // Find all param references in order of appearance
@@ -134,12 +135,23 @@ export function assembleSelectSQL(state: RuntimeSelectState): string {
             }
         }
 
-        // Replace each param with its positional placeholder
-        for (let i = 0; i < usedParams.length; i++) {
-            const name = usedParams[i];
-            // Replace :name with $N (1-indexed)
+        // Replace each param with its positional placeholder(s)
+        // Track position across all params (arrays expand to multiple positions)
+        let position = 1;
+        for (const name of usedParams) {
+            const value = namedParams[name];
             const regex = new RegExp(`:${name}(?![a-zA-Z0-9_])`, "g");
-            sql = sql.replace(regex, `$${i + 1}`);
+
+            if (Array.isArray(value)) {
+                // Expand array to multiple placeholders: $1, $2, $3
+                const placeholders = value.map((_, i) => `$${position + i}`).join(", ");
+                sql = sql.replace(regex, placeholders);
+                position += value.length;
+            }
+            else {
+                sql = sql.replace(regex, `$${position}`);
+                position++;
+            }
         }
     }
 

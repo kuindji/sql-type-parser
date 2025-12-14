@@ -248,6 +248,12 @@ export function whenRuntime<B>(
 /** Runtime parameter value type supported by query builders. */
 export type QueryParamValue = string | number | boolean | null;
 
+/**
+ * Input parameter value type - allows arrays which will be expanded
+ * to multiple placeholders (e.g., :ids with [1,2,3] becomes "$1, $2, $3").
+ */
+export type QueryParamInput = QueryParamValue | readonly QueryParamValue[];
+
 type BuildArray<N extends number, Acc extends unknown[] = []> = number extends N
     ? unknown[]
     : Acc["length"] extends N ? Acc

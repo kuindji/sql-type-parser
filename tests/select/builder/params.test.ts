@@ -221,4 +221,126 @@ describe("withParams()", () => {
         );
         expect(builder.getParams()).toEqual([ "active", "john", 100 ]);
     });
+
+    it("expands array params to multiple placeholders", () => {
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select([ "u.id", "u.status" ])
+            .withParams({ ids: [ 1, 2, 3 ], status: "active" })
+            .where("u.id IN (:ids)")
+            .where("u.status = :status");
+
+        const sql = builder.toString();
+        expect(sql).toBe(
+            `SELECT u.id, u.status FROM users u WHERE u.id IN ($1, $2, $3) AND u.status = $4`,
+        );
+        expect(builder.getParams()).toEqual([ 1, 2, 3, "active" ]);
+    });
+
+    it("handles array params with other scalar params interspersed", () => {
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({
+                minId: 10,
+                ids: [ 100, 200, 300 ],
+                status: "pending",
+                scores: [ 5, 10 ],
+            })
+            .where("u.id > :minId")
+            .where("u.id IN (:ids)")
+            .where("u.status = :status")
+            .where("u.id IN (:scores)");
+
+        const sql = builder.toString();
+        // Order: minId=$1, ids=$2,$3,$4, status=$5, scores=$6,$7
+        expect(sql).toBe(
+            `SELECT u.id FROM users u WHERE u.id > $1 AND u.id IN ($2, $3, $4) AND u.status = $5 AND u.id IN ($6, $7)`,
+        );
+        expect(builder.getParams()).toEqual([
+            10,
+            100,
+            200,
+            300,
+            "pending",
+            5,
+            10,
+        ]);
+    });
+
+    it("handles single-element arrays", () => {
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({ ids: [ 42 ] })
+            .where("u.id IN (:ids)");
+
+        expect(builder.toString()).toBe(
+            `SELECT u.id FROM users u WHERE u.id IN ($1)`,
+        );
+        expect(builder.getParams()).toEqual([ 42 ]);
+    });
+
+    it("handles empty arrays", () => {
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({ ids: [] })
+            .where("u.id IN (:ids)");
+
+        // Empty array produces empty placeholder list
+        expect(builder.toString()).toBe(
+            `SELECT u.id FROM users u WHERE u.id IN ()`,
+        );
+        expect(builder.getParams()).toEqual([]);
+    });
+
+    it("merges multiple withParams calls", () => {
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({ userId: 1 })
+            .where("u.id = :userId")
+            .withParams({ status: "active" })
+            .where("u.status = :status")
+            .withParams({ active: true })
+            .where("u.active = :active");
+
+        expect(builder.toString()).toBe(
+            `SELECT u.id FROM users u WHERE u.id = $1 AND u.status = $2 AND u.active = $3`,
+        );
+        expect(builder.getParams()).toEqual([ 1, "active", true ]);
+    });
+
+    it("later withParams calls overwrite earlier values for same key", () => {
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({ userId: 1, status: "pending" })
+            .where("u.id = :userId")
+            .where("u.status = :status")
+            .withParams({ status: "active" }); // Override status
+
+        expect(builder.toString()).toBe(
+            `SELECT u.id FROM users u WHERE u.id = $1 AND u.status = $2`,
+        );
+        expect(builder.getParams()).toEqual([ 1, "active" ]);
+    });
+
+    it("merges withParams with array values", () => {
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({ status: "active" })
+            .where("u.status = :status")
+            .withParams({ ids: [ 1, 2, 3 ] })
+            .where("u.id IN (:ids)")
+            .withParams({ limit: 10 })
+            .where("u.id < :limit");
+
+        expect(builder.toString()).toBe(
+            `SELECT u.id FROM users u WHERE u.status = $1 AND u.id IN ($2, $3, $4) AND u.id < $5`,
+        );
+        expect(builder.getParams()).toEqual([ "active", 1, 2, 3, 10 ]);
+    });
 });

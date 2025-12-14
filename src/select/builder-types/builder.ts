@@ -1,4 +1,4 @@
-import type { QueryParamValue } from "../../common/builder.js";
+import type { QueryParamInput, QueryParamValue } from "../../common/builder.js";
 import type { ConditionTreeBuilder } from "../../common/builder.js";
 import type { DatabaseSchema } from "../../common/schema.js";
 import type {
@@ -60,8 +60,11 @@ export interface RuntimeSelectState extends SelectBuilderState {
     readonly unionSql?: string;
     /** Collected query parameter values (positional) - legacy, prefer namedParams */
     readonly params: ReadonlyArray<QueryParamValue>;
-    /** Named parameters - keys become :name placeholders, values go to params array */
-    readonly namedParams: Record<string, QueryParamValue>;
+    /**
+     * Named parameters - keys become :name placeholders, values go to params array.
+     * Array values are expanded to multiple placeholders (e.g., :ids becomes $1, $2, $3).
+     */
+    readonly namedParams: Record<string, QueryParamInput>;
 }
 
 /**
@@ -402,6 +405,9 @@ export interface SelectQueryBuilder<
      * Use `:paramName` syntax in SQL strings (WHERE, JOIN, etc.) and they will
      * be replaced with `$1`, `$2`, etc. at runtime based on object key order.
      *
+     * Array values are expanded to multiple placeholders:
+     * `:ids` with `[1, 2, 3]` becomes `$1, $2, $3` in the SQL.
+     *
      * Multiple calls to this method will merge parameters, with later calls
      * overwriting earlier values for the same key.
      *
@@ -412,15 +418,14 @@ export interface SelectQueryBuilder<
      * @example
      * ```typescript
      * builder
-     *   .withParams({ userId: 123 })
+     *   .withParams({ userId: 123, ids: [1, 2, 3] })
      *   .where('user_id = :userId')
-     *   .withParams({ status: 'active' })
-     *   .where('status = :status')
-     * // SQL: "... WHERE user_id = $1 AND status = $2"
-     * // Params: [123, 'active']
+     *   .where('id IN (:ids)')
+     * // SQL: "... WHERE user_id = $1 AND id IN ($2, $3, $4)"
+     * // Params: [123, 1, 2, 3]
      * ```
      */
-    withParams<P extends Record<string, QueryParamValue>>(
+    withParams<P extends Record<string, QueryParamInput>>(
         params: P,
     ): SelectQueryBuilder<Schema, State, Sql>;
 
@@ -630,10 +635,11 @@ export interface UntypedSelectBuilder<Result = unknown> {
      * Use `:paramName` syntax in SQL strings and they will be replaced
      * with `$1`, `$2`, etc. at runtime based on object key order.
      *
+     * Array values are expanded to multiple placeholders.
      * Multiple calls will merge parameters, with later calls overwriting
      * earlier values for the same key.
      */
-    withParams<P extends Record<string, QueryParamValue>>(
+    withParams<P extends Record<string, QueryParamInput>>(
         params: P,
     ): UntypedSelectBuilder<Result>;
 
