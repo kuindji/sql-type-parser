@@ -169,18 +169,21 @@ export type ResolveUnboundColumn<
 /**
  * Search for a column across all tables in context
  * Uses mapped type to avoid distributive conditional infinite recursion
+ * When Column is generic string (from ${string} template holes), return unknown
  */
 export type FindColumnInContext<
     Column extends string,
     Context,
     _Keys = keyof Context, // Kept for backwards compatibility, not used
-> = {
-    [K in keyof Context]: Column extends keyof Context[K] ? Context[K][Column]
-        : never;
-}[keyof Context] extends infer Result
-    ? [ Result ] extends [ never ]
-        ? MatchError<`Column '${Column}' not found in any table`>
-    : Result
+> = string extends Column ? unknown // Generic string type, can't resolve
+    : {
+        [K in keyof Context]: Column extends keyof Context[K]
+            ? Context[K][Column]
+            : never;
+    }[keyof Context] extends infer Result
+        ? [ Result ] extends [ never ]
+            ? MatchError<`Column '${Column}' not found in any table`>
+        : Result
     : never;
 
 // ============================================================================
@@ -304,14 +307,16 @@ export type ValidateSchemaTableColumn<
 /**
  * Check if an unbound column exists in any table
  * Uses mapped type to avoid distributive conditional infinite recursion
+ * When Column is generic string (from ${string} template holes), skip validation
  */
 export type FindColumnExists<
     Column extends string,
     Context,
     _Keys = keyof Context, // Kept for backwards compatibility, not used
-> = true extends {
-    [K in keyof Context]: Column extends keyof Context[K] ? true : never;
-}[keyof Context] ? true
+> = string extends Column ? true // Generic string type, skip validation
+    : true extends {
+        [K in keyof Context]: Column extends keyof Context[K] ? true : never;
+    }[keyof Context] ? true
     : MatchError<`Column '${Column}' not found in any table`>;
 
 // ============================================================================

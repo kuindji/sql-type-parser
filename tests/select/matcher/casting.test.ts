@@ -62,6 +62,13 @@ type M_CastToInt = QueryResult<
 >;
 type _F38c = RequireTrue<AssertEqual<M_CastToInt, { name_num: number; }>>;
 
+// Test: CAST() with different type conversion
+type M_DynamicCast = QueryResult<
+    `SELECT ${string}::int AS int_result FROM users`,
+    TestSchema
+>;
+type _F39 = RequireTrue<AssertEqual<M_DynamicCast, { int_result: number; }>>;
+
 // ============================================================================
 // Export for verification
 // ============================================================================
