@@ -402,6 +402,9 @@ export interface SelectQueryBuilder<
      * Use `:paramName` syntax in SQL strings (WHERE, JOIN, etc.) and they will
      * be replaced with `$1`, `$2`, etc. at runtime based on object key order.
      *
+     * Multiple calls to this method will merge parameters, with later calls
+     * overwriting earlier values for the same key.
+     *
      * Note: This method does not affect the type-level SQL tag to avoid
      * TypeScript depth limit issues when chaining many methods after withParams.
      * The params are only used at runtime for SQL string assembly.
@@ -409,8 +412,9 @@ export interface SelectQueryBuilder<
      * @example
      * ```typescript
      * builder
-     *   .withParams({ userId: 123, status: 'active' })
+     *   .withParams({ userId: 123 })
      *   .where('user_id = :userId')
+     *   .withParams({ status: 'active' })
      *   .where('status = :status')
      * // SQL: "... WHERE user_id = $1 AND status = $2"
      * // Params: [123, 'active']
@@ -625,6 +629,9 @@ export interface UntypedSelectBuilder<Result = unknown> {
      *
      * Use `:paramName` syntax in SQL strings and they will be replaced
      * with `$1`, `$2`, etc. at runtime based on object key order.
+     *
+     * Multiple calls will merge parameters, with later calls overwriting
+     * earlier values for the same key.
      */
     withParams<P extends Record<string, QueryParamValue>>(
         params: P,

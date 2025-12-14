@@ -611,7 +611,9 @@ class SelectQueryBuilderImpl<
     withParams<P extends Record<string, QueryParamValue>>(
         params: P,
     ): SelectQueryBuilder<Schema, State, Sql> {
-        const nextState = this.clone({ namedParams: params });
+        const nextState = this.clone({
+            namedParams: { ...this._state.namedParams, ...params },
+        });
         return new SelectQueryBuilderImpl<
             Schema,
             State,
