@@ -89,13 +89,28 @@ type Prettify<T> =
     & {};
 
 /**
+ * Keys in Overrides that don't exist in Result
+ */
+type InvalidOverrideKeys<Result, Overrides> = Exclude<
+    keyof Overrides,
+    keyof Result
+>;
+
+/**
  * Merge result type with user-provided overrides.
  * Overrides take precedence over inferred types.
  * Short-circuits when Overrides is empty for zero performance cost.
+ *
+ * Produces an error type if Overrides contains keys not present in Result.
  */
 export type MergeOverrides<Result, Overrides> = keyof Overrides extends never
     ? Result
-    : Prettify<Omit<Result, keyof Overrides> & Overrides>;
+    : InvalidOverrideKeys<Result, Overrides> extends never
+        ? Prettify<Omit<Result, keyof Overrides> & Overrides>
+        : {
+            __error: true;
+            message: `Override contains keys not in result type: ${InvalidOverrideKeys<Result, Overrides> & string}`;
+        };
 
 /**
  * Result type for a SELECT query builder (flattened for better IDE display)

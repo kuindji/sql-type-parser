@@ -16,7 +16,13 @@ import type {
 
 import type { AssertEqual, RequireTrue } from "../../helpers.js";
 
-import { createSelectQuery } from "../../../src/index.js";
+import {
+    AnyBuilderSqlTag,
+    AnyBuilderStateTag,
+    createSelectQuery,
+    DatabaseSchema,
+    SelectQueryBuilder,
+} from "../../../src/index.js";
 
 // ============================================================================
 // Test Schema
@@ -642,6 +648,207 @@ describe("Complex combined patterns in builder", () => {
         );
 
         type ReturnType = BuilderReturnType<typeof builder>;
+    });
+
+    it("builds query with conditional complex expression", () => {
+        type MainDatabase = {
+            defaultSchema: "public";
+            schemas: {
+                public: {
+                    User_ApprovedPayment: {
+                        id: string & { table: "User_ApprovedPayment"; };
+                        userId: string & { table: "User"; };
+                        status: string;
+                        networkOrderId: string;
+                        revolutDraftId: string | null;
+                        createdAt: string;
+                        currency: string;
+                        amount: number;
+                        vat: number;
+                    };
+                    User: {
+                        id: string & { table: "User"; };
+                        givenName: string;
+                        familyName: string;
+                    };
+                    Revolut_Counterparty: {
+                        id: string & { table: "Revolut_Counterparty"; };
+                        userId: string & { table: "User"; };
+                    };
+                    Revolut_PaymentDraft: {
+                        id: string & { table: "Revolut_PaymentDraft"; };
+                        userId: string & { table: "User"; };
+                        createdAt: string;
+                        amount: number;
+                        vat: number;
+                    };
+                };
+            };
+        };
+
+        function getPeriodRange(
+            period: string | null,
+            format: string = "YYYY-MM-DD",
+        ): [ string | null, string | null ] {
+            if (!period) return [ null, null ];
+
+            const [ start, end ] = period.split("-");
+            return [ start, end ];
+        }
+
+        function setPeriod<
+            Schema extends DatabaseSchema,
+            State extends AnyBuilderStateTag,
+            Sql extends AnyBuilderSqlTag,
+            Field extends string,
+        >(
+            b: SelectQueryBuilder<Schema, State, Sql>,
+            period: string | null,
+            field: Field,
+            format: string = "YYYY-MM-DD",
+        ): SelectQueryBuilder<Schema, State, Sql> {
+            const [ start, end ] = getPeriodRange(period, format);
+
+            return b
+                .whereIf(
+                    !!start && !!end,
+                    `${field} between '${start as string}' and '${end as string}'`,
+                )
+                .whereIf(!!start && !end, `${field} >= '${start as string}'`)
+                .whereIf(
+                    !start && !!end,
+                    `${field} <= '${end as string}'`,
+                ) as SelectQueryBuilder<Schema, State, Sql>;
+        }
+
+        function applyQueryBuilderFilters<
+            Schema extends DatabaseSchema,
+            State extends AnyBuilderStateTag,
+            Sql extends AnyBuilderSqlTag,
+        >(
+            select: SelectQueryBuilder<Schema, State, Sql>,
+            filter: {
+                status: string | string[] | null;
+                pseId: string | string[] | null;
+                orderId: string | string[] | null;
+                revolutDraftId: string | string[] | null | true;
+                period: string | null;
+            },
+        ) {
+            const { status, pseId, orderId, revolutDraftId, period } = filter
+                || {};
+
+            return select
+                .withParams({
+                    status: status!,
+                    pseId: pseId!,
+                    orderId: orderId!,
+                    revolutDraftId: revolutDraftId!,
+                })
+                .whereIf(
+                    !!status && Array.isArray(status),
+                    `uap."status" in (:status)`,
+                )
+                .whereIf(
+                    !!status && !Array.isArray(status),
+                    `uap."status" = :status`,
+                )
+                .whereIf(
+                    !!pseId && Array.isArray(pseId),
+                    `uap."userId" in (:pseId)`,
+                )
+                .whereIf(
+                    !!pseId && !Array.isArray(pseId),
+                    `uap."userId" = :pseId`,
+                )
+                .whereIf(
+                    !!orderId && Array.isArray(orderId),
+                    `uap."networkOrderId" in (:orderId)`,
+                )
+                .whereIf(
+                    !!orderId && !Array.isArray(orderId),
+                    `uap."networkOrderId" = :orderId`,
+                )
+                .whereIf(
+                    !!revolutDraftId && revolutDraftId !== true
+                        && Array.isArray(revolutDraftId),
+                    `uap."revolutDraftId" in (:revolutDraftId)`,
+                )
+                .whereIf(
+                    !!revolutDraftId && revolutDraftId !== true
+                        && !Array.isArray(revolutDraftId),
+                    `uap."revolutDraftId" = :revolutDraftId`,
+                )
+                .whereIf(
+                    revolutDraftId === true,
+                    `uap."revolutDraftId" is not null`,
+                )
+                .whereIf(
+                    revolutDraftId === null,
+                    `uap."revolutDraftId" is null`,
+                )
+                .applyIf(
+                    !!period,
+                    b => setPeriod(b, period!, `uap."createdAt"`),
+                ) as SelectQueryBuilder<Schema, State, Sql>;
+        }
+
+        const convertToGBP = (
+            field: string,
+            date: string | null = `uap."createdAt"::date`,
+            currency: string = `uap."currency"`,
+        ) => {
+            return /*sql*/ `convert_currency(
+                (${field})::numeric, 
+                ${currency}, 
+                'GBP'::text,
+                ${date}
+            )`;
+        };
+
+        const filters = {
+            status: Math.random() > 0.5 ? "approved" : null,
+            pseId: Math.random() > 0.5 ? "123" : null,
+            orderId: Math.random() > 0.5 ? "456" : null,
+            revolutDraftId: Math.random() > 0.5 ? "789" : null,
+            period: Math.random() > 0.5 ? "2025-01-01-2025-01-31" : null,
+        };
+
+        const limit = (Math.random() > 0.5 ? 100 : undefined) as
+            | number
+            | undefined
+            | false;
+        const offset = (Math.random() > 0.5 ? 10 : undefined) as
+            | number
+            | undefined;
+
+        const q = createSelectQuery<MainDatabase>()
+            .from(/*sql*/ `"User_ApprovedPayment" uap`)
+            .join(/*sql*/ `left join "User" pse on pse.id = uap."userId"`)
+            .join(
+                /*sql*/ `left join "Revolut_Counterparty" rc on rc."userId" = uap."userId"`,
+            )
+            .join(
+                /*sql*/ `left join "Revolut_PaymentDraft" rpd on rpd."id" = uap."revolutDraftId"`,
+            )
+            .orderBy(/*sql*/ `uap."createdAt" desc`)
+            .apply(b => applyQueryBuilderFilters(b, filters || {}))
+            .limitIf(limit !== undefined && limit !== false, limit as number)
+            .offsetIf(offset !== undefined, offset as number)
+            .select([
+                /*sql*/ `uap.*`,
+                /*sql*/ `pse."givenName" as "pseGivenName"`,
+                /*sql*/ `pse."familyName" as "pseFamilyName"`,
+                /*sql*/ `(rc."id" is not null)::boolean as "hasBankDetails"`,
+                /*sql*/ `(uap."amount" + uap."vat")::float8 as "total"`,
+                `${convertToGBP(`uap."amount"`)}::float8 as "amountGBP"`,
+                `${convertToGBP(`uap."vat"`)}::float8 as "vatGBP"`,
+                `${
+                    convertToGBP(`uap."amount" + uap."vat"`)
+                }::float8 as "totalGBP"`,
+            ]);
+
+        type ReturnType = BuilderReturnType<typeof q>;
     });
 });
 
