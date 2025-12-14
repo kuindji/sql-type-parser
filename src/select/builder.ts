@@ -695,6 +695,11 @@ class SelectQueryBuilderImpl<
             const result: QueryParamValue[] = [];
             for (const name of usedParams) {
                 const value = namedParams[name];
+                if (value === undefined) {
+                    throw new Error(
+                        `Query parameter ":${name}" is used but its value is undefined`,
+                    );
+                }
                 if (Array.isArray(value)) {
                     result.push(...value);
                 }

@@ -343,4 +343,52 @@ describe("withParams()", () => {
         );
         expect(builder.getParams()).toEqual([ "active", 1, 2, 3, 10 ]);
     });
+
+    it("allows undefined params in withParams", () => {
+        // Should compile and build without error
+        const maybeStatus: string | undefined = undefined;
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({ userId: 1, status: maybeStatus })
+            .where("u.id = :userId");
+
+        // Only userId is used in SQL, so getParams should work
+        expect(builder.toString()).toBe(
+            `SELECT u.id FROM users u WHERE u.id = $1`,
+        );
+        expect(builder.getParams()).toEqual([ 1 ]);
+    });
+
+    it("throws when undefined param is used in query", () => {
+        const maybeStatus: string | undefined = undefined;
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({ userId: 1, status: maybeStatus })
+            .where("u.id = :userId")
+            .where("u.status = :status"); // Uses undefined param
+
+        // toString works fine
+        expect(builder.toString()).toBe(
+            `SELECT u.id FROM users u WHERE u.id = $1 AND u.status = $2`,
+        );
+
+        // But getParams throws because :status is used but undefined
+        expect(() => builder.getParams()).toThrow(
+            `Query parameter ":status" is used but its value is undefined`,
+        );
+    });
+
+    it("does not throw when undefined param is not used in query", () => {
+        const maybeStatus: string | undefined = undefined;
+        const builder = createSelectQuery<B_ParamSchema>()
+            .from("users u")
+            .select("u.id")
+            .withParams({ userId: 1, status: maybeStatus, extra: undefined })
+            .where("u.id = :userId");
+
+        // status and extra are undefined but not used in the query
+        expect(builder.getParams()).toEqual([ 1 ]);
+    });
 });

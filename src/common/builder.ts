@@ -251,8 +251,13 @@ export type QueryParamValue = string | number | boolean | null;
 /**
  * Input parameter value type - allows arrays which will be expanded
  * to multiple placeholders (e.g., :ids with [1,2,3] becomes "$1, $2, $3").
+ * Also allows undefined - params with undefined values will throw at runtime
+ * if they are actually used in the query.
  */
-export type QueryParamInput = QueryParamValue | readonly QueryParamValue[];
+export type QueryParamInput =
+    | QueryParamValue
+    | readonly QueryParamValue[]
+    | undefined;
 
 type BuildArray<N extends number, Acc extends unknown[] = []> = number extends N
     ? unknown[]
